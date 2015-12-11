@@ -27,6 +27,8 @@
 *.out
 *.app
 
+sysbuild
+
 # Created by https://www.gitignore.io
 
 ### OSX ###
@@ -294,3 +296,4 @@ FakesAssemblies/
 
 # Visual Studio 6 workspace options file
 *.opt
+*.props
