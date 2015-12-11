@@ -44,11 +44,14 @@ public:
 	ovrVector3f      hmdToEyeViewOffset[2];
 	ovrLayerEyeFov layer;
 	ovrSwapTextureSet * pTextureSet;
+	ovrSizei pTextureDim;
 	ovrTexture * mirrorTexture;
 
 	long long frameIndex;
 
 	int perfMode;
+
+	GLuint fbo, rbo;
 
 	oculusrift() {
 
@@ -56,6 +59,8 @@ public:
 
 		frameIndex = 0;
 		perfMode = 0;
+		fbo = 0;
+		rbo = 0;
 
 		ovrResult result;
 
@@ -81,12 +86,11 @@ public:
 		float pixelDensity = 1.f;
 		ovrSizei recommenedTex0Size = ovr_GetFovTextureSize(session, ovrEye_Left, hmd.DefaultEyeFov[0], pixelDensity);
 		ovrSizei recommenedTex1Size = ovr_GetFovTextureSize(session, ovrEye_Right, hmd.DefaultEyeFov[1], pixelDensity);
-		ovrSizei bufferSize;
 		// assumes a single shared texture for both eyes:
-		bufferSize.w = recommenedTex0Size.w + recommenedTex1Size.w;
-		bufferSize.h = max(recommenedTex0Size.h, recommenedTex1Size.h);
+		pTextureDim.w = recommenedTex0Size.w + recommenedTex1Size.w;
+		pTextureDim.h = max(recommenedTex0Size.h, recommenedTex1Size.h);
 
-		post("recommended texture resolution %d %d\n", bufferSize.w, bufferSize.h);
+		post("recommended texture resolution %d %d\n", pTextureDim.w, pTextureDim.h);
 
 
 		//  - Allocate render target texture sets with ovr_CreateSwapTextureSetD3D11() or
@@ -104,8 +108,8 @@ public:
 #ifndef GL_SRGB8_ALPHA8
 #define GL_SRGB8_ALPHA8                   0x8C43
 #endif
-		result = ovr_CreateSwapTextureSetGL(session, GL_SRGB8_ALPHA8, bufferSize.w, bufferSize.h, &pTextureSet);
-		//result = ovr_CreateSwapTextureSetGL(session, GL_RGBA8, bufferSize.w, bufferSize.h, &pTextureSet);
+		result = ovr_CreateSwapTextureSetGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
+		//result = ovr_CreateSwapTextureSetGL(session, GL_RGBA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
 		if (result != ovrSuccess) {
 			ovrErrorInfo errInfo;
 			ovr_GetLastErrorInfo(&errInfo);
@@ -118,7 +122,7 @@ public:
 			//glBindTexture(GL_TEXTURE_2D, 0);
 		}
 
-		result = ovr_CreateMirrorTextureGL(session, GL_SRGB8_ALPHA8, bufferSize.w, bufferSize.h, &mirrorTexture);
+		result = ovr_CreateMirrorTextureGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &mirrorTexture);
 		if (result != ovrSuccess) {
 			ovrErrorInfo errInfo;
 			ovr_GetLastErrorInfo(&errInfo);
@@ -146,12 +150,12 @@ public:
 		layer.Fov[1] = eyeRenderDesc[1].Fov;
 		layer.Viewport[0].Pos.x = 0;
 		layer.Viewport[0].Pos.y = 0;
-		layer.Viewport[0].Size.w = bufferSize.w / 2;
-		layer.Viewport[0].Size.h = bufferSize.h;
-		layer.Viewport[1].Pos.x = bufferSize.w / 2;
+		layer.Viewport[0].Size.w = pTextureDim.w / 2;
+		layer.Viewport[0].Size.h = pTextureDim.h;
+		layer.Viewport[1].Pos.x = pTextureDim.w / 2;
 		layer.Viewport[1].Pos.y = 0;
-		layer.Viewport[1].Size.w = bufferSize.w / 2;
-		layer.Viewport[1].Size.h = bufferSize.h;
+		layer.Viewport[1].Size.w = pTextureDim.w / 2;
+		layer.Viewport[1].Size.h = pTextureDim.h;
 
 		// ld.RenderPose and ld.SensorSampleTime are updated later per frame.
 	}
@@ -232,7 +236,7 @@ public:
 			atom_setfloat(a + 0, p.x);
 			atom_setfloat(a + 1, p.y);
 			atom_setfloat(a + 2, p.z);
-			outlet_anything(outlet_msg, gensym("position"), 3, a);
+			//outlet_anything(outlet_msg, gensym("position"), 3, a);
 		}
 
 		/*
@@ -258,18 +262,73 @@ public:
 
 	void jit_gl_texture(t_symbol * s) {
 
+		
+		if (!fbo) {
+			glGenFramebuffersEXT(1, &fbo);
+			glGenRenderbuffersEXT(1, &rbo);
+			
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+			//Attach 2D texture to this FBO
+			ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
+			GLuint oglid = tex->OGL.TexId;
+			glBindTexture(GL_TEXTURE_2D, oglid);	// is it necessary?
+			glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, oglid, 0);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
+			glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, pTextureDim.w, pTextureDim.h);
+			//Attach depth buffer to FBO
+			glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, rbo);
+			//Does the GPU support current FBO configuration?
+			if (!check_fbo()) {
+				object_error(&ob, "falied to create FBO");
+				glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+				glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+				fbo = 0;
+				rbo = 0;
+				return;
+			}
+			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+		}
+
 		void * texob = jit_object_findregistered(s);
 		if (!texob) return;	// no texture to copy from.
 
 		long glid = jit_attr_getlong(texob, ps_glid);
 
-		post("got texture %s id %ld\n", s->s_name, glid);
+		//post("got texture %s id %ld\n", s->s_name, glid);
 
 		// Increment to use next texture, just before writing
 		pTextureSet->CurrentIndex = (pTextureSet->CurrentIndex + 1) % pTextureSet->TextureCount;
 		// TODO? Clear and set up render-target.    
 
-		// TODO: copy our texture input to this layer
+		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
+		GLuint oglid = tex->OGL.TexId;
+
+		// TODO: copy our texture input to this layer:
+		
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+		//Attach 2D texture to this FBO
+		glBindTexture(GL_TEXTURE_2D, oglid);	// is it necessary?
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, oglid, 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		//Does the GPU support current FBO configuration?
+		if (check_fbo()) {
+			drawscene(glid);
+		}
+		// done with fbo
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+		// mipmaps?
+		//glBindTexture(GL_TEXTURE_2D, oglid);
+		//glGenerateMipmapEXT(GL_TEXTURE_2D);
+		//glBindTexture(GL_TEXTURE_2D, 0);
+		
 
 		// Submit frame with one layer we have.
 		// ovr_SubmitFrame returns once frame present is queued up and the next texture slot in the ovrSwapTextureSet is available for the next frame. 
@@ -290,11 +349,156 @@ public:
 		// frameIndex++;
 	}
 
+	void drawscene(GLuint glid) {
+		/*
+		// save state
+		//glPushAttrib(GL_VIEWPORT_BIT|GL_COLOR_BUFFER_BIT);
+		glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
+		glClearColor(0.0, 0.0, 0.0, 0.0);
+		glClear(GL_COLOR_BUFFER_BIT);
+		*/
+
+		glViewport(0, 0, pTextureDim.w, pTextureDim.h);
+		/*
+		glMatrixMode(GL_TEXTURE);
+		glPushMatrix();
+		glLoadIdentity();
+
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		glOrtho(0.0, 1., 0.0, 1., -1.0, 1.0);
+
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+
+		//-------------------------
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_LIGHTING);
+
+		*/
+		//glActiveTexture(0);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, glid);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+		//				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+		//				glTexParameterf( GL_TEXTURE_RECTANGLE_EXT, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+		//				glTexParameterf( GL_TEXTURE_RECTANGLE_EXT, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		//				glTexParameterf( GL_TEXTURE_RECTANGLE_EXT, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE );
+		//				glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		//				glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		//				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		//				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		//				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		//				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+
+		//				 GLfloat verts[] = {
+		//				 0.0,(GLfloat)height,
+		//				 (GLfloat)width,(GLfloat)height,
+		//				 (GLfloat)width,0.0,
+		//				 0.0,0.0
+		//				 };
+		//				 
+		//				 GLfloat tex_coords[] = {
+		//				 0.0, (GLfloat)height,
+		//				 (GLfloat)width*x->width_scale, (GLfloat)height,
+		//				 (GLfloat)width*x->width_scale, 0.0,
+		//				 0.0, 0.0
+		//				 };
+		//				 if(!x->ownsoutput && x->dsttexflipped) {
+		//				 tex_coords[1]=0;
+		//				 tex_coords[3]=0;
+		//				 tex_coords[5]=height;
+		//				 tex_coords[7]=height;
+		//				 }
+		//				 if(x->target == GL_TEXTURE_2D) {
+		//				 tex_coords[1] /= (float)x->backingHeight;
+		//				 tex_coords[3] /= (float)x->backingHeight;
+		//				 tex_coords[5] /= (float)x->backingHeight;
+		//				 tex_coords[7] /= (float)x->backingHeight;
+		//				 tex_coords[2] /= (float)x->backingWidth;
+		//				 tex_coords[4] /= (float)x->backingWidth;
+		//				 }
+		//				 
+		//				 glEnable(x->target);
+		//				 if(x->source_type == VIDTEX_SOURCE_YUV420)
+		//				 fbo_texture_bind_yuv420(x);
+		//				 else if (x->source_type == VIDTEX_SOURCE_YUV422)
+		//				 fbo_texture_bind_yuv422(x);
+		//				 else
+		//				 glBindTexture(x->target,x->srctex);
+		//				 
+		//				 glClientActiveTextureARB(GL_TEXTURE0_ARB);
+		//				 glEnableClientState( GL_TEXTURE_COORD_ARRAY );
+		//				 glTexCoordPointer(2, GL_FLOAT, 0, tex_coords );
+		//				 glEnableClientState(GL_VERTEX_ARRAY);		
+		//				 glVertexPointer(2, GL_FLOAT, 0, verts );
+		//				 
+		//				 glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
+
+		// render quad:
+
+		glBegin(GL_QUADS);
+		glColor3d(1., 1., 1.);
+		glTexCoord2d(0., 0.);
+		glVertex2d(-1., -1.);
+		glColor3d(1., 0., 1.);
+		glTexCoord2d(1., 0.);
+		glVertex2d(1., -1.);
+		glColor3d(1., 0., 0.);
+		glTexCoord2d(1., 1.);
+		glVertex2d(1., 1.);
+		glColor3d(1., 1., 0.);
+		glTexCoord2d(0., 1.);
+		glVertex2d(-1., 1.);
+		glEnd();
+
+		
+		//jit_gl_report_error("oculus fbo draw end");
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+		//glDisable(GL_TEXTURE_2D);
+
+		/*
+		glPopClientAttrib();
+		//glPopAttrib();
+
+		*/
+	}
+
 	void perf() {
 		// just toggle through the various perf modes
 		// see https://developer.oculus.com/documentation/pcsdk/latest/concepts/dg-hud/
 		perfMode = (perfMode + 1) % ovrPerfHud_Count;
 		ovr_SetInt(session, OVR_PERF_HUD_MODE, perfMode);
+	}
+
+	bool check_fbo() {
+		GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
+		if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
+			if (status == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT_EXT) {
+				object_error(&ob, "failed to create render to texture target GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT");
+			}
+			else if (status == GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT) {
+				object_error(&ob, "failed to create render to texture target GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS");
+			}
+			else if (status == GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT_EXT) {
+				object_error(&ob, "failed to create render to texture target GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT");
+			}
+			else if (status == GL_FRAMEBUFFER_UNSUPPORTED_EXT) {
+				object_error(&ob, "failed to create render to texture target GL_FRAMEBUFFER_UNSUPPORTED");
+			}
+			else {
+				object_error(&ob, "failed to create render to texture target %d", status);
+			}
+			return false;
+		}
+		return true;
 	}
 };
 

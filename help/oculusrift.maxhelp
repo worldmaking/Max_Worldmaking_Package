@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 601.0, 307.0, 1023.0, 624.0 ],
+		"rect" : [ 784.0, 280.0, 1094.0, 718.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -38,13 +38,51 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-24",
+					"linecount" : 8,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 51.0, 437.0, 150.0, 117.0 ],
+					"style" : "",
+					"text" : "rift thinks all frames are dropping. So long as I don't send \"erase\" to jit.gl.render, I can get a flickery scene on the rift. but this flickery scene doesn't include the input texture. "
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-23",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "bang" ],
+					"patching_rect" : [ 38.0, 50.0, 63.0, 22.0 ],
+					"style" : "",
+					"text" : "delay 500"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-22",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "bang" ],
+					"patching_rect" : [ 27.0, 13.0, 60.0, 22.0 ],
+					"style" : "",
+					"text" : "loadbang"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-21",
 					"maxclass" : "message",
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 564.0, 337.0, 31.0, 22.0 ],
-					"presentation_rect" : [ 564.0, 339.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "perf"
 				}
@@ -234,7 +272,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 647.0, 142.0, 150.0, 62.0 ],
+					"patching_rect" : [ 600.0, 94.0, 150.0, 62.0 ],
 					"style" : "",
 					"text" : "Jitter doesn't really provide a way to use external GPU memory that it didn't allocate itself"
 				}
@@ -247,7 +285,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 647.0, 216.0, 176.0, 75.0 ],
+					"patching_rect" : [ 600.0, 168.0, 176.0, 75.0 ],
 					"style" : "",
 					"text" : "We can generate a texture within Jitter, pass it to the oculus object, and ask it to copy this texture over to the Oculus memory"
 				}
@@ -260,7 +298,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 647.0, 86.0, 150.0, 48.0 ],
+					"patching_rect" : [ 600.0, 38.0, 150.0, 48.0 ],
 					"style" : "",
 					"text" : "Oculus driver gives us GPU texture memory to render our scene into."
 				}
@@ -402,6 +440,24 @@
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-21", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-23", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-22", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-11", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-23", 0 ]
 				}
 
 			}
