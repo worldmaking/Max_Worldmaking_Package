@@ -31,6 +31,11 @@ extern "C" {
 
 static t_class * max_class = 0;
 
+static t_symbol * ps_quat;
+static t_symbol * ps_pos;
+static t_symbol * ps_viewport;
+static t_symbol * ps_frustum;
+static t_symbol * ps_warning;
 static t_symbol * ps_glid;
 
 class oculusrift {
@@ -500,6 +505,45 @@ public:
 		}
 		return true;
 	}
+	
+	t_jit_err draw() {
+		// this gets called, but not really sure what it should do.
+		// probably nothing...
+		//object_post(&ob, "draw");
+		
+		return JIT_ERR_NONE;
+	}
+	
+	t_jit_err dest_changed() {
+		
+		object_post(&ob, "dest_changed");
+
+	}
+	
+	t_jit_err dest_closing() {
+		object_post(&ob, "dest_closing");
+		
+//		glDeleteRenderbuffersEXT(1, &rbo);
+//		rbo = 0;
+//		//Bind 0, which means render to back buffer, as a result, fb is unbound
+//		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+//		glDeleteFramebuffersEXT(1, &fbo);
+//		fbo = 0;
+		
+		return JIT_ERR_NONE;
+	}
+	
+	t_jit_err ui(t_line_3d *p_line, t_wind_mouse_info *p_mouse) {
+		/*
+		 post("line (%f,%f,%f)-(%f,%f,%f); mouse(%s)",
+			p_line->u[0], p_line->u[1], p_line->u[2],
+			p_line->v[0], p_line->v[1], p_line->v[2],
+			p_mouse->mousesymbol->s_name			// mouse, mouseidle
+		 );
+		 */
+		return JIT_ERR_NONE;
+	}
+	
 };
 
 void * oculusrift_new(t_symbol *s, long argc, t_atom *argv) {
@@ -520,6 +564,11 @@ void * oculusrift_new(t_symbol *s, long argc, t_atom *argv) {
 void oculusrift_free(oculusrift *x) {
 	x->~oculusrift();
 }
+
+t_jit_err oculusrift_draw(oculusrift * x) { return x->draw(); }
+t_jit_err oculusrift_ui(oculusrift * x, t_line_3d *p_line, t_wind_mouse_info *p_mouse) { return x->ui(p_line, p_mouse); }
+t_jit_err oculusrift_dest_closing(oculusrift * x) { return x->dest_closing(); }
+t_jit_err oculusrift_dest_changed(oculusrift * x) { return x->dest_changed(); }
 
 void oculusrift_assist(oculusrift *x, void *b, long m, long a, char *s)
 {
@@ -577,6 +626,12 @@ void ext_main(void *r)
 	t_class *c;
 	ovrResult result;
 
+	common_symbols_init();
+	ps_quat = gensym("quat");
+	ps_pos = gensym("pos");
+	ps_viewport = gensym("viewport");
+	ps_frustum = gensym("frustum");
+	ps_warning = gensym("warning");
 	ps_glid = gensym("glid");
 
 	result = ovr_Initialize(NULL);
@@ -608,9 +663,40 @@ void ext_main(void *r)
 		*/
 	}
 	quittask_install((method)oculusrift_quit, NULL);
-
+	
 	c = class_new("oculusrift", (method)oculusrift_new, (method)oculusrift_free, (long)sizeof(oculusrift),
 				  0L /* leave NULL!! */, A_GIMME, 0);
+	
+	
+	long ob3d_flags = JIT_OB3D_NO_MATRIXOUTPUT | JIT_OB3D_DOES_UI;
+	/*
+	 JIT_OB3D_NO_ROTATION_SCALE;
+	 ob3d_flags |= JIT_OB3D_NO_POLY_VARS;
+	 ob3d_flags |= JIT_OB3D_NO_BLEND;
+	 ob3d_flags |= JIT_OB3D_NO_TEXTURE;
+	 ob3d_flags |= JIT_OB3D_NO_MATRIXOUTPUT;
+	 ob3d_flags |= JIT_OB3D_AUTO_ONLY;
+	 ob3d_flags |= JIT_OB3D_NO_DEPTH;
+	 ob3d_flags |= JIT_OB3D_NO_ANTIALIAS;
+	 ob3d_flags |= JIT_OB3D_NO_FOG;
+	 ob3d_flags |= JIT_OB3D_NO_LIGHTING_MATERIAL;
+	 ob3d_flags |= JIT_OB3D_NO_SHADER;
+	 ob3d_flags |= JIT_OB3D_NO_BOUNDS;
+	 ob3d_flags |= JIT_OB3D_NO_COLOR;
+	 */
+	
+	void * ob3d = jit_ob3d_setup(c, calcoffset(oculusrift, ob3d), ob3d_flags);
+	// define our OB3D draw methods
+	jit_class_addmethod(c, (method)(oculusrift_draw), "ob3d_draw", A_CANT, 0L);
+	jit_class_addmethod(c, (method)(oculusrift_dest_closing), "dest_closing", A_CANT, 0L);
+	jit_class_addmethod(c, (method)(oculusrift_dest_changed), "dest_changed", A_CANT, 0L);
+	if (ob3d_flags & JIT_OB3D_DOES_UI) {
+		jit_class_addmethod(maxclass, (method)(oculusrift_ui), "ob3d_ui", A_CANT, 0L);
+	}
+	// must register for ob3d use
+	jit_class_addmethod(c, (method)jit_object_register, "register", A_CANT, 0L);
+	
+
 	
 	/* you CAN'T call this from the patcher */
 	class_addmethod(c, (method)oculusrift_assist,			"assist",		A_CANT, 0);
