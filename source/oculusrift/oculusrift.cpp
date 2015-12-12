@@ -28,6 +28,9 @@ extern "C" {
 #include "OVR_CAPI.h"
 #include "OVR_CAPI_GL.h"
 
+#ifndef GL_SRGB8_ALPHA8
+#define GL_SRGB8_ALPHA8                   0x8C43
+#endif
 
 static t_class * max_class = 0;
 
@@ -41,6 +44,7 @@ static t_symbol * ps_glid;
 class oculusrift {
 public:
 	t_object ob; // must be first!
+	void * ob3d;
 	void * outlet_msg;
 
 	ovrSession session;
@@ -54,18 +58,22 @@ public:
 
 	long long frameIndex;
 
+	t_symbol * intexture;
+
 	int perfMode;
 
-	GLuint fbo, rbo;
+	GLuint fbo, rbo, depthTexId;
 
-	oculusrift() {
+	oculusrift(t_symbol * dest_name) {
 
+		jit_ob3d_new(this, dest_name);
 		outlet_msg = outlet_new(&ob, NULL);
 
 		frameIndex = 0;
 		perfMode = 0;
 		fbo = 0;
 		rbo = 0;
+		pTextureSet = 0;
 
 		ovrResult result;
 
@@ -96,73 +104,7 @@ public:
 		pTextureDim.h = max(recommenedTex0Size.h, recommenedTex1Size.h);
 
 		post("recommended texture resolution %d %d\n", pTextureDim.w, pTextureDim.h);
-
-
-		//  - Allocate render target texture sets with ovr_CreateSwapTextureSetD3D11() or
-		//    ovr_CreateSwapTextureSetGL().
-		pTextureSet = 0;
-		// TODO problem here: Jitter API GL headers don't export GL_SRGB8_ALPHA8
-		// might also need  GL_EXT_framebuffer_sRGB for the copy
-		// "your application should call glEnable(GL_FRAMEBUFFER_SRGB); before rendering into these textures."
-		// I'm not sure if just passing in the constant like this will actually work
-		// Even though it is not recommended, if your application is configured to treat the texture as a linear 
-		// format (e.g.GL_RGBA) and performs linear - to - gamma conversion in GLSL or does not care about gamma - 
-		// correction, then:
-		// Request an sRGB format(e.g.GL_SRGB8_ALPHA8) swap - texture - set.
-		// Do not call glEnable(GL_FRAMEBUFFER_SRGB); when rendering into the swap texture.
-#ifndef GL_SRGB8_ALPHA8
-#define GL_SRGB8_ALPHA8                   0x8C43
-#endif
-		result = ovr_CreateSwapTextureSetGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
-		//result = ovr_CreateSwapTextureSetGL(session, GL_RGBA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
-		if (result != ovrSuccess) {
-			ovrErrorInfo errInfo;
-			ovr_GetLastErrorInfo(&errInfo);
-			object_error(&ob, "failed to create texture set: %s", errInfo.ErrorString);
-			
-			// Sample texture access:
-			//ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[i];
-			//glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
-			//...
-			//glBindTexture(GL_TEXTURE_2D, 0);
-		}
-
-		result = ovr_CreateMirrorTextureGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &mirrorTexture);
-		if (result != ovrSuccess) {
-			ovrErrorInfo errInfo;
-			ovr_GetLastErrorInfo(&errInfo);
-			object_error(&ob, "failed to create mirror texture: %s", errInfo.ErrorString);
-
-			// Sample texture access:
-			//ovrGLTexture* tex = (ovrGLTexture*)mirrorTexture;
-			//glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
-			//...
-			//glBindTexture(GL_TEXTURE_2D, 0);
-		}
-
-		// Initialize VR structures, filling out description.
-		eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.DefaultEyeFov[0]);
-		eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.DefaultEyeFov[1]);
-		hmdToEyeViewOffset[0] = eyeRenderDesc[0].HmdToEyeViewOffset;
-		hmdToEyeViewOffset[1] = eyeRenderDesc[1].HmdToEyeViewOffset;
-
-		// Initialize our single full screen Fov layer.
-		layer.Header.Type = ovrLayerType_EyeFov;
-		layer.Header.Flags = 0;
-		layer.ColorTexture[0] = pTextureSet;
-		layer.ColorTexture[1] = pTextureSet;
-		layer.Fov[0] = eyeRenderDesc[0].Fov;
-		layer.Fov[1] = eyeRenderDesc[1].Fov;
-		layer.Viewport[0].Pos.x = 0;
-		layer.Viewport[0].Pos.y = 0;
-		layer.Viewport[0].Size.w = pTextureDim.w / 2;
-		layer.Viewport[0].Size.h = pTextureDim.h;
-		layer.Viewport[1].Pos.x = pTextureDim.w / 2;
-		layer.Viewport[1].Pos.y = 0;
-		layer.Viewport[1].Size.w = pTextureDim.w / 2;
-		layer.Viewport[1].Size.h = pTextureDim.h;
-
-		// ld.RenderPose and ld.SensorSampleTime are updated later per frame.
+		
 	}
 
 	void info() {
@@ -174,11 +116,11 @@ public:
             atom_setsym(a, gensym( #T )); \
             outlet_anything(outlet_msg, gensym("hmdType"), 1, a); \
             break; \
-	        }
+			        }
 		switch (hmd.Type) {
 			HMD_CASE(ovrHmd_DK1)
-			HMD_CASE(ovrHmd_DKHD)
-			HMD_CASE(ovrHmd_DK2)
+				HMD_CASE(ovrHmd_DKHD)
+				HMD_CASE(ovrHmd_DK2)
 		default: {
 				atom_setsym(a, gensym("unknown"));
 				outlet_anything(outlet_msg, gensym("Type"), 1, a);
@@ -199,18 +141,18 @@ public:
 		atom_setlong(a + 1, hmd.FirmwareMinor);
 		outlet_anything(outlet_msg, gensym("Firmware"), 2, a);
 	}
-	
+
 	~oculusrift() {
-		if (session) ovr_Destroy(session);
-		if (pTextureSet) ovr_DestroySwapTextureSet(session, pTextureSet);
-		if (mirrorTexture) ovr_DestroyMirrorTexture(session, mirrorTexture);
+		dest_closing();
+		jit_ob3d_free(this);
+		max_jit_object_free(this);
 	}
 
 	/*
-	Frame rendering typically involves several steps: 
-	- obtaining predicted eye poses based on the headset tracking pose, 
-	- rendering the view for each eye and, finally, 
-	- submitting eye textures to the compositor through ovr_SubmitFrame. 
+	Frame rendering typically involves several steps:
+	- obtaining predicted eye poses based on the headset tracking pose, (bang)
+	- rendering the view for each eye and, finally, (generate input texture)
+	- submitting eye textures to the compositor through ovr_SubmitFrame. (draw)
 	*/
 
 	void bang() {
@@ -228,7 +170,7 @@ public:
 		no prediction. In a production application, however, you should use the real-time
 		computed value returned by GetPredictedDisplayTime.
 		*/
-		
+
 		t_atom a[4];
 
 		if (ts.StatusFlags & (ovrStatus_OrientationTracked | ovrStatus_PositionTracked))
@@ -249,83 +191,78 @@ public:
 		// TODO: calculate these values and pass them to Jitter to capture the scenes:
 		//The code then computes view and projection matrices and sets viewport scene rendering for each eye. In this example, view calculation combines the original pose (originPos and originRot values) with the new pose computed based on the tracking state and stored in the layer. There original values can be modified by input to move the player within the 3D world.
 		for (int eye = 0; eye < 2; eye++) {
-			// Get view and projection matrices for the Rift camera
-			Vector3f pos = originPos + originRot.Transform(layer.RenderPose[eye].Position);
-			Matrix4f rot = originRot * Matrix4f(layer.RenderPose[eye].Orientation);
+		// Get view and projection matrices for the Rift camera
+		Vector3f pos = originPos + originRot.Transform(layer.RenderPose[eye].Position);
+		Matrix4f rot = originRot * Matrix4f(layer.RenderPose[eye].Orientation);
 
-			Vector3f finalUp      = rot.Transform(Vector3f(0, 1, 0));
-			Vector3f finalForward = rot.Transform(Vector3f(0, 0, -1));
-			Matrix4f view         = Matrix4f::LookAtRH(pos, pos + finalForward, finalUp);
-        
-			Matrix4f proj = ovrMatrix4f_Projection(layer.Fov[eye], 0.2f, 1000.0f, ovrProjection_RightHanded);
-			// Render the scene for this eye.
-			DIRECTX.SetViewport(layer.Viewport[eye]);
-			roomScene.Render(proj * view, 1, 1, 1, 1, true);
+		Vector3f finalUp      = rot.Transform(Vector3f(0, 1, 0));
+		Vector3f finalForward = rot.Transform(Vector3f(0, 0, -1));
+		Matrix4f view         = Matrix4f::LookAtRH(pos, pos + finalForward, finalUp);
+
+		Matrix4f proj = ovrMatrix4f_Projection(layer.Fov[eye], 0.2f, 1000.0f, ovrProjection_RightHanded);
+		// Render the scene for this eye.
+		DIRECTX.SetViewport(layer.Viewport[eye]);
+		roomScene.Render(proj * view, 1, 1, 1, 1, true);
 		}
-	*/
+		*/
 	}
 
+
 	void jit_gl_texture(t_symbol * s) {
+		//post("got texture %s", s->s_name);
+		intexture = s;
 
-		
+		submit();
+	}
+
+
+
+	// send the current texture to the Oculus driver:
+	void submit() {
+		void * texob = jit_object_findregistered(intexture);
+		if (!texob) {
+			object_error(&ob, "no texture to draw");
+			return;	// no texture to copy from.
+		}
+		long glid = jit_attr_getlong(texob, ps_glid);
+		//post("submit texture id %ld\n", glid);
+
 		if (!fbo) {
-			glGenFramebuffersEXT(1, &fbo);
-			glGenRenderbuffersEXT(1, &rbo);
-			
-			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-			//Attach 2D texture to this FBO
-			ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
-			GLuint oglid = tex->OGL.TexId;
-			glBindTexture(GL_TEXTURE_2D, oglid);	// is it necessary?
-			glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, oglid, 0);
-			glBindTexture(GL_TEXTURE_2D, 0);
-
-			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
-			glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, pTextureDim.w, pTextureDim.h);
-			//Attach depth buffer to FBO
-			glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, rbo);
-			//Does the GPU support current FBO configuration?
-			if (!check_fbo()) {
-				object_error(&ob, "falied to create FBO");
-				glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
-				glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-				fbo = 0;
-				rbo = 0;
-				return;
-			}
-			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
-			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-
+			object_error(&ob, "no fbo yet");
+			return;	// no texture to copy from.
 		}
 
-		void * texob = jit_object_findregistered(s);
-		if (!texob) return;	// no texture to copy from.
-
-		long glid = jit_attr_getlong(texob, ps_glid);
-
-		//post("got texture %s id %ld\n", s->s_name, glid);
 
 		// Increment to use next texture, just before writing
 		pTextureSet->CurrentIndex = (pTextureSet->CurrentIndex + 1) % pTextureSet->TextureCount;
 		// TODO? Clear and set up render-target.    
 
-		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
-		GLuint oglid = tex->OGL.TexId;
+		if (fbo_set_and_clear()) {
 
-		// TODO: copy our texture input to this layer:
-		
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-		//Attach 2D texture to this FBO
-		glBindTexture(GL_TEXTURE_2D, oglid);	// is it necessary?
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, oglid, 0);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		//Does the GPU support current FBO configuration?
-		if (check_fbo()) {
+			/*
+			ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
+			GLuint oglid = tex->OGL.TexId;
+
+			// TODO: copy our texture input to this layer:
+
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+			//Attach 2D texture to this FBO
+			glBindTexture(GL_TEXTURE_2D, oglid);	// is it necessary?
+			glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, oglid, 0);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glBindTexture(GL_TEXTURE_2D, 0);
+			//Does the GPU support current FBO configuration?
+			if (check_fbo()) {*/
+
 			drawscene(glid);
+		}
+
+		fbo_unset();
+
+		/*
 		}
 		// done with fbo
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
@@ -333,7 +270,7 @@ public:
 		//glBindTexture(GL_TEXTURE_2D, oglid);
 		//glGenerateMipmapEXT(GL_TEXTURE_2D);
 		//glBindTexture(GL_TEXTURE_2D, 0);
-		
+		*/
 
 		// Submit frame with one layer we have.
 		// ovr_SubmitFrame returns once frame present is queued up and the next texture slot in the ovrSwapTextureSet is available for the next frame. 
@@ -341,18 +278,18 @@ public:
 		ovrResult       result = ovr_SubmitFrame(session, frameIndex, nullptr, &layers, 1);
 		if (result == ovrError_DisplayLost) {
 			/*
-			TODO: If you receive ovrError_DisplayLost, the device was removed and the session is invalid. 
+			TODO: If you receive ovrError_DisplayLost, the device was removed and the session is invalid.
 			Release the shared resources (ovr_DestroySwapTextureSet), destroy the session (ovr_Destory),
-			recreate it (ovr_Create), and create new resources (ovr_CreateSwapTextureSetXXX). 
-			The application's existing private graphics resources do not need to be recreated unless 
+			recreate it (ovr_Create), and create new resources (ovr_CreateSwapTextureSetXXX).
+			The application's existing private graphics resources do not need to be recreated unless
 			the new ovr_Create call returns a different GraphicsLuid.
 			*/
 			object_error(&ob, "fatal error connection lost.");
 		}
 
-		// TODO: enable this for multi-threaded rendering
-		// frameIndex++;
+		frameIndex++;
 	}
+
 
 	void drawscene(GLuint glid) {
 		/*
@@ -449,21 +386,21 @@ public:
 		// render quad:
 
 		glBegin(GL_QUADS);
-		glColor3d(1., 1., 1.);
+		//glColor3d(1., 1., 1.);
 		glTexCoord2d(0., 0.);
 		glVertex2d(-1., -1.);
-		glColor3d(1., 0., 1.);
+		//glColor3d(1., 0., 1.);
 		glTexCoord2d(1., 0.);
 		glVertex2d(1., -1.);
-		glColor3d(1., 0., 0.);
+		//glColor3d(1., 0., 0.);
 		glTexCoord2d(1., 1.);
 		glVertex2d(1., 1.);
-		glColor3d(1., 1., 0.);
+		//glColor3d(1., 1., 0.);
 		glTexCoord2d(0., 1.);
 		glVertex2d(-1., 1.);
 		glEnd();
 
-		
+
 		//jit_gl_report_error("oculus fbo draw end");
 
 		glBindTexture(GL_TEXTURE_2D, 0);
@@ -483,7 +420,124 @@ public:
 		ovr_SetInt(session, OVR_PERF_HUD_MODE, perfMode);
 	}
 
-	bool check_fbo() {
+
+	t_jit_err draw() {
+		// this gets called when the jit.gl.render context updates clients
+		// the oculusrift object doesn't draw to the main scene, so there's nothing needed to be done here
+
+		// TODO: perhaps use this to copy the mirrorTexture back into Jitter space?
+
+		return JIT_ERR_NONE;
+	}
+
+	t_jit_err dest_changed() {
+
+		object_post(&ob, "dest_changed");
+
+		ovrHmdDesc hmd = ovr_GetHmdDesc(session);
+
+		if (!fbo_create()) {
+			return JIT_ERR_INVALID_OBJECT;
+		}
+		//mirror_create();
+
+		// Initialize VR structures, filling out description.
+		eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.DefaultEyeFov[0]);
+		eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.DefaultEyeFov[1]);
+		hmdToEyeViewOffset[0] = eyeRenderDesc[0].HmdToEyeViewOffset;
+		hmdToEyeViewOffset[1] = eyeRenderDesc[1].HmdToEyeViewOffset;
+
+		// Initialize our single full screen Fov layer.
+		layer.Header.Type = ovrLayerType_EyeFov;
+		layer.Header.Flags = 0;
+		layer.ColorTexture[0] = pTextureSet;
+		layer.ColorTexture[1] = pTextureSet;
+		layer.Fov[0] = eyeRenderDesc[0].Fov;
+		layer.Fov[1] = eyeRenderDesc[1].Fov;
+		layer.Viewport[0].Pos.x = 0;
+		layer.Viewport[0].Pos.y = 0;
+		layer.Viewport[0].Size.w = pTextureDim.w / 2;
+		layer.Viewport[0].Size.h = pTextureDim.h;
+		layer.Viewport[1].Pos.x = pTextureDim.w / 2;
+		layer.Viewport[1].Pos.y = 0;
+		layer.Viewport[1].Size.w = pTextureDim.w / 2;
+		layer.Viewport[1].Size.h = pTextureDim.h;
+
+		// ld.RenderPose and ld.SensorSampleTime are updated later per frame.
+
+		return JIT_ERR_NONE;
+	}
+
+	t_jit_err dest_closing() {
+		object_post(&ob, "dest_closing");
+
+		fbo_delete();
+		mirror_delete();
+
+		return JIT_ERR_NONE;
+	}
+
+	t_jit_err ui(t_line_3d *p_line, t_wind_mouse_info *p_mouse) {
+		/*
+		 post("line (%f,%f,%f)-(%f,%f,%f); mouse(%s)",
+		 p_line->u[0], p_line->u[1], p_line->u[2],
+		 p_line->v[0], p_line->v[1], p_line->v[2],
+		 p_mouse->mousesymbol->s_name			// mouse, mouseidle
+		 );
+		 */
+		return JIT_ERR_NONE;
+	}
+
+
+
+	// TODO problem here: Jitter API GL headers don't export GL_SRGB8_ALPHA8
+	// might also need  GL_EXT_framebuffer_sRGB for the copy
+	// "your application should call glEnable(GL_FRAMEBUFFER_SRGB); before rendering into these textures."
+	// I'm not sure if just passing in the constant like this will actually work
+	// Even though it is not recommended, if your application is configured to treat the texture as a linear 
+	// format (e.g.GL_RGBA) and performs linear - to - gamma conversion in GLSL or does not care about gamma - 
+	// correction, then:
+	// Request an sRGB format(e.g.GL_SRGB8_ALPHA8) swap - texture - set.
+	// Do not call glEnable(GL_FRAMEBUFFER_SRGB); when rendering into the swap texture.
+	bool fbo_create(int mipLevels = 0) {
+		if (!fbo) {
+			auto result = ovr_CreateSwapTextureSetGL(session, GL_RGBA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
+			//auto result = ovr_CreateSwapTextureSetGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
+			if (result != ovrSuccess) {
+				ovrErrorInfo errInfo;
+				ovr_GetLastErrorInfo(&errInfo);
+				object_error(&ob, "failed to create texture set: %s", errInfo.ErrorString);
+				return false;
+			}
+
+			// create a depth buffer texture:
+			glGenTextures(1, &depthTexId);
+			glBindTexture(GL_TEXTURE_2D, depthTexId);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, pTextureDim.w, pTextureDim.h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
+			
+			for (int i = 0; i < pTextureSet->TextureCount; ++i) {
+				ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[i];
+				glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				if (mipLevels > 1) {
+					glGenerateMipmapEXT(GL_TEXTURE_2D);
+				}
+			}
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			glGenFramebuffersEXT(1, &fbo);
+		}
+		return true;
+	}
+
+	bool fbo_check() {
 		GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
 		if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
 			if (status == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT_EXT) {
@@ -505,52 +559,76 @@ public:
 		}
 		return true;
 	}
-	
-	t_jit_err draw() {
-		// this gets called, but not really sure what it should do.
-		// probably nothing...
-		//object_post(&ob, "draw");
-		
-		return JIT_ERR_NONE;
-	}
-	
-	t_jit_err dest_changed() {
-		
-		object_post(&ob, "dest_changed");
 
+	bool fbo_delete(int mipLevels = 0) {
+		if (depthTexId) glDeleteTextures(1, &depthTexId);
+		if (fbo) glDeleteFramebuffersEXT(1, &fbo);
+
+		if (pTextureSet) {
+			ovr_DestroySwapTextureSet(session, pTextureSet);
+			pTextureSet = 0;
+		}
+		return true;
 	}
+
+	bool fbo_set_and_clear() {
+		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
+
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, tex->OGL.TexId, 0);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, depthTexId, 0);
+
 	
-	t_jit_err dest_closing() {
-		object_post(&ob, "dest_closing");
-		
-//		glDeleteRenderbuffersEXT(1, &rbo);
-//		rbo = 0;
-//		//Bind 0, which means render to back buffer, as a result, fb is unbound
-//		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-//		glDeleteFramebuffersEXT(1, &fbo);
-//		fbo = 0;
-		
-		return JIT_ERR_NONE;
+		if (!fbo_check()) {
+			object_error(&ob, "falied to create FBO");
+			return false;
+		}
+
+		glViewport(0, 0, pTextureDim.w, pTextureDim.h);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		return true;
 	}
-	
-	t_jit_err ui(t_line_3d *p_line, t_wind_mouse_info *p_mouse) {
-		/*
-		 post("line (%f,%f,%f)-(%f,%f,%f); mouse(%s)",
-			p_line->u[0], p_line->u[1], p_line->u[2],
-			p_line->v[0], p_line->v[1], p_line->v[2],
-			p_mouse->mousesymbol->s_name			// mouse, mouseidle
-		 );
-		 */
-		return JIT_ERR_NONE;
+
+	void fbo_unset()
+	{
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, 0, 0);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	}
-	
+
+	void mirror_create() {
+		if (!mirrorTexture) {
+			auto result = ovr_CreateMirrorTextureGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &mirrorTexture);
+			if (result != ovrSuccess) {
+				ovrErrorInfo errInfo;
+				ovr_GetLastErrorInfo(&errInfo);
+				object_error(&ob, "failed to create mirror texture: %s", errInfo.ErrorString);
+
+				// Sample texture access:
+				//ovrGLTexture* tex = (ovrGLTexture*)mirrorTexture;
+				//glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
+				//...
+				//glBindTexture(GL_TEXTURE_2D, 0);
+			}
+		}
+	}
+
+	void mirror_delete() {
+
+		if (mirrorTexture) {
+			ovr_DestroyMirrorTexture(session, mirrorTexture);
+			mirrorTexture = 0;
+		}
+	}
 };
 
 void * oculusrift_new(t_symbol *s, long argc, t_atom *argv) {
 	oculusrift *x = NULL;
-	if ((x = (oculusrift *)object_alloc(max_class))) {
+	if ((x = (oculusrift *)object_alloc(max_class))) {// get context:
+		t_symbol * dest_name = atom_getsym(argv);
 		
-		x = new (x) oculusrift();
+		x = new (x)oculusrift(dest_name);
 		
 		// apply attrs:
 		attr_args_process(x, (short)argc, argv);
@@ -586,6 +664,10 @@ void oculusrift_info(oculusrift * x) {
 
 void oculusrift_bang(oculusrift * x) {
 	x->bang();
+}
+
+void oculusrift_submit(oculusrift * x) {
+	x->submit();
 }
 
 void oculusrift_perf(oculusrift * x) {
@@ -687,11 +769,11 @@ void ext_main(void *r)
 	
 	void * ob3d = jit_ob3d_setup(c, calcoffset(oculusrift, ob3d), ob3d_flags);
 	// define our OB3D draw methods
-	jit_class_addmethod(c, (method)(oculusrift_draw), "ob3d_draw", A_CANT, 0L);
+	//jit_class_addmethod(c, (method)(oculusrift_draw), "ob3d_draw", A_CANT, 0L);
 	jit_class_addmethod(c, (method)(oculusrift_dest_closing), "dest_closing", A_CANT, 0L);
 	jit_class_addmethod(c, (method)(oculusrift_dest_changed), "dest_changed", A_CANT, 0L);
 	if (ob3d_flags & JIT_OB3D_DOES_UI) {
-		jit_class_addmethod(maxclass, (method)(oculusrift_ui), "ob3d_ui", A_CANT, 0L);
+		jit_class_addmethod(c, (method)(oculusrift_ui), "ob3d_ui", A_CANT, 0L);
 	}
 	// must register for ob3d use
 	jit_class_addmethod(c, (method)jit_object_register, "register", A_CANT, 0L);
@@ -706,6 +788,7 @@ void ext_main(void *r)
 
 	class_addmethod(c, (method)oculusrift_info, "info", 0);
 	class_addmethod(c, (method)oculusrift_bang, "bang", 0);
+	class_addmethod(c, (method)oculusrift_submit, "submit", 0);
 	class_addmethod(c, (method)oculusrift_perf, "perf", 0);
 	
 	class_register(CLASS_BOX, c);
