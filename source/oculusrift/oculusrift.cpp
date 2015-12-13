@@ -63,6 +63,9 @@ public:
 	int perfMode;
 
 	GLuint fbo, rbo, depthTexId;
+	GLuint fboIn;
+
+	int submit_method;
 
 	oculusrift(t_symbol * dest_name) {
 
@@ -74,6 +77,7 @@ public:
 		fbo = 0;
 		rbo = 0;
 		pTextureSet = 0;
+		submit_method = 0;
 
 		ovrResult result;
 
@@ -219,13 +223,18 @@ public:
 
 	// send the current texture to the Oculus driver:
 	void submit() {
+		if (!session) return;
+
 		void * texob = jit_object_findregistered(intexture);
 		if (!texob) {
 			object_error(&ob, "no texture to draw");
 			return;	// no texture to copy from.
 		}
 		long glid = jit_attr_getlong(texob, ps_glid);
-		//post("submit texture id %ld\n", glid);
+		// get input texture dimensions
+		t_atom_long texdim[2];
+		jit_attr_getlong_array(texob, _sym_dim, 2, texdim);
+		//post("submit texture id %ld dim %ld %ld\n", glid, texdim[0], texdim[1]);
 
 		if (!fbo) {
 			object_error(&ob, "no fbo yet");
@@ -237,30 +246,11 @@ public:
 		pTextureSet->CurrentIndex = (pTextureSet->CurrentIndex + 1) % pTextureSet->TextureCount;
 		// TODO? Clear and set up render-target.    
 
-		if (fbo_set_and_clear()) {
-
-			/*
-			ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
-			GLuint oglid = tex->OGL.TexId;
-
-			// TODO: copy our texture input to this layer:
-
-			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-			//Attach 2D texture to this FBO
-			glBindTexture(GL_TEXTURE_2D, oglid);	// is it necessary?
-			glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, oglid, 0);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glBindTexture(GL_TEXTURE_2D, 0);
-			//Does the GPU support current FBO configuration?
-			if (check_fbo()) {*/
-
-			drawscene(glid);
+		switch (submit_method) {
+		case 1:submit_by_copy(glid, texdim); break;
+		default: submit_by_fbo(glid, texdim);
 		}
-
-		fbo_unset();
+		
 
 		/*
 		}
@@ -290,6 +280,76 @@ public:
 		frameIndex++;
 	}
 
+	void submit_by_copy(long glid, t_atom_long texdim[2]) {
+
+		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
+
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fboIn);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, glid, 0);
+		//glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, depthTexId, 0);
+
+		if (fbo_check()) {
+			glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
+			//glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, 0, 0, pTextureDim.w, pTextureDim.h, 0);
+			glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, pTextureDim.w, pTextureDim.h);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+		} else {
+			object_error(&ob, "falied to create FBO");
+		}
+
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+	}
+
+	void submit_by_fbo(long glid, t_atom_long texdim[2]) {
+
+		if (fbo_set_and_clear()) {
+
+			glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
+			glMatrixMode(GL_TEXTURE);
+			//glPushMatrix();
+			glLoadIdentity();
+
+			glMatrixMode(GL_PROJECTION);
+			glLoadIdentity();
+			glOrtho(-1.0, 1., -1.0, 1., -1.0, 1.0);
+
+			glMatrixMode(GL_MODELVIEW);
+			glLoadIdentity();
+
+			//-------------------------
+			glDisable(GL_BLEND);
+			glDisable(GL_DEPTH_TEST);
+			glDisable(GL_LIGHTING);
+
+
+			glEnable(GL_TEXTURE_RECTANGLE_ARB);
+			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, glid);
+			glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+			// render quad:
+			glBegin(GL_QUADS);
+			glTexCoord2i(0, 0);
+			glVertex2d(-1., -1.);
+			glTexCoord2i(texdim[0], 0);
+			glVertex2d(1., -1.);
+			glTexCoord2i(texdim[0], texdim[1]);
+			glVertex2d(1., 1.);
+			glTexCoord2i(0, texdim[1]);
+			glVertex2d(-1., 1.);
+			glEnd();
+
+			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+
+			glPopClientAttrib();
+			//glPopAttrib();
+
+		}
+
+		fbo_unset();
+	}
 
 	void drawscene(GLuint glid) {
 		/*
@@ -533,6 +593,7 @@ public:
 			glBindTexture(GL_TEXTURE_2D, 0);
 
 			glGenFramebuffersEXT(1, &fbo);
+			glGenFramebuffersEXT(1, &fboIn);
 		}
 		return true;
 	}
@@ -563,6 +624,7 @@ public:
 	bool fbo_delete(int mipLevels = 0) {
 		if (depthTexId) glDeleteTextures(1, &depthTexId);
 		if (fbo) glDeleteFramebuffersEXT(1, &fbo);
+		if (fboIn) glDeleteFramebuffersEXT(1, &fboIn);
 
 		if (pTextureSet) {
 			ovr_DestroySwapTextureSet(session, pTextureSet);
@@ -790,6 +852,8 @@ void ext_main(void *r)
 	class_addmethod(c, (method)oculusrift_bang, "bang", 0);
 	class_addmethod(c, (method)oculusrift_submit, "submit", 0);
 	class_addmethod(c, (method)oculusrift_perf, "perf", 0);
+
+	CLASS_ATTR_LONG(c, "submit_method", 0, oculusrift, submit_method);
 	
 	class_register(CLASS_BOX, c);
 	max_class = c;
