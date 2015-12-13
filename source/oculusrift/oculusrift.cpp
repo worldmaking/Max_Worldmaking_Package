@@ -46,6 +46,7 @@ public:
 	t_object ob; // must be first!
 	void * ob3d;
 	void * outlet_msg;
+	void * outlet_eye[2];
 
 	ovrSession session;
 	ovrGraphicsLuid luid;
@@ -65,12 +66,15 @@ public:
 	GLuint fbo, rbo, depthTexId;
 	GLuint fboIn;
 
+	float near_clip, far_clip;
 	int submit_method;
 
 	oculusrift(t_symbol * dest_name) {
 
 		jit_ob3d_new(this, dest_name);
 		outlet_msg = outlet_new(&ob, NULL);
+		outlet_eye[1] = outlet_new(&ob, NULL);
+		outlet_eye[0] = outlet_new(&ob, NULL);
 
 		frameIndex = 0;
 		perfMode = 0;
@@ -78,6 +82,8 @@ public:
 		rbo = 0;
 		pTextureSet = 0;
 		submit_method = 0;
+		near_clip = 0.2f;
+		far_clip = 100.f;
 
 		ovrResult result;
 
@@ -175,7 +181,7 @@ public:
 		computed value returned by GetPredictedDisplayTime.
 		*/
 
-		t_atom a[4];
+		t_atom a[6];
 
 		if (ts.StatusFlags & (ovrStatus_OrientationTracked | ovrStatus_PositionTracked))
 		{
@@ -189,26 +195,51 @@ public:
 			atom_setfloat(a + 2, p.z);
 			//outlet_anything(outlet_msg, gensym("position"), 3, a);
 		}
-
-		/*
-		// Render Scene to Eye Buffers
-		// TODO: calculate these values and pass them to Jitter to capture the scenes:
-		//The code then computes view and projection matrices and sets viewport scene rendering for each eye. In this example, view calculation combines the original pose (originPos and originRot values) with the new pose computed based on the tracking state and stored in the layer. There original values can be modified by input to move the player within the 3D world.
 		for (int eye = 0; eye < 2; eye++) {
-		// Get view and projection matrices for the Rift camera
-		Vector3f pos = originPos + originRot.Transform(layer.RenderPose[eye].Position);
-		Matrix4f rot = originRot * Matrix4f(layer.RenderPose[eye].Orientation);
 
-		Vector3f finalUp      = rot.Transform(Vector3f(0, 1, 0));
-		Vector3f finalForward = rot.Transform(Vector3f(0, 0, -1));
-		Matrix4f view         = Matrix4f::LookAtRH(pos, pos + finalForward, finalUp);
+			// TODO: add navigation pose to this before outputting, or do that in the patcher afterward?
 
-		Matrix4f proj = ovrMatrix4f_Projection(layer.Fov[eye], 0.2f, 1000.0f, ovrProjection_RightHanded);
-		// Render the scene for this eye.
-		DIRECTX.SetViewport(layer.Viewport[eye]);
-		roomScene.Render(proj * view, 1, 1, 1, 1, true);
+			// modelview
+			const ovrVector3f p = layer.RenderPose[eye].Position;
+
+			atom_setfloat(a + 0, p.x);
+			atom_setfloat(a + 1, p.y);
+			atom_setfloat(a + 2, p.z);
+			outlet_anything(outlet_eye[eye], _jit_sym_position, 3, a);
+
+			const ovrQuatf q = layer.RenderPose[eye].Orientation;
+			atom_setfloat(a + 0, q.x);
+			atom_setfloat(a + 1, q.y);
+			atom_setfloat(a + 2, q.z);
+			atom_setfloat(a + 3, q.w);
+			outlet_anything(outlet_eye[eye], _jit_sym_quat, 4, a);
+
+			// projection
+			//Matrix4f proj = ovrMatrix4f_Projection(layer.Fov[eye], near, far, ovrProjection_RightHanded);
+			const ovrFovPort& fov = layer.Fov[eye];
+			atom_setfloat(a + 0, -fov.LeftTan * near_clip);
+			atom_setfloat(a + 1,  fov.RightTan * near_clip);
+			atom_setfloat(a + 2, -fov.DownTan * near_clip);
+			atom_setfloat(a + 3,  fov.UpTan * near_clip);
+			atom_setfloat(a + 4, near_clip);
+			atom_setfloat(a + 5, far_clip);
+			outlet_anything(outlet_eye[eye], ps_frustum, 6, a);
+
+			/*
+			/// Field Of View (FOV) tangent of the angle units.
+/// \note For a standard 90 degree vertical FOV, we would
+/// have: { UpTan = tan(90 degrees / 2), DownTan = tan(90 degrees / 2) }.
+typedef struct OVR_ALIGNAS(4) ovrFovPort_
+{
+    float UpTan;    ///< The tangent of the angle between the viewing vector and the top edge of the field of view.
+    float DownTan;  ///< The tangent of the angle between the viewing vector and the bottom edge of the field of view.
+    float LeftTan;  ///< The tangent of the angle between the viewing vector and the left edge of the field of view.
+    float RightTan; ///< The tangent of the angle between the viewing vector and the right edge of the field of view.
+} ovrFovPort;*/
+
+
+
 		}
-		*/
 	}
 
 
@@ -313,7 +344,7 @@ public:
 
 			glMatrixMode(GL_PROJECTION);
 			glLoadIdentity();
-			glOrtho(-1.0, 1., -1.0, 1., -1.0, 1.0);
+			glOrtho(-1.0, 1., 1.0, -1., -1.0, 1.0);
 
 			glMatrixMode(GL_MODELVIEW);
 			glLoadIdentity();
@@ -499,7 +530,7 @@ public:
 		if (!fbo_create()) {
 			return JIT_ERR_INVALID_OBJECT;
 		}
-		//mirror_create();
+		mirror_create();
 
 		// Initialize VR structures, filling out description.
 		eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.DefaultEyeFov[0]);
@@ -854,6 +885,9 @@ void ext_main(void *r)
 	class_addmethod(c, (method)oculusrift_perf, "perf", 0);
 
 	CLASS_ATTR_LONG(c, "submit_method", 0, oculusrift, submit_method);
+
+	CLASS_ATTR_FLOAT(c, "near_clip", 0, oculusrift, near_clip);
+	CLASS_ATTR_FLOAT(c, "far_clip", 0, oculusrift, far_clip);
 	
 	class_register(CLASS_BOX, c);
 	max_class = c;
