@@ -321,10 +321,10 @@ public:
 
 		*/
 		//glActiveTexture(0);
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, glid);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glEnable(GL_TEXTURE_RECTANGLE_ARB);
+		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, glid);
+		glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR); 
+		glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 		//				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 		//				glTexParameterf( GL_TEXTURE_RECTANGLE_EXT, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
@@ -390,20 +390,20 @@ public:
 		glTexCoord2d(0., 0.);
 		glVertex2d(-1., -1.);
 		//glColor3d(1., 0., 1.);
-		glTexCoord2d(1., 0.);
+		glTexCoord2d(400., 0.);
 		glVertex2d(1., -1.);
 		//glColor3d(1., 0., 0.);
-		glTexCoord2d(1., 1.);
+		glTexCoord2d(400., 400.);
 		glVertex2d(1., 1.);
 		//glColor3d(1., 1., 0.);
-		glTexCoord2d(0., 1.);
+		glTexCoord2d(0., 400.);
 		glVertex2d(-1., 1.);
 		glEnd();
 
 
 		//jit_gl_report_error("oculus fbo draw end");
 
-		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
 		//glDisable(GL_TEXTURE_2D);
 
 		/*
