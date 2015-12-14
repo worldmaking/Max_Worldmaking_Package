@@ -39,14 +39,18 @@ static t_symbol * ps_viewport;
 static t_symbol * ps_frustum;
 static t_symbol * ps_warning;
 static t_symbol * ps_glid;
+static t_symbol * ps_jit_gl_texture;
 
 class oculusrift {
 public:
 	t_object ob; // must be first!
 	void * ob3d;
 	void * outlet_msg;
+	void * outlet_tracking;
 	void * outlet_node;
 	void * outlet_eye[2];
+	void * outlet_tex;
+
 	t_symbol * intexture;
 	float near_clip, far_clip;
 	float pixel_density;
@@ -58,8 +62,8 @@ public:
 	ovrEyeRenderDesc eyeRenderDesc[2];
 	ovrVector3f      hmdToEyeViewOffset[2];
 	ovrLayerEyeFov layer;
-	ovrSwapTextureSet * pTextureSet;
 	ovrSizei pTextureDim;
+	ovrSwapTextureSet * pTextureSet;
 	ovrTexture * mirrorTexture;
 	long long frameIndex;
 
@@ -72,9 +76,11 @@ public:
 		jit_ob3d_new(this, dest_name);
 		// outlets create in reverse order:
 		outlet_msg = outlet_new(&ob, NULL);
+		outlet_tracking = outlet_new(&ob, NULL);
 		outlet_node = outlet_new(&ob, NULL);
 		outlet_eye[1] = outlet_new(&ob, NULL);
 		outlet_eye[0] = outlet_new(&ob, NULL);
+		outlet_tex = outlet_new(&ob, "jit_gl_texture");
 
 		// init state
 		fbo = 0;
@@ -83,6 +89,8 @@ public:
 		depthTexId = 0;
 		pTextureSet = 0;
 		frameIndex = 0;
+		pTextureDim.w = 0;
+		pTextureDim.h = 0;
 
 		// init attrs
 		perfMode = 0;
@@ -95,6 +103,10 @@ public:
 
 	// attempt to connect to the OVR runtime, creating a session:
 	bool connect() {
+		if (session) {
+			object_warn(&ob, "already connected");
+			return true;
+		}
 
 		ovrResult result;
 
@@ -118,14 +130,15 @@ public:
 
 	void disconnect() {
 		if (session) {
-			// destroy any resources tied to the session:
-			if (pTextureSet) {
-				ovr_DestroySwapTextureSet(session, pTextureSet);
-				pTextureSet = 0;
-			}
+			// destroy any OVR resources tied to the session:
+			textureset_destroy();
+			mirror_destroy();
+
 			ovr_Destroy(session);
 			session = 0;
 		}
+
+		outlet_anything(outlet_msg, gensym("disconnected"), 0, NULL);
 	}
 
 	// usually called after session is created, and when important attributes are changed
@@ -146,6 +159,38 @@ public:
 		// assumes a single shared texture for both eyes:
 		pTextureDim.w = recommenedTex0Size.w + recommenedTex1Size.w;
 		pTextureDim.h = max(recommenedTex0Size.h, recommenedTex1Size.h);
+
+		// in case this is a re-configure, clear out the previous ones:
+		textureset_destroy();
+		mirror_destroy();
+
+		textureset_create();
+		mirror_create();
+
+		// Initialize VR structures, filling out description.
+		eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.DefaultEyeFov[0]);
+		eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.DefaultEyeFov[1]);
+		hmdToEyeViewOffset[0] = eyeRenderDesc[0].HmdToEyeViewOffset;
+		hmdToEyeViewOffset[1] = eyeRenderDesc[1].HmdToEyeViewOffset;
+
+		// Initialize our single full screen Fov layer.
+		// (needs to happen after textureset_create)
+		layer.Header.Type = ovrLayerType_EyeFov;
+		layer.Header.Flags = 0;
+		layer.ColorTexture[0] = pTextureSet;
+		layer.ColorTexture[1] = pTextureSet;
+		layer.Fov[0] = eyeRenderDesc[0].Fov;
+		layer.Fov[1] = eyeRenderDesc[1].Fov;
+		layer.Viewport[0].Pos.x = 0;
+		layer.Viewport[0].Pos.y = 0;
+		layer.Viewport[0].Size.w = pTextureDim.w / 2;
+		layer.Viewport[0].Size.h = pTextureDim.h;
+		layer.Viewport[1].Pos.x = pTextureDim.w / 2;
+		layer.Viewport[1].Pos.y = 0;
+		layer.Viewport[1].Size.w = pTextureDim.w / 2;
+		layer.Viewport[1].Size.h = pTextureDim.h;
+
+		// ld.RenderPose and ld.SensorSampleTime are updated later per frame.
 		
 		info();
 	}
@@ -203,11 +248,47 @@ public:
 		// disconnect from session
 		disconnect();
 		// free GL resources created by this external
-		dest_closing();
+		//dest_closing();
 		// remove from jit.gl* hierarchy
 		jit_ob3d_free(this);
 		// actually delete object
 		max_jit_object_free(this);
+	}
+
+	bool textureset_create() {
+		if (!session) return false; 
+		if (pTextureSet) return true; // already exists
+
+		// TODO problem here: Jitter API GL headers don't export GL_SRGB8_ALPHA8
+		// might also need  GL_EXT_framebuffer_sRGB for the copy
+		// "your application should call glEnable(GL_FRAMEBUFFER_SRGB); before rendering into these textures."
+		// SDK says:
+		// Even though it is not recommended, if your application is configured to treat the texture as a linear 
+		// format (e.g.GL_RGBA) and performs linear - to - gamma conversion in GLSL or does not care about gamma - 
+		// correction, then:
+		// Request an sRGB format(e.g.GL_SRGB8_ALPHA8) swap - texture - set.
+		// Do not call glEnable(GL_FRAMEBUFFER_SRGB); when rendering into the swap texture.
+		
+		// TODO: this shouldn't be in response to dest_changed
+		auto result = ovr_CreateSwapTextureSetGL(session, GL_RGBA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
+		//auto result = ovr_CreateSwapTextureSetGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
+		if (result != ovrSuccess) {
+			ovrErrorInfo errInfo;
+			ovr_GetLastErrorInfo(&errInfo);
+			object_error(&ob, "failed to create texture set: %s", errInfo.ErrorString);
+			return false;
+		}
+
+		
+
+		return true;
+	}
+
+	void textureset_destroy() {
+		if (session && pTextureSet) {
+			ovr_DestroySwapTextureSet(session, pTextureSet);
+			pTextureSet = 0;
+		}
 	}
 
 	/*
@@ -271,13 +352,13 @@ public:
 			atom_setfloat(a + 0, p.x);
 			atom_setfloat(a + 1, p.y);
 			atom_setfloat(a + 2, p.z);
-			outlet_anything(outlet_msg, _jit_sym_position, 3, a);
+			outlet_anything(outlet_tracking, _jit_sym_position, 3, a);
 
 			atom_setfloat(a + 0, q.x);
 			atom_setfloat(a + 1, q.y);
 			atom_setfloat(a + 2, q.z);
 			atom_setfloat(a + 3, q.w);
-			outlet_anything(outlet_msg, _jit_sym_quat, 4, a);
+			outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
 		}
 	}
 
@@ -339,6 +420,12 @@ public:
 		}
 
 		frameIndex++;
+
+		// copy mirrorTexture back, or just pass input texture through
+		// TODO: implement copying mirror texture back to Jitter
+		t_atom a[1];
+		atom_setsym(a, intexture);
+		outlet_anything(outlet_tex, ps_jit_gl_texture, 1, a);
 	}
 
 	void submit_by_copy(long glid, t_atom_long texdim[2]) {
@@ -424,61 +511,34 @@ public:
 	t_jit_err draw() {
 		// this gets called when the jit.gl.render context updates clients
 		// the oculusrift object doesn't draw to the main scene, so there's nothing needed to be done here
-
-		// TODO: perhaps use this to copy the mirrorTexture back into Jitter space?
-
 		return JIT_ERR_NONE;
 	}
 
 	t_jit_err dest_changed() {
+		object_post(&ob, "dest_changed");
+		connect();
+
 		if (!session) {
 			object_error(&ob, "no session available to allocate textures for");
 			return JIT_ERR_INVALID_OBJECT;
 		}
-		//object_post(&ob, "dest_changed");
 
-		ovrHmdDesc hmd = ovr_GetHmdDesc(session);
-
-	
 		if (!fbo_create()) {
 			return JIT_ERR_INVALID_OBJECT;
 		}
-		// TODO: implement copying mirror texture back to Jitter
-		mirror_create();
-
-		// Initialize VR structures, filling out description.
-		eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.DefaultEyeFov[0]);
-		eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.DefaultEyeFov[1]);
-		hmdToEyeViewOffset[0] = eyeRenderDesc[0].HmdToEyeViewOffset;
-		hmdToEyeViewOffset[1] = eyeRenderDesc[1].HmdToEyeViewOffset;
-
-		// Initialize our single full screen Fov layer.
-		layer.Header.Type = ovrLayerType_EyeFov;
-		layer.Header.Flags = 0;
-		layer.ColorTexture[0] = pTextureSet;
-		layer.ColorTexture[1] = pTextureSet;
-		layer.Fov[0] = eyeRenderDesc[0].Fov;
-		layer.Fov[1] = eyeRenderDesc[1].Fov;
-		layer.Viewport[0].Pos.x = 0;
-		layer.Viewport[0].Pos.y = 0;
-		layer.Viewport[0].Size.w = pTextureDim.w / 2;
-		layer.Viewport[0].Size.h = pTextureDim.h;
-		layer.Viewport[1].Pos.x = pTextureDim.w / 2;
-		layer.Viewport[1].Pos.y = 0;
-		layer.Viewport[1].Size.w = pTextureDim.w / 2;
-		layer.Viewport[1].Size.h = pTextureDim.h;
-
-		// ld.RenderPose and ld.SensorSampleTime are updated later per frame.
 
 		return JIT_ERR_NONE;
 	}
 
+	// free any locally-allocated GL resources
 	t_jit_err dest_closing() {
 		object_post(&ob, "dest_closing");
 
-		// TODO: check that this is only touching GL stuff created in Jitter
-		fbo_delete();
-		mirror_delete();
+		if (depthTexId) glDeleteTextures(1, &depthTexId);
+		if (fbo) glDeleteFramebuffersEXT(1, &fbo);
+		if (fboIn) glDeleteFramebuffersEXT(1, &fboIn);
+
+		disconnect();
 
 		return JIT_ERR_NONE;
 	}
@@ -495,26 +555,13 @@ public:
 	}
 
 
-
-	// TODO problem here: Jitter API GL headers don't export GL_SRGB8_ALPHA8
-	// might also need  GL_EXT_framebuffer_sRGB for the copy
-	// "your application should call glEnable(GL_FRAMEBUFFER_SRGB); before rendering into these textures."
-	// I'm not sure if just passing in the constant like this will actually work
-	// Even though it is not recommended, if your application is configured to treat the texture as a linear 
-	// format (e.g.GL_RGBA) and performs linear - to - gamma conversion in GLSL or does not care about gamma - 
-	// correction, then:
-	// Request an sRGB format(e.g.GL_SRGB8_ALPHA8) swap - texture - set.
-	// Do not call glEnable(GL_FRAMEBUFFER_SRGB); when rendering into the swap texture.
-	bool fbo_create(int mipLevels = 0) {
+	bool fbo_create() {
 		if (!fbo) {
-			// TODO: this shouldn't be in response to dest_changed
-			auto result = ovr_CreateSwapTextureSetGL(session, GL_RGBA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
-			//auto result = ovr_CreateSwapTextureSetGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
-			if (result != ovrSuccess) {
-				ovrErrorInfo errInfo;
-				ovr_GetLastErrorInfo(&errInfo);
-				object_error(&ob, "failed to create texture set: %s", errInfo.ErrorString);
-				return false;
+			if (!pTextureSet) {
+				if (!textureset_create()) {
+					object_error(&ob, "no texture set to bind to");
+					return false;
+				}
 			}
 
 			// create a depth buffer texture:
@@ -526,6 +573,7 @@ public:
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, pTextureDim.w, pTextureDim.h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
 			
+			// is this necessary?
 			for (int i = 0; i < pTextureSet->TextureCount; ++i) {
 				ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[i];
 				glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
@@ -533,14 +581,13 @@ public:
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-				if (mipLevels > 1) {
-					glGenerateMipmapEXT(GL_TEXTURE_2D);
-				}
 			}
 			glBindTexture(GL_TEXTURE_2D, 0);
 
 			glGenFramebuffersEXT(1, &fbo);
 			glGenFramebuffersEXT(1, &fboIn);
+
+			post("Created fbos");
 		}
 		return true;
 	}
@@ -568,12 +615,6 @@ public:
 		return true;
 	}
 
-	bool fbo_delete(int mipLevels = 0) {
-		if (depthTexId) glDeleteTextures(1, &depthTexId);
-		if (fbo) glDeleteFramebuffersEXT(1, &fbo);
-		if (fboIn) glDeleteFramebuffersEXT(1, &fboIn);
-		return true;
-	}
 
 	bool fbo_set_and_clear() {
 		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
@@ -601,7 +642,7 @@ public:
 	}
 
 	void mirror_create() {
-		if (!mirrorTexture) {
+		if (session && !mirrorTexture) {
 			auto result = ovr_CreateMirrorTextureGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &mirrorTexture);
 			if (result != ovrSuccess) {
 				ovrErrorInfo errInfo;
@@ -617,11 +658,12 @@ public:
 		}
 	}
 
-	void mirror_delete() {
-
-		if (mirrorTexture) {
-			ovr_DestroyMirrorTexture(session, mirrorTexture);
-			mirrorTexture = 0;
+	void mirror_destroy() {
+		if (session) {
+			if (mirrorTexture) {
+				ovr_DestroyMirrorTexture(session, mirrorTexture);
+				mirrorTexture = 0;
+			}
 		}
 	}
 };
@@ -654,10 +696,17 @@ t_jit_err oculusrift_dest_changed(oculusrift * x) { return x->dest_changed(); }
 void oculusrift_assist(oculusrift *x, void *b, long m, long a, char *s)
 {
 	if (m == ASSIST_INLET) { // inlet
-		sprintf(s, "I am inlet %ld", a);
-	}
-	else {	// outlet
-		sprintf(s, "I am outlet %ld", a);
+		sprintf(s, "bang to update tracking, texture to submit, other messages");
+	} else {	// outlet
+		switch (a) {
+		case 0: sprintf(s, "output/mirror texture"); break;
+		case 1: sprintf(s, "to left eye camera"); break;
+		case 2: sprintf(s, "to right eye camera"); break;
+		case 3: sprintf(s, "to scene node"); break;
+		case 4: sprintf(s, "tracking state"); break;
+		case 5: sprintf(s, "other messages"); break;
+		//default: sprintf(s, "I am outlet %ld", a); break;
+		}
 	}
 }
 
@@ -741,6 +790,7 @@ void ext_main(void *r)
 	ps_frustum = gensym("frustum");
 	ps_warning = gensym("warning");
 	ps_glid = gensym("glid");
+	ps_jit_gl_texture = gensym("jit_gl_texture");
 
 	// init OVR SDK
 	result = ovr_Initialize(NULL);
