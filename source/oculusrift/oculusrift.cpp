@@ -8,7 +8,6 @@
 
 */
 
-
 // a bunch of likely Max includes:
 extern "C" {
 #include "ext.h"
@@ -46,7 +45,13 @@ public:
 	t_object ob; // must be first!
 	void * ob3d;
 	void * outlet_msg;
+	void * outlet_node;
 	void * outlet_eye[2];
+	t_symbol * intexture;
+	float near_clip, far_clip;
+	float pixel_density;
+	int submit_method;
+	int perfMode;
 
 	ovrSession session;
 	ovrGraphicsLuid luid;
@@ -56,68 +61,101 @@ public:
 	ovrSwapTextureSet * pTextureSet;
 	ovrSizei pTextureDim;
 	ovrTexture * mirrorTexture;
-
 	long long frameIndex;
-
-	t_symbol * intexture;
-
-	int perfMode;
 
 	GLuint fbo, rbo, depthTexId;
 	GLuint fboIn;
 
-	float near_clip, far_clip;
-	int submit_method;
-
 	oculusrift(t_symbol * dest_name) {
 
+		// init Max object:
 		jit_ob3d_new(this, dest_name);
+		// outlets create in reverse order:
 		outlet_msg = outlet_new(&ob, NULL);
+		outlet_node = outlet_new(&ob, NULL);
 		outlet_eye[1] = outlet_new(&ob, NULL);
 		outlet_eye[0] = outlet_new(&ob, NULL);
 
-		frameIndex = 0;
-		perfMode = 0;
+		// init state
 		fbo = 0;
 		rbo = 0;
+		fboIn = 0;
+		depthTexId = 0;
 		pTextureSet = 0;
+		frameIndex = 0;
+
+		// init attrs
+		perfMode = 0;
 		submit_method = 0;
 		near_clip = 0.2f;
 		far_clip = 100.f;
+		pixel_density = 1.f;
+
+	}
+
+	// attempt to connect to the OVR runtime, creating a session:
+	bool connect() {
 
 		ovrResult result;
 
 		result = ovr_Create(&session, &luid);
-		if (OVR_FAILURE(result))
-		{
-			error("failed to create session -- is the HMD plugged in?");
-			return;
+		if (OVR_FAILURE(result)) {
+			ovrErrorInfo errInfo;
+			ovr_GetLastErrorInfo(&errInfo);
+			object_error(&ob, "failed to create session: %s", errInfo.ErrorString);
+
+			object_error(NULL, errInfo.ErrorString);
+			return false;
 		}
 
 		object_post(&ob, "LibOVR runtime version %s", ovr_GetVersionString());
 
+		outlet_anything(outlet_msg, gensym("connected"), 0, NULL);
+
+		configure();
+		return true;
+	}
+
+	void disconnect() {
+		if (session) {
+			// destroy any resources tied to the session:
+			if (pTextureSet) {
+				ovr_DestroySwapTextureSet(session, pTextureSet);
+				pTextureSet = 0;
+			}
+			ovr_Destroy(session);
+			session = 0;
+		}
+	}
+
+	// usually called after session is created, and when important attributes are changed
+	// invokes info() to send configuration results 
+	void configure() {
+		if (!session) {
+			object_error(&ob, "no session to configure");
+			return;
+		}
+
+		// TODO: support nonstandard tracking options via ovr_ConfigureTracking()
+
 		ovrHmdDesc hmd = ovr_GetHmdDesc(session);
-		ovrSizei resolution = hmd.Resolution;
-
-		post("created session with resolution %d %d\n", resolution.w, resolution.h);
-
-		// just use default tracking options for now -- nothing to do for ovr_ConfigureTracking()
-
-		//  - Use hmd members and ovr_GetFovTextureSize() to determine graphics configuration
-		//    and ovr_GetRenderDesc() to get per-eye rendering parameters.
-		// Configure Stereo settings.
-		float pixelDensity = 1.f;
-		ovrSizei recommenedTex0Size = ovr_GetFovTextureSize(session, ovrEye_Left, hmd.DefaultEyeFov[0], pixelDensity);
-		ovrSizei recommenedTex1Size = ovr_GetFovTextureSize(session, ovrEye_Right, hmd.DefaultEyeFov[1], pixelDensity);
+		// Use hmd members and ovr_GetFovTextureSize() to determine graphics configuration
+		// TODO: allow different FOV options -- perhaps a FOV scalar?
+		ovrSizei recommenedTex0Size = ovr_GetFovTextureSize(session, ovrEye_Left, hmd.DefaultEyeFov[0], pixel_density);
+		ovrSizei recommenedTex1Size = ovr_GetFovTextureSize(session, ovrEye_Right, hmd.DefaultEyeFov[1], pixel_density);
 		// assumes a single shared texture for both eyes:
 		pTextureDim.w = recommenedTex0Size.w + recommenedTex1Size.w;
 		pTextureDim.h = max(recommenedTex0Size.h, recommenedTex1Size.h);
-
-		post("recommended texture resolution %d %d\n", pTextureDim.w, pTextureDim.h);
 		
+		info();
 	}
 
 	void info() {
+		if (!session) {
+			object_warn(&ob, "no session");
+			return;
+		}
+
 		ovrHmdDesc hmd = ovr_GetHmdDesc(session);
 		t_atom a[2];
 
@@ -138,7 +176,6 @@ public:
 		}
 #undef HMD_CASE
 
-		// note serial:
 		atom_setsym(a, gensym(hmd.SerialNumber));
 		outlet_anything(outlet_msg, gensym("serial"), 1, a);
 
@@ -150,107 +187,106 @@ public:
 		atom_setlong(a, hmd.FirmwareMajor);
 		atom_setlong(a + 1, hmd.FirmwareMinor);
 		outlet_anything(outlet_msg, gensym("Firmware"), 2, a);
+
+		ovrSizei resolution = hmd.Resolution;
+		atom_setlong(a + 0, resolution.w);
+		atom_setlong(a + 1, resolution.h);
+		outlet_anything(outlet_msg, gensym("resolution"), 2, a);
+
+		// send texture dim (determined via configure()) to the scene jit.gl.node:
+		atom_setlong(a + 0, pTextureDim.w);
+		atom_setlong(a + 1, pTextureDim.h);
+		outlet_anything(outlet_node, _jit_sym_dim, 2, a);
 	}
 
 	~oculusrift() {
+		// disconnect from session
+		disconnect();
+		// free GL resources created by this external
 		dest_closing();
+		// remove from jit.gl* hierarchy
 		jit_ob3d_free(this);
+		// actually delete object
 		max_jit_object_free(this);
 	}
 
 	/*
 	Frame rendering typically involves several steps:
 	- obtaining predicted eye poses based on the headset tracking pose, (bang)
-	- rendering the view for each eye and, finally, (generate input texture)
-	- submitting eye textures to the compositor through ovr_SubmitFrame. (draw)
+	- rendering the view for each eye and, finally, (jit.gl.node @capture 1 renders and then sends texture to this external)
+	- submitting eye textures to the compositor through ovr_SubmitFrame. (submit, in response to texture received)
 	*/
 
 	void bang() {
-		// Query the HMD for the current tracking state.
-
-		// Get both eye poses simultaneously, with IPD offset already included.
-		double displayMidpointSeconds = ovr_GetPredictedDisplayTime(session, frameIndex);
-		ovrTrackingState ts = ovr_GetTrackingState(session, displayMidpointSeconds, ovrTrue);
-		ovr_CalcEyePoses(ts.HeadPose.ThePose, hmdToEyeViewOffset, layer.RenderPose);
-
-		/*
-		TODO
-		If the time passed into ovr_GetTrackingState is the current time or earlier,
-		the tracking state returned will be based on the latest sensor readings with
-		no prediction. In a production application, however, you should use the real-time
-		computed value returned by GetPredictedDisplayTime.
-		*/
+		if (!session) return;  // just ignore, no error because this is likely to be called at high frequency
 
 		t_atom a[6];
 
-		if (ts.StatusFlags & (ovrStatus_OrientationTracked | ovrStatus_PositionTracked))
-		{
-			ovrPoseStatef posestate = ts.HeadPose;
-			ovrPosef pose = posestate.ThePose;
+		// Query the HMD for the current tracking state.
+		// Get both eye poses simultaneously, with IPD offset already included.
+		double displayMidpointSeconds = ovr_GetPredictedDisplayTime(session, frameIndex);
+		ovrTrackingState ts = ovr_GetTrackingState(session, displayMidpointSeconds, ovrTrue);
+		if (ts.StatusFlags & (ovrStatus_OrientationTracked | ovrStatus_PositionTracked)) {
+			// get current head pose
+			const ovrPosef& pose = ts.HeadPose.ThePose;
+			
+			// use the tracking state to update the layers (part of how timewarp works)
+			ovr_CalcEyePoses(pose, hmdToEyeViewOffset, layer.RenderPose);
+
+			// update the camera view matrices accordingly:
+			for (int eye = 0; eye < 2; eye++) {
+
+				// TODO: add navigation pose to this before outputting, or do that in the patcher afterward?
+
+				// modelview
+				const ovrVector3f p = layer.RenderPose[eye].Position;
+				atom_setfloat(a + 0, p.x);
+				atom_setfloat(a + 1, p.y);
+				atom_setfloat(a + 2, p.z);
+				outlet_anything(outlet_eye[eye], _jit_sym_position, 3, a);
+
+				const ovrQuatf q = layer.RenderPose[eye].Orientation;
+				atom_setfloat(a + 0, q.x);
+				atom_setfloat(a + 1, q.y);
+				atom_setfloat(a + 2, q.z);
+				atom_setfloat(a + 3, q.w);
+				outlet_anything(outlet_eye[eye], _jit_sym_quat, 4, a);
+
+				// TODO: proj matrix doesn't need to be calculated every frame; only when near/far/layer data changes
+				// projection
+				const ovrFovPort& fov = layer.Fov[eye];
+				atom_setfloat(a + 0, -fov.LeftTan * near_clip);
+				atom_setfloat(a + 1, fov.RightTan * near_clip);
+				atom_setfloat(a + 2, -fov.DownTan * near_clip);
+				atom_setfloat(a + 3, fov.UpTan * near_clip);
+				atom_setfloat(a + 4, near_clip);
+				atom_setfloat(a + 5, far_clip);
+				outlet_anything(outlet_eye[eye], ps_frustum, 6, a);
+			}
+
+			// it may be useful to have the pose information in Max for other purposes:
 			ovrVector3f p = pose.Position;
 			ovrQuatf q = pose.Orientation;
-			//
-			atom_setfloat(a + 0, p.x);
-			atom_setfloat(a + 1, p.y);
-			atom_setfloat(a + 2, p.z);
-			//outlet_anything(outlet_msg, gensym("position"), 3, a);
-		}
-		for (int eye = 0; eye < 2; eye++) {
-
-			// TODO: add navigation pose to this before outputting, or do that in the patcher afterward?
-
-			// modelview
-			const ovrVector3f p = layer.RenderPose[eye].Position;
 
 			atom_setfloat(a + 0, p.x);
 			atom_setfloat(a + 1, p.y);
 			atom_setfloat(a + 2, p.z);
-			outlet_anything(outlet_eye[eye], _jit_sym_position, 3, a);
+			outlet_anything(outlet_msg, _jit_sym_position, 3, a);
 
-			const ovrQuatf q = layer.RenderPose[eye].Orientation;
 			atom_setfloat(a + 0, q.x);
 			atom_setfloat(a + 1, q.y);
 			atom_setfloat(a + 2, q.z);
 			atom_setfloat(a + 3, q.w);
-			outlet_anything(outlet_eye[eye], _jit_sym_quat, 4, a);
-
-			// projection
-			//Matrix4f proj = ovrMatrix4f_Projection(layer.Fov[eye], near, far, ovrProjection_RightHanded);
-			const ovrFovPort& fov = layer.Fov[eye];
-			atom_setfloat(a + 0, -fov.LeftTan * near_clip);
-			atom_setfloat(a + 1,  fov.RightTan * near_clip);
-			atom_setfloat(a + 2, -fov.DownTan * near_clip);
-			atom_setfloat(a + 3,  fov.UpTan * near_clip);
-			atom_setfloat(a + 4, near_clip);
-			atom_setfloat(a + 5, far_clip);
-			outlet_anything(outlet_eye[eye], ps_frustum, 6, a);
-
-			/*
-			/// Field Of View (FOV) tangent of the angle units.
-/// \note For a standard 90 degree vertical FOV, we would
-/// have: { UpTan = tan(90 degrees / 2), DownTan = tan(90 degrees / 2) }.
-typedef struct OVR_ALIGNAS(4) ovrFovPort_
-{
-    float UpTan;    ///< The tangent of the angle between the viewing vector and the top edge of the field of view.
-    float DownTan;  ///< The tangent of the angle between the viewing vector and the bottom edge of the field of view.
-    float LeftTan;  ///< The tangent of the angle between the viewing vector and the left edge of the field of view.
-    float RightTan; ///< The tangent of the angle between the viewing vector and the right edge of the field of view.
-} ovrFovPort;*/
-
-
-
+			outlet_anything(outlet_msg, _jit_sym_quat, 4, a);
 		}
 	}
 
-
+	// receive a texture
+	// TODO: validate texture format?
 	void jit_gl_texture(t_symbol * s) {
-		//post("got texture %s", s->s_name);
 		intexture = s;
-
 		submit();
 	}
-
-
 
 	// send the current texture to the Oculus driver:
 	void submit() {
@@ -261,6 +297,7 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 			object_error(&ob, "no texture to draw");
 			return;	// no texture to copy from.
 		}
+		// TODO: verify that texob is a texture
 		long glid = jit_attr_getlong(texob, ps_glid);
 		// get input texture dimensions
 		t_atom_long texdim[2];
@@ -272,6 +309,10 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 			return;	// no texture to copy from.
 		}
 
+		if (!pTextureSet) {
+			object_error(&ob, "no texture set yet");
+			return;	
+		}
 
 		// Increment to use next texture, just before writing
 		pTextureSet->CurrentIndex = (pTextureSet->CurrentIndex + 1) % pTextureSet->TextureCount;
@@ -281,17 +322,6 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 		case 1:submit_by_copy(glid, texdim); break;
 		default: submit_by_fbo(glid, texdim);
 		}
-		
-
-		/*
-		}
-		// done with fbo
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-		// mipmaps?
-		//glBindTexture(GL_TEXTURE_2D, oglid);
-		//glGenerateMipmapEXT(GL_TEXTURE_2D);
-		//glBindTexture(GL_TEXTURE_2D, 0);
-		*/
 
 		// Submit frame with one layer we have.
 		// ovr_SubmitFrame returns once frame present is queued up and the next texture slot in the ovrSwapTextureSet is available for the next frame. 
@@ -336,6 +366,7 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 
 		if (fbo_set_and_clear()) {
 
+			// TODO are all these necessary?
 			glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 
 			glMatrixMode(GL_TEXTURE);
@@ -382,128 +413,6 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 		fbo_unset();
 	}
 
-	void drawscene(GLuint glid) {
-		/*
-		// save state
-		//glPushAttrib(GL_VIEWPORT_BIT|GL_COLOR_BUFFER_BIT);
-		glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-
-		glClearColor(0.0, 0.0, 0.0, 0.0);
-		glClear(GL_COLOR_BUFFER_BIT);
-		*/
-
-		glViewport(0, 0, pTextureDim.w, pTextureDim.h);
-		/*
-		glMatrixMode(GL_TEXTURE);
-		glPushMatrix();
-		glLoadIdentity();
-
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		glOrtho(0.0, 1., 0.0, 1., -1.0, 1.0);
-
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-
-		//-------------------------
-		glDisable(GL_BLEND);
-		glDisable(GL_DEPTH_TEST);
-		glDisable(GL_LIGHTING);
-
-		*/
-		//glActiveTexture(0);
-		glEnable(GL_TEXTURE_RECTANGLE_ARB);
-		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, glid);
-		glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR); 
-		glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-		//				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-		//				glTexParameterf( GL_TEXTURE_RECTANGLE_EXT, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-		//				glTexParameterf( GL_TEXTURE_RECTANGLE_EXT, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-		//				glTexParameterf( GL_TEXTURE_RECTANGLE_EXT, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE );
-		//				glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		//				glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-		//				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		//				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		//				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		//				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-
-		//				 GLfloat verts[] = {
-		//				 0.0,(GLfloat)height,
-		//				 (GLfloat)width,(GLfloat)height,
-		//				 (GLfloat)width,0.0,
-		//				 0.0,0.0
-		//				 };
-		//				 
-		//				 GLfloat tex_coords[] = {
-		//				 0.0, (GLfloat)height,
-		//				 (GLfloat)width*x->width_scale, (GLfloat)height,
-		//				 (GLfloat)width*x->width_scale, 0.0,
-		//				 0.0, 0.0
-		//				 };
-		//				 if(!x->ownsoutput && x->dsttexflipped) {
-		//				 tex_coords[1]=0;
-		//				 tex_coords[3]=0;
-		//				 tex_coords[5]=height;
-		//				 tex_coords[7]=height;
-		//				 }
-		//				 if(x->target == GL_TEXTURE_2D) {
-		//				 tex_coords[1] /= (float)x->backingHeight;
-		//				 tex_coords[3] /= (float)x->backingHeight;
-		//				 tex_coords[5] /= (float)x->backingHeight;
-		//				 tex_coords[7] /= (float)x->backingHeight;
-		//				 tex_coords[2] /= (float)x->backingWidth;
-		//				 tex_coords[4] /= (float)x->backingWidth;
-		//				 }
-		//				 
-		//				 glEnable(x->target);
-		//				 if(x->source_type == VIDTEX_SOURCE_YUV420)
-		//				 fbo_texture_bind_yuv420(x);
-		//				 else if (x->source_type == VIDTEX_SOURCE_YUV422)
-		//				 fbo_texture_bind_yuv422(x);
-		//				 else
-		//				 glBindTexture(x->target,x->srctex);
-		//				 
-		//				 glClientActiveTextureARB(GL_TEXTURE0_ARB);
-		//				 glEnableClientState( GL_TEXTURE_COORD_ARRAY );
-		//				 glTexCoordPointer(2, GL_FLOAT, 0, tex_coords );
-		//				 glEnableClientState(GL_VERTEX_ARRAY);		
-		//				 glVertexPointer(2, GL_FLOAT, 0, verts );
-		//				 
-		//				 glDrawArrays( GL_TRIANGLE_FAN, 0, 4 );
-
-		// render quad:
-
-		glBegin(GL_QUADS);
-		//glColor3d(1., 1., 1.);
-		glTexCoord2d(0., 0.);
-		glVertex2d(-1., -1.);
-		//glColor3d(1., 0., 1.);
-		glTexCoord2d(400., 0.);
-		glVertex2d(1., -1.);
-		//glColor3d(1., 0., 0.);
-		glTexCoord2d(400., 400.);
-		glVertex2d(1., 1.);
-		//glColor3d(1., 1., 0.);
-		glTexCoord2d(0., 400.);
-		glVertex2d(-1., 1.);
-		glEnd();
-
-
-		//jit_gl_report_error("oculus fbo draw end");
-
-		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
-		//glDisable(GL_TEXTURE_2D);
-
-		/*
-		glPopClientAttrib();
-		//glPopAttrib();
-
-		*/
-	}
-
 	void perf() {
 		// just toggle through the various perf modes
 		// see https://developer.oculus.com/documentation/pcsdk/latest/concepts/dg-hud/
@@ -522,14 +431,19 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 	}
 
 	t_jit_err dest_changed() {
-
-		object_post(&ob, "dest_changed");
+		if (!session) {
+			object_error(&ob, "no session available to allocate textures for");
+			return JIT_ERR_INVALID_OBJECT;
+		}
+		//object_post(&ob, "dest_changed");
 
 		ovrHmdDesc hmd = ovr_GetHmdDesc(session);
 
+	
 		if (!fbo_create()) {
 			return JIT_ERR_INVALID_OBJECT;
 		}
+		// TODO: implement copying mirror texture back to Jitter
 		mirror_create();
 
 		// Initialize VR structures, filling out description.
@@ -562,6 +476,7 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 	t_jit_err dest_closing() {
 		object_post(&ob, "dest_closing");
 
+		// TODO: check that this is only touching GL stuff created in Jitter
 		fbo_delete();
 		mirror_delete();
 
@@ -592,6 +507,7 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 	// Do not call glEnable(GL_FRAMEBUFFER_SRGB); when rendering into the swap texture.
 	bool fbo_create(int mipLevels = 0) {
 		if (!fbo) {
+			// TODO: this shouldn't be in response to dest_changed
 			auto result = ovr_CreateSwapTextureSetGL(session, GL_RGBA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
 			//auto result = ovr_CreateSwapTextureSetGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
 			if (result != ovrSuccess) {
@@ -656,11 +572,6 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 		if (depthTexId) glDeleteTextures(1, &depthTexId);
 		if (fbo) glDeleteFramebuffersEXT(1, &fbo);
 		if (fboIn) glDeleteFramebuffersEXT(1, &fboIn);
-
-		if (pTextureSet) {
-			ovr_DestroySwapTextureSet(session, pTextureSet);
-			pTextureSet = 0;
-		}
 		return true;
 	}
 
@@ -671,14 +582,13 @@ typedef struct OVR_ALIGNAS(4) ovrFovPort_
 		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, tex->OGL.TexId, 0);
 		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, depthTexId, 0);
 
-	
 		if (!fbo_check()) {
 			object_error(&ob, "falied to create FBO");
 			return false;
 		}
 
 		glViewport(0, 0, pTextureDim.w, pTextureDim.h);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO -- do we even need a depth buffer?
 		return true;
 	}
 
@@ -727,7 +637,7 @@ void * oculusrift_new(t_symbol *s, long argc, t_atom *argv) {
 		attr_args_process(x, (short)argc, argv);
 		
 		// invoke any initialization after the attrs are set from here:
-
+		x->connect();
 	}
 	return (x);
 }
@@ -751,6 +661,18 @@ void oculusrift_assist(oculusrift *x, void *b, long m, long a, char *s)
 	}
 }
 
+void oculusrift_connect(oculusrift * x) {
+	x->connect();
+}
+
+void oculusrift_disconnect(oculusrift * x) {
+	x->disconnect();
+}
+
+void oculusrift_configure(oculusrift * x) {
+	x->configure();
+}
+
 void oculusrift_info(oculusrift * x) {
 	x->info();
 }
@@ -765,6 +687,17 @@ void oculusrift_submit(oculusrift * x) {
 
 void oculusrift_perf(oculusrift * x) {
 	x->perf();
+}
+
+void oculusrift_recenter(oculusrift * x) {
+	if (x->session) ovr_RecenterPose(x->session);
+}
+
+t_max_err oculusrift_pixel_density_set(oculusrift *x, t_object *attr, long argc, t_atom *argv) {
+	x->pixel_density = atom_getfloat(argv);
+
+	x->configure();
+	return 0;
 }
 
 void oculusrift_jit_gl_texture(oculusrift * x, t_symbol * s, long argc, t_atom * argv) {
@@ -809,6 +742,7 @@ void ext_main(void *r)
 	ps_warning = gensym("warning");
 	ps_glid = gensym("glid");
 
+	// init OVR SDK
 	result = ovr_Initialize(NULL);
 	if (OVR_FAILURE(result)) {
 		error( "LibOVR: failed to initialize library");
@@ -831,17 +765,12 @@ void ext_main(void *r)
 		ovrErrorInfo errInfo;
 		ovr_GetLastErrorInfo(&errInfo);
 		object_error(NULL, errInfo.ErrorString);
-
-		}
-		
-		//
 		*/
 	}
 	quittask_install((method)oculusrift_quit, NULL);
 	
 	c = class_new("oculusrift", (method)oculusrift_new, (method)oculusrift_free, (long)sizeof(oculusrift),
 				  0L /* leave NULL!! */, A_GIMME, 0);
-	
 	
 	long ob3d_flags = JIT_OB3D_NO_MATRIXOUTPUT | JIT_OB3D_DOES_UI;
 	/*
@@ -879,15 +808,27 @@ void ext_main(void *r)
 
 	class_addmethod(c, (method)oculusrift_jit_gl_texture, "jit_gl_texture", A_GIMME, 0);
 
+	class_addmethod(c, (method)oculusrift_connect, "connect", 0);
+	class_addmethod(c, (method)oculusrift_disconnect, "disconnect", 0);
+	class_addmethod(c, (method)oculusrift_configure, "configure", 0);
 	class_addmethod(c, (method)oculusrift_info, "info", 0);
+
+
+	class_addmethod(c, (method)oculusrift_recenter, "recenter", 0);
+
 	class_addmethod(c, (method)oculusrift_bang, "bang", 0);
 	class_addmethod(c, (method)oculusrift_submit, "submit", 0);
 	class_addmethod(c, (method)oculusrift_perf, "perf", 0);
+
+	// TODO: recenterpose
 
 	CLASS_ATTR_LONG(c, "submit_method", 0, oculusrift, submit_method);
 
 	CLASS_ATTR_FLOAT(c, "near_clip", 0, oculusrift, near_clip);
 	CLASS_ATTR_FLOAT(c, "far_clip", 0, oculusrift, far_clip);
+
+	CLASS_ATTR_FLOAT(c, "pixel_density", 0, oculusrift, pixel_density);
+	CLASS_ATTR_ACCESSORS(c, "pixel_density", NULL, oculusrift_pixel_density_set);
 	
 	class_register(CLASS_BOX, c);
 	max_class = c;
