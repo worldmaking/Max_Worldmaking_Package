@@ -70,6 +70,8 @@ public:
 	GLuint fbo, rbo, depthTexId;
 	GLuint fboIn;
 
+	GLuint fbo1;
+
 	oculusrift(t_symbol * dest_name) {
 
 		// init Max object:
@@ -84,6 +86,7 @@ public:
 
 		// init state
 		fbo = 0;
+		fbo1 = 0;
 		rbo = 0;
 		fboIn = 0;
 		depthTexId = 0;
@@ -103,6 +106,7 @@ public:
 
 	// attempt to connect to the OVR runtime, creating a session:
 	bool connect() {
+		post("connect");
 		if (session) {
 			object_warn(&ob, "already connected");
 			return true;
@@ -129,6 +133,7 @@ public:
 	}
 
 	void disconnect() {
+		post("disconnect");
 		if (session) {
 			// destroy any OVR resources tied to the session:
 			textureset_destroy();
@@ -136,14 +141,17 @@ public:
 
 			ovr_Destroy(session);
 			session = 0;
+			
+			outlet_anything(outlet_msg, gensym("disconnected"), 0, NULL);
 		}
 
-		outlet_anything(outlet_msg, gensym("disconnected"), 0, NULL);
+		
 	}
 
 	// usually called after session is created, and when important attributes are changed
 	// invokes info() to send configuration results 
 	void configure() {
+		post("configure");
 		if (!session) {
 			object_error(&ob, "no session to configure");
 			return;
@@ -196,6 +204,7 @@ public:
 	}
 
 	void info() {
+		post("info");
 		if (!session) {
 			object_warn(&ob, "no session");
 			return;
@@ -245,10 +254,10 @@ public:
 	}
 
 	~oculusrift() {
+		// free GL resources created by this external
+		dest_closing();
 		// disconnect from session
 		disconnect();
-		// free GL resources created by this external
-		//dest_closing();
 		// remove from jit.gl* hierarchy
 		jit_ob3d_free(this);
 		// actually delete object
@@ -256,6 +265,7 @@ public:
 	}
 
 	bool textureset_create() {
+		post("textureset_create");
 		if (!session) return false; 
 		if (pTextureSet) return true; // already exists
 
@@ -285,6 +295,7 @@ public:
 	}
 
 	void textureset_destroy() {
+		post("textureset_destroy");
 		if (session && pTextureSet) {
 			ovr_DestroySwapTextureSet(session, pTextureSet);
 			pTextureSet = 0;
@@ -385,7 +396,7 @@ public:
 		jit_attr_getlong_array(texob, _sym_dim, 2, texdim);
 		//post("submit texture id %ld dim %ld %ld\n", glid, texdim[0], texdim[1]);
 
-		if (!fbo) {
+		if (!fbo1) {
 			object_error(&ob, "no fbo yet");
 			return;	// no texture to copy from.
 		}
@@ -399,11 +410,82 @@ public:
 		pTextureSet->CurrentIndex = (pTextureSet->CurrentIndex + 1) % pTextureSet->TextureCount;
 		// TODO? Clear and set up render-target.    
 
+		// TODO: move stuff out of here if we can:
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo1);
+		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
+		GLuint dstId = tex->OGL.TexId;
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, dstId, 0);
+		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
+		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, pTextureDim.w, pTextureDim.h);
+		// following shouldn't be necessary so long as the texture has matching dimensions:
+		glBindTexture(GL_TEXTURE_2D, dstId);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		if (!fbo_check()) {
+			object_error(&ob, "falied to create FBO");
+			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+			return;
+		}
+
+		glViewport(0, 0, pTextureDim.w, pTextureDim.h);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO -- do we even need a depth buffer?
+
+		// TODO are all these necessary?
+		//glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
+		glMatrixMode(GL_TEXTURE);
+		glLoadIdentity();
+
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		glOrtho(-1.0, 1., 1.0, -1., -1.0, 1.0);
+
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+
+		//-------------------------
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_LIGHTING);
+
+
+		glEnable(GL_TEXTURE_RECTANGLE_ARB);
+		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, glid);
+		//glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		//glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+		// render quad:
+		glBegin(GL_QUADS);
+		glTexCoord2i(0, 0);
+		glVertex2d(-1., -1.);
+		glTexCoord2i(texdim[0], 0);
+		glVertex2d(1., -1.);
+		glTexCoord2i(texdim[0], texdim[1]);
+		glVertex2d(1., 1.);
+		glTexCoord2i(0, texdim[1]);
+		glVertex2d(-1., 1.);
+		glEnd();
+
+		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+
+		//glPopClientAttrib();
+
+		//glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+
+		/*
 		switch (submit_method) {
 		case 1:submit_by_copy(glid, texdim); break;
 		default: submit_by_fbo(glid, texdim);
 		}
-
+*/
 		// Submit frame with one layer we have.
 		// ovr_SubmitFrame returns once frame present is queued up and the next texture slot in the ovrSwapTextureSet is available for the next frame. 
 		ovrLayerHeader* layers = &layer.Header;
@@ -516,29 +598,57 @@ public:
 
 	t_jit_err dest_changed() {
 		object_post(&ob, "dest_changed");
-		connect();
+		//return JIT_ERR_NONE;
+		//connect();
 
 		if (!session) {
-			object_error(&ob, "no session available to allocate textures for");
-			return JIT_ERR_INVALID_OBJECT;
+			// try to create one:
+			connect();
+			if (!session) {
+				object_error(&ob, "no session available to allocate textures for");
+				return JIT_ERR_INVALID_OBJECT;
+			}
 		}
 
+		glGenFramebuffersEXT(1, &fbo1);
+		glGenRenderbuffersEXT(1, &rbo);
+
+
+		/*
 		if (!fbo_create()) {
 			return JIT_ERR_INVALID_OBJECT;
 		}
-
+*/
 		return JIT_ERR_NONE;
 	}
 
 	// free any locally-allocated GL resources
 	t_jit_err dest_closing() {
 		object_post(&ob, "dest_closing");
-
-		if (depthTexId) glDeleteTextures(1, &depthTexId);
-		if (fbo) glDeleteFramebuffersEXT(1, &fbo);
-		if (fboIn) glDeleteFramebuffersEXT(1, &fboIn);
-
 		disconnect();
+
+		if (fbo1) {
+			glDeleteFramebuffersEXT(1, &fbo1);
+			fbo1 = 0;
+		}
+
+		if (depthTexId) {
+			glDeleteTextures(1, &depthTexId);
+			depthTexId = 0;
+		}
+		if (fbo) {
+			glDeleteFramebuffersEXT(1, &fbo);
+			fbo = 0;
+		}
+		if (fboIn) {
+			glDeleteFramebuffersEXT(1, &fboIn);
+			fboIn = 0;
+		}
+		if (rbo) {
+			glDeleteRenderbuffersEXT(1, &rbo);
+			rbo = 0;
+		}
+		//disconnect();
 
 		return JIT_ERR_NONE;
 	}
@@ -556,6 +666,7 @@ public:
 
 
 	bool fbo_create() {
+		post("fbo_create");
 		if (!fbo) {
 			if (!pTextureSet) {
 				if (!textureset_create()) {
@@ -642,6 +753,7 @@ public:
 	}
 
 	void mirror_create() {
+		post("mirror_create");
 		if (session && !mirrorTexture) {
 			auto result = ovr_CreateMirrorTextureGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &mirrorTexture);
 			if (result != ovrSuccess) {
@@ -659,6 +771,7 @@ public:
 	}
 
 	void mirror_destroy() {
+		post("mirror_destroy");
 		if (session) {
 			if (mirrorTexture) {
 				ovr_DestroyMirrorTexture(session, mirrorTexture);
