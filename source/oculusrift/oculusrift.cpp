@@ -41,6 +41,11 @@ static t_symbol * ps_warning;
 static t_symbol * ps_glid;
 static t_symbol * ps_jit_gl_texture;
 
+// TODO: this is a really annoying hack. The Oculus driver doesn't seem to like being reconnected too quickly 
+// -- it says it reconnects, but the display remains blank or noisy.
+// inserting a short wait seems to avoid it. This wait in terms of frames:
+#define RECONNECTION_TIME 100
+
 class oculusrift {
 public:
 	t_object ob; // must be first!
@@ -54,8 +59,11 @@ public:
 	t_symbol * intexture;
 	float near_clip, far_clip;
 	float pixel_density;
+	int max_fov;
 	int submit_method;
 	int perfMode;
+
+	int reconnect_wait;
 
 	ovrSession session;
 	ovrGraphicsLuid luid;
@@ -98,9 +106,12 @@ public:
 		// init attrs
 		perfMode = 0;
 		submit_method = 0;
-		near_clip = 0.2f;
+		near_clip = 0.15f;
 		far_clip = 100.f;
 		pixel_density = 1.f;
+		max_fov = 0;
+
+		reconnect_wait = 0;
 
 	}
 
@@ -143,6 +154,9 @@ public:
 			session = 0;
 			
 			outlet_anything(outlet_msg, gensym("disconnected"), 0, NULL);
+
+
+			reconnect_wait = RECONNECTION_TIME;
 		}
 
 		
@@ -157,16 +171,39 @@ public:
 			return;
 		}
 
-		// TODO: support nonstandard tracking options via ovr_ConfigureTracking()
+		// maybe never: support disabling tracking options via ovr_ConfigureTracking()
 
 		ovrHmdDesc hmd = ovr_GetHmdDesc(session);
 		// Use hmd members and ovr_GetFovTextureSize() to determine graphics configuration
-		// TODO: allow different FOV options -- perhaps a FOV scalar?
-		ovrSizei recommenedTex0Size = ovr_GetFovTextureSize(session, ovrEye_Left, hmd.DefaultEyeFov[0], pixel_density);
-		ovrSizei recommenedTex1Size = ovr_GetFovTextureSize(session, ovrEye_Right, hmd.DefaultEyeFov[1], pixel_density);
+
+		ovrSizei recommenedTex0Size, recommenedTex1Size;
+		//MaxEyeFov - Maximum optical field of view that can be practically rendered for each eye.
+		if (max_fov){
+			recommenedTex0Size = ovr_GetFovTextureSize(session, ovrEye_Left, hmd.MaxEyeFov[0], pixel_density);
+			recommenedTex1Size = ovr_GetFovTextureSize(session, ovrEye_Right, hmd.MaxEyeFov[1], pixel_density);
+		}
+		else{
+			recommenedTex0Size = ovr_GetFovTextureSize(session, ovrEye_Left, hmd.DefaultEyeFov[0], pixel_density);
+			recommenedTex1Size = ovr_GetFovTextureSize(session, ovrEye_Right, hmd.DefaultEyeFov[1], pixel_density);
+		}
+
+
 		// assumes a single shared texture for both eyes:
 		pTextureDim.w = recommenedTex0Size.w + recommenedTex1Size.w;
 		pTextureDim.h = max(recommenedTex0Size.h, recommenedTex1Size.h);
+
+		// Initialize VR structures, filling out description.
+		if (max_fov) {
+			eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.MaxEyeFov[0]);
+			eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.MaxEyeFov[1]);
+
+		}
+		else {
+			eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.DefaultEyeFov[0]);
+			eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.DefaultEyeFov[1]);
+		}
+		hmdToEyeViewOffset[0] = eyeRenderDesc[0].HmdToEyeViewOffset;
+		hmdToEyeViewOffset[1] = eyeRenderDesc[1].HmdToEyeViewOffset;
 
 		// in case this is a re-configure, clear out the previous ones:
 		textureset_destroy();
@@ -174,12 +211,6 @@ public:
 
 		textureset_create();
 		mirror_create();
-
-		// Initialize VR structures, filling out description.
-		eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.DefaultEyeFov[0]);
-		eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.DefaultEyeFov[1]);
-		hmdToEyeViewOffset[0] = eyeRenderDesc[0].HmdToEyeViewOffset;
-		hmdToEyeViewOffset[1] = eyeRenderDesc[1].HmdToEyeViewOffset;
 
 		// Initialize our single full screen Fov layer.
 		// (needs to happen after textureset_create)
@@ -237,6 +268,29 @@ public:
 		outlet_anything(outlet_msg, gensym("Manufacturer"), 1, a);
 		atom_setsym(a, gensym(hmd.ProductName));
 		outlet_anything(outlet_msg, gensym("ProductName"), 1, a);
+
+		atom_setlong(a, (hmd.VendorId));
+		outlet_anything(outlet_msg, gensym("VendorId"), 1, a);
+		atom_setlong(a, (hmd.ProductId));
+		outlet_anything(outlet_msg, gensym("ProductId"), 1, a);
+		atom_setfloat(a, (hmd.CameraFrustumHFovInRadians));
+		outlet_anything(outlet_msg, gensym("CameraFrustumHFovInRadians"), 1, a);
+		atom_setfloat(a, (hmd.CameraFrustumVFovInRadians));
+		outlet_anything(outlet_msg, gensym("CameraFrustumVFovInRadians"), 1, a);
+		atom_setfloat(a, (hmd.CameraFrustumNearZInMeters));
+		outlet_anything(outlet_msg, gensym("CameraFrustumNearZInMeters"), 1, a);
+		atom_setfloat(a, (hmd.CameraFrustumFarZInMeters));
+		outlet_anything(outlet_msg, gensym("CameraFrustumFarZInMeters"), 1, a);
+		atom_setlong(a, (hmd.AvailableHmdCaps));
+		outlet_anything(outlet_msg, gensym("AvailableHmdCaps"), 1, a);
+		atom_setlong(a, (hmd.DefaultHmdCaps));
+		outlet_anything(outlet_msg, gensym("DefaultHmdCaps"), 1, a);
+		atom_setlong(a, (hmd.AvailableTrackingCaps));
+		outlet_anything(outlet_msg, gensym("AvailableTrackingCaps"), 1, a);
+		atom_setlong(a, (hmd.DefaultTrackingCaps));
+		outlet_anything(outlet_msg, gensym("DefaultTrackingCaps"), 1, a);
+		atom_setfloat(a, (hmd.DisplayRefreshRate));
+		outlet_anything(outlet_msg, gensym("DisplayRefreshRate"), 1, a);
 
 		atom_setlong(a, hmd.FirmwareMajor);
 		atom_setlong(a + 1, hmd.FirmwareMinor);
@@ -310,7 +364,25 @@ public:
 	*/
 
 	void bang() {
-		if (!session) return;  // just ignore, no error because this is likely to be called at high frequency
+		if (!session) {
+			// TODO: does SDK provide notification of Rift being reconnected?
+
+			if (reconnect_wait) {
+				reconnect_wait--;
+			}
+			else {
+				post("reconnecting...");
+				if (!connect()) {
+					reconnect_wait = RECONNECTION_TIME;
+					
+				}
+				return;
+			}
+
+			// try to connect:
+			//if (!connect())
+				//return;  // just ignore, no error because this is likely to be called at high frequency
+		}
 
 		t_atom a[6];
 
@@ -499,7 +571,9 @@ public:
 			the new ovr_Create call returns a different GraphicsLuid.
 			*/
 			object_error(&ob, "fatal error connection lost.");
-		}
+
+			disconnect();
+		} 
 
 		frameIndex++;
 
@@ -598,27 +672,10 @@ public:
 
 	t_jit_err dest_changed() {
 		object_post(&ob, "dest_changed");
-		//return JIT_ERR_NONE;
-		//connect();
-
-		if (!session) {
-			// try to create one:
-			connect();
-			if (!session) {
-				object_error(&ob, "no session available to allocate textures for");
-				return JIT_ERR_INVALID_OBJECT;
-			}
-		}
 
 		glGenFramebuffersEXT(1, &fbo1);
 		glGenRenderbuffersEXT(1, &rbo);
-
-
-		/*
-		if (!fbo_create()) {
-			return JIT_ERR_INVALID_OBJECT;
-		}
-*/
+		
 		return JIT_ERR_NONE;
 	}
 
@@ -862,6 +919,13 @@ t_max_err oculusrift_pixel_density_set(oculusrift *x, t_object *attr, long argc,
 	return 0;
 }
 
+t_max_err oculusrift_max_fov_set(oculusrift *x, t_object *attr, long argc, t_atom *argv) {
+	x->max_fov = atom_getlong(argv);
+
+	x->configure();
+	return 0;
+}
+
 void oculusrift_jit_gl_texture(oculusrift * x, t_symbol * s, long argc, t_atom * argv) {
 	if (argc > 0 && atom_gettype(argv) == A_SYM) {
 		x->jit_gl_texture(atom_getsym(argv));
@@ -992,6 +1056,11 @@ void ext_main(void *r)
 
 	CLASS_ATTR_FLOAT(c, "pixel_density", 0, oculusrift, pixel_density);
 	CLASS_ATTR_ACCESSORS(c, "pixel_density", NULL, oculusrift_pixel_density_set);
+
+	// TODO: why is Rift not using max FOV (seems like the black overlay is not being made bigger - oculus bug?)
+	CLASS_ATTR_LONG(c, "max_fov", 0, oculusrift, max_fov);
+	CLASS_ATTR_ACCESSORS(c, "max_fov", NULL, oculusrift_max_fov_set);
+
 	
 	class_register(CLASS_BOX, c);
 	max_class = c;
