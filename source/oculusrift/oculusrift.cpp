@@ -60,7 +60,6 @@ public:
 	float near_clip, far_clip;
 	float pixel_density;
 	int max_fov;
-	int submit_method;
 	int perfMode;
 
 	int reconnect_wait;
@@ -75,9 +74,7 @@ public:
 	ovrTexture * mirrorTexture;
 	long long frameIndex;
 
-	GLuint fbo, rbo, depthTexId;
-	GLuint fboIn;
-
+	GLuint rbo;
 	GLuint fbo1;
 
 	oculusrift(t_symbol * dest_name) {
@@ -93,11 +90,8 @@ public:
 		outlet_tex = outlet_new(&ob, "jit_gl_texture");
 
 		// init state
-		fbo = 0;
 		fbo1 = 0;
 		rbo = 0;
-		fboIn = 0;
-		depthTexId = 0;
 		pTextureSet = 0;
 		frameIndex = 0;
 		pTextureDim.w = 0;
@@ -105,7 +99,6 @@ public:
 
 		// init attrs
 		perfMode = 0;
-		submit_method = 0;
 		near_clip = 0.15f;
 		far_clip = 100.f;
 		pixel_density = 1.f;
@@ -333,7 +326,6 @@ public:
 		// Request an sRGB format(e.g.GL_SRGB8_ALPHA8) swap - texture - set.
 		// Do not call glEnable(GL_FRAMEBUFFER_SRGB); when rendering into the swap texture.
 		
-		// TODO: this shouldn't be in response to dest_changed
 		auto result = ovr_CreateSwapTextureSetGL(session, GL_RGBA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
 		//auto result = ovr_CreateSwapTextureSetGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
 		if (result != ovrSuccess) {
@@ -378,10 +370,6 @@ public:
 				}
 				return;
 			}
-
-			// try to connect:
-			//if (!connect())
-				//return;  // just ignore, no error because this is likely to be called at high frequency
 		}
 
 		t_atom a[6];
@@ -552,12 +540,7 @@ public:
 
 		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
 
-		/*
-		switch (submit_method) {
-		case 1:submit_by_copy(glid, texdim); break;
-		default: submit_by_fbo(glid, texdim);
-		}
-*/
+		
 		// Submit frame with one layer we have.
 		// ovr_SubmitFrame returns once frame present is queued up and the next texture slot in the ovrSwapTextureSet is available for the next frame. 
 		ovrLayerHeader* layers = &layer.Header;
@@ -579,81 +562,85 @@ public:
 
 		// copy mirrorTexture back, or just pass input texture through
 		// TODO: implement copying mirror texture back to Jitter
+
+
+		// TODO: move stuff out of here if we can:
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo1);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, glid, 0);
+		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
+		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, texdim[0], texdim[1]);
+		// following shouldn't be necessary so long as the texture has matching dimensions:
+		glBindTexture(GL_TEXTURE_2D, glid);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		if (!fbo_check()) {
+			object_error(&ob, "falied to create FBO");
+			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+			return;
+		}
+
+		glViewport(0, 0, texdim[0], texdim[1]);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO -- do we even need a depth buffer?
+
+		// TODO are all these necessary?
+		//glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
+		glMatrixMode(GL_TEXTURE);
+		glLoadIdentity();
+
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		glOrtho(-1.0, 1., 1.0, -1., -1.0, 1.0);
+
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+
+		//-------------------------
+		glDisable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_LIGHTING);
+
+
+		glEnable(GL_TEXTURE_RECTANGLE_ARB);
+
+		tex = (ovrGLTexture*)mirrorTexture;
+		ovrSizei mirrorTexDim = mirrorTexture->Header.TextureSize;
+		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tex->OGL.TexId); // is this GL_TEXTURE_2D?
+
+		//glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		//glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+		// render quad:
+		glBegin(GL_QUADS);
+		glTexCoord2i(0, 0);
+		glVertex2d(-1., -1.);
+		glTexCoord2i(mirrorTexDim.w, 0);
+		glVertex2d(1., -1.);
+		glTexCoord2i(mirrorTexDim.w, mirrorTexDim.h);
+		glVertex2d(1., 1.);
+		glTexCoord2i(0, mirrorTexDim.h);
+		glVertex2d(-1., 1.);
+		glEnd();
+
+		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+
+		//glPopClientAttrib();
+
+		//glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+
+
+
 		t_atom a[1];
 		atom_setsym(a, intexture);
 		outlet_anything(outlet_tex, ps_jit_gl_texture, 1, a);
-	}
-
-	void submit_by_copy(long glid, t_atom_long texdim[2]) {
-
-		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
-
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fboIn);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, glid, 0);
-		//glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, depthTexId, 0);
-
-		if (fbo_check()) {
-			glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
-			//glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, 0, 0, pTextureDim.w, pTextureDim.h, 0);
-			glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, pTextureDim.w, pTextureDim.h);
-			glBindTexture(GL_TEXTURE_2D, 0);
-
-		} else {
-			object_error(&ob, "falied to create FBO");
-		}
-
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-	}
-
-	void submit_by_fbo(long glid, t_atom_long texdim[2]) {
-
-		if (fbo_set_and_clear()) {
-
-			// TODO are all these necessary?
-			glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-
-			glMatrixMode(GL_TEXTURE);
-			//glPushMatrix();
-			glLoadIdentity();
-
-			glMatrixMode(GL_PROJECTION);
-			glLoadIdentity();
-			glOrtho(-1.0, 1., 1.0, -1., -1.0, 1.0);
-
-			glMatrixMode(GL_MODELVIEW);
-			glLoadIdentity();
-
-			//-------------------------
-			glDisable(GL_BLEND);
-			glDisable(GL_DEPTH_TEST);
-			glDisable(GL_LIGHTING);
-
-
-			glEnable(GL_TEXTURE_RECTANGLE_ARB);
-			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, glid);
-			glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-			// render quad:
-			glBegin(GL_QUADS);
-			glTexCoord2i(0, 0);
-			glVertex2d(-1., -1.);
-			glTexCoord2i(texdim[0], 0);
-			glVertex2d(1., -1.);
-			glTexCoord2i(texdim[0], texdim[1]);
-			glVertex2d(1., 1.);
-			glTexCoord2i(0, texdim[1]);
-			glVertex2d(-1., 1.);
-			glEnd();
-
-			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
-
-			glPopClientAttrib();
-			//glPopAttrib();
-
-		}
-
-		fbo_unset();
 	}
 
 	void perf() {
@@ -675,6 +662,9 @@ public:
 
 		glGenFramebuffersEXT(1, &fbo1);
 		glGenRenderbuffersEXT(1, &rbo);
+
+		// create a jit.gl.texture to copy mirror to
+		// create fbo to do that copy??
 		
 		return JIT_ERR_NONE;
 	}
@@ -688,24 +678,10 @@ public:
 			glDeleteFramebuffersEXT(1, &fbo1);
 			fbo1 = 0;
 		}
-
-		if (depthTexId) {
-			glDeleteTextures(1, &depthTexId);
-			depthTexId = 0;
-		}
-		if (fbo) {
-			glDeleteFramebuffersEXT(1, &fbo);
-			fbo = 0;
-		}
-		if (fboIn) {
-			glDeleteFramebuffersEXT(1, &fboIn);
-			fboIn = 0;
-		}
 		if (rbo) {
 			glDeleteRenderbuffersEXT(1, &rbo);
 			rbo = 0;
 		}
-		//disconnect();
 
 		return JIT_ERR_NONE;
 	}
@@ -722,43 +698,6 @@ public:
 	}
 
 
-	bool fbo_create() {
-		post("fbo_create");
-		if (!fbo) {
-			if (!pTextureSet) {
-				if (!textureset_create()) {
-					object_error(&ob, "no texture set to bind to");
-					return false;
-				}
-			}
-
-			// create a depth buffer texture:
-			glGenTextures(1, &depthTexId);
-			glBindTexture(GL_TEXTURE_2D, depthTexId);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, pTextureDim.w, pTextureDim.h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
-			
-			// is this necessary?
-			for (int i = 0; i < pTextureSet->TextureCount; ++i) {
-				ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[i];
-				glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			}
-			glBindTexture(GL_TEXTURE_2D, 0);
-
-			glGenFramebuffersEXT(1, &fbo);
-			glGenFramebuffersEXT(1, &fboIn);
-
-			post("Created fbos");
-		}
-		return true;
-	}
 
 	bool fbo_check() {
 		GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
@@ -783,35 +722,9 @@ public:
 		return true;
 	}
 
-
-	bool fbo_set_and_clear() {
-		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
-
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, tex->OGL.TexId, 0);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, depthTexId, 0);
-
-		if (!fbo_check()) {
-			object_error(&ob, "falied to create FBO");
-			return false;
-		}
-
-		glViewport(0, 0, pTextureDim.w, pTextureDim.h);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO -- do we even need a depth buffer?
-		return true;
-	}
-
-	void fbo_unset()
-	{
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, 0, 0);
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-	}
-
 	void mirror_create() {
-		post("mirror_create");
 		if (session && !mirrorTexture) {
+			// TODO SRGB?
 			auto result = ovr_CreateMirrorTextureGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &mirrorTexture);
 			if (result != ovrSuccess) {
 				ovrErrorInfo errInfo;
@@ -828,7 +741,6 @@ public:
 	}
 
 	void mirror_destroy() {
-		post("mirror_destroy");
 		if (session) {
 			if (mirrorTexture) {
 				ovr_DestroyMirrorTexture(session, mirrorTexture);
@@ -1046,10 +958,6 @@ void ext_main(void *r)
 	class_addmethod(c, (method)oculusrift_bang, "bang", 0);
 	class_addmethod(c, (method)oculusrift_submit, "submit", 0);
 	class_addmethod(c, (method)oculusrift_perf, "perf", 0);
-
-	// TODO: recenterpose
-
-	CLASS_ATTR_LONG(c, "submit_method", 0, oculusrift, submit_method);
 
 	CLASS_ATTR_FLOAT(c, "near_clip", 0, oculusrift, near_clip);
 	CLASS_ATTR_FLOAT(c, "far_clip", 0, oculusrift, far_clip);
