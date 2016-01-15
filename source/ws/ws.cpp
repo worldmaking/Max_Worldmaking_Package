@@ -3,6 +3,8 @@
 #include <string>
 #include <list>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <set>
 #include <map>
 #include <websocketpp/config/asio_no_tls.hpp>
@@ -14,16 +16,12 @@ typedef std::set<websocketpp::connection_hdl, std::owner_less<websocketpp::conne
 
 // a bunch of likely Max includes:
 extern "C" {
-#include "ext.h"
-#include "ext_obex.h"
-#include "ext_dictionary.h"
-#include "ext_dictobj.h"
-#include "ext_systhread.h"
-	
-#include "z_dsp.h"
-	
-#include "jit.common.h"
-#include "jit.gl.h"
+	#include "ext.h"
+	#include "ext_obex.h"
+	#include "ext_dictionary.h"
+	#include "ext_dictobj.h"
+	#include "ext_strings.h"
+	#include "ext_systhread.h"
 }
 
 // TODO: check any multi-threading issues?
@@ -34,7 +32,6 @@ static std::map <t_atom_long, Server *> server_map;
 
 static t_class * max_class = 0;
 
-
 class Server {
 	
 	// this can throw an exception.
@@ -42,10 +39,16 @@ class Server {
 		server.set_open_handler(bind(&Server::on_open,this,websocketpp::lib::placeholders::_1));
 		server.set_close_handler(bind(&Server::on_close,this,websocketpp::lib::placeholders::_1));
 		server.set_message_handler(bind(&Server::on_message,this,websocketpp::lib::placeholders::_1,websocketpp::lib::placeholders::_2));
+		server.set_reuse_addr(true);
 		server.init_asio();
 		server.listen(port);
 		post("created server listening on port %i", port);
 		server.start_accept();
+		server.clear_access_channels(websocketpp::log::alevel::all); // this will turn off everything in console output
+		
+		received_dict_name = symbol_unique();
+		received_dict = dictionary_new();
+		atom_setsym(&received_dict_name_atom, received_dict_name);
 		
 		// make sure this doesn't get duplicated:
 		server_map[port] = this;
@@ -56,10 +59,33 @@ public:
 	t_atom_long port;
 	con_list clients;				// a set of client client_connections as websocketpp::connection_hdl
 	
-	std::list<ws *> maxobjects;		// is this still needed?
+	std::list<ws *> maxobjects;		// the set of max objects using this server
+	
+	t_dictionary * received_dict;
+	t_symbol * received_dict_name;
+	t_atom received_dict_name_atom;
+
 	
 	~Server() {
-		// any teardown necessary?
+		post("closing server on port %d", port);
+		server.stop_listening();
+		
+		// remove from map:
+		const auto& it= server_map.find(port);
+		server_map.erase(it);
+		
+		for (auto& client : clients) {
+			try{
+				server.close(client, websocketpp::close::status::normal, "");
+			} catch (std::exception& ec) {
+				error("close error %s", ec.what());
+			}
+		}
+		
+		// now run once to clear them:
+		server.run();
+		
+		object_release((t_object *)received_dict);
 	}
 	
 	// this can throw an exception:
@@ -82,7 +108,10 @@ public:
 	void remove(ws * listener) {
 		maxobjects.remove(listener);
 		
-		// TODO: should we check whether to destroy the server at this point, if there are no more listeners?
+		// check whether to destroy the server at this point if there are no more listeners
+		if (maxobjects.empty()) {
+			delete this;
+		}
 	}
 	
 	void bang() {
@@ -137,22 +166,44 @@ public:
 	}
 	
 	~ws() {
-		server->remove(this);
+		if (server) server->remove(this);
 	}
 	
 	void bang() {
 		if (server) server->bang();
 	}
 	
-	void send(t_symbol * s) {
-		if (server) server->send(std::string(s->s_name));
+	void send(const std::string& s) {
+		if (server) server->send(s);
 	}
 };
 
 void Server::on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
-	for (auto x : maxobjects) {
-		outlet_anything(x->outlet_frame, gensym(msg->get_payload().c_str()), 0, 0);
-	}
+	
+	const char * buf = msg->get_payload().c_str();
+	
+//	// attempt to parse as dict?
+//	//dictobj_unregister(received_dict);
+//	char errstring[256];
+//	t_dictionary * result = NULL;
+//	if (0 == dictobj_dictionaryfromstring(&result, buf, 1, errstring)) {
+//		object_release((t_object *)received_dict);
+//		received_dict = result;
+//		dictobj_register(received_dict, &received_dict_name);
+//		
+//		for (auto x : maxobjects) {
+//			outlet_anything(x->outlet_frame, _sym_dictionary, 1, &received_dict_name_atom);
+//		}
+//	} else {
+//		error("error parsing received message as JSON: %s", errstring);
+	
+		// just output as string:
+		t_symbol * sym = gensym(buf);
+		for (auto x : maxobjects) {
+			outlet_anything(x->outlet_frame, sym, 0, 0);
+		}
+	
+//	}
 }
 
 
@@ -185,23 +236,81 @@ void ws_assist(ws *x, void *b, long m, long a, char *s)
 	}
 }
 
-
 void ws_bang(ws * x) {
 	x->bang();
 }
 
 void ws_send(ws * x, t_symbol * s) {
-	x->send(s);
+	x->send(std::string(s->s_name));
+}
+
+void ws_dictionary(ws * x, t_symbol * s) {
+	t_dictionary *d = dictobj_findregistered_retain(s);
+	if (d) {
+		t_object *jsonwriter = (t_object *)object_new(_sym_nobox, _sym_jsonwriter);
+		t_handle json;
+		object_method(jsonwriter, _sym_writedictionary, d);
+		object_method(jsonwriter, _sym_getoutput, &json);
+		
+		x->send(std::string(*json));
+		
+		object_free(jsonwriter);
+		sysmem_freehandle(json);
+	} else {
+		object_error(&x->ob, "unable to reference dictionary named %s", s->s_name);
+		return;
+	}
+	dictobj_release(d);
+}
+
+void ws_anything(ws * x, t_symbol * s, int argc, t_atom * argv) {
+	static const char * separator = " "; // TODO we could have an attribute to set this separator character.
+	
+	std::stringstream ss;
+	
+	if (s && s->s_name) {
+		ss << s->s_name;
+		if (argc) ss << separator;
+	}
+	
+	for (int i = 0; i < argc; i++,argv++) {
+		switch (argv->a_type) {
+			case A_LONG:
+				ss << atom_getlong(argv);
+				break;
+			case A_FLOAT:
+				ss << atom_getfloat(argv);
+				break;
+			case A_SYM:
+				ss << atom_getsym(argv)->s_name;
+				break;
+			default:
+				continue;
+		}
+		if (i < argc-1) ss << separator;
+	}
+	
+	x->send(ss.str());
+}
+
+
+void ws_list(ws * x, t_symbol * s, int argc, t_atom * argv) {
+	ws_anything(x, NULL, argc, argv);
 }
 
 void ext_main(void *r)
 {
 	t_class *c;
 	
+	common_symbols_init();
+	
 	c = class_new("ws", (method)ws_new, (method)ws_free, (long)sizeof(ws), 0L, A_GIMME, 0);
 	class_addmethod(c, (method)ws_assist, "assist", A_CANT, 0);
 	class_addmethod(c, (method)ws_bang,	"bang",	0);
 	class_addmethod(c, (method)ws_send,	"send",	A_SYM, 0);
+	class_addmethod(c, (method)ws_dictionary, "dictionary", A_SYM, 0);
+	class_addmethod(c, (method)ws_anything, "anything", A_GIMME, 0);
+	class_addmethod(c, (method)ws_list, "list", A_GIMME, 0);
 	
 	CLASS_ATTR_LONG(c, "port", 0, ws, port);
 	

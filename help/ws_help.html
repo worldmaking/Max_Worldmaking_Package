@@ -61,6 +61,9 @@ function ws_connect() {
             var message = 'hello from browser';
             post('SENT: ' + message);
             wsocket.send(message);
+			
+			// send some JSON:
+			wsocket.send(JSON.stringify({ "hello": "world" }));
         };
 
         wsocket.onclose = function(ev) {
