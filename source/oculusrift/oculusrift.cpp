@@ -19,6 +19,7 @@ extern "C" {
 #include "z_dsp.h"
 	
 #include "jit.common.h"
+#include "jit.vecmath.h"
 #include "jit.gl.h"
 }
 
@@ -56,11 +57,17 @@ public:
 	void * outlet_eye[2];
 	void * outlet_tex;
 
+	t_symbol * dest_name;
 	t_symbol * intexture;
 	float near_clip, far_clip;
 	float pixel_density;
 	int max_fov;
 	int perfMode;
+	int mirror;
+
+	void * outtexture;
+	t_atom_long outdim[2];
+	t_symbol * outname;
 
 	int reconnect_wait;
 
@@ -74,10 +81,9 @@ public:
 	ovrTexture * mirrorTexture;
 	long long frameIndex;
 
-	GLuint rbo;
-	GLuint fbo1;
+	GLuint fbo, fbomirror;
 
-	oculusrift(t_symbol * dest_name) {
+	oculusrift(t_symbol * dest_name) : dest_name(dest_name) {
 
 		// init Max object:
 		jit_ob3d_new(this, dest_name);
@@ -90,12 +96,13 @@ public:
 		outlet_tex = outlet_new(&ob, "jit_gl_texture");
 
 		// init state
-		fbo1 = 0;
-		rbo = 0;
+		fbo = 0;
+		fbomirror = 0;
 		pTextureSet = 0;
 		frameIndex = 0;
 		pTextureDim.w = 0;
 		pTextureDim.h = 0;
+		intexture = _sym_nothing;
 
 		// init attrs
 		perfMode = 0;
@@ -103,8 +110,12 @@ public:
 		far_clip = 100.f;
 		pixel_density = 1.f;
 		max_fov = 0;
+		mirror = 0;
 
 		reconnect_wait = 0;
+
+		outdim[0] = 1024;
+		outdim[1] = 768;
 
 	}
 
@@ -335,8 +346,6 @@ public:
 			return false;
 		}
 
-		
-
 		return true;
 	}
 
@@ -372,6 +381,7 @@ public:
 			}
 		}
 
+
 		t_atom a[6];
 
 		// Query the HMD for the current tracking state.
@@ -385,6 +395,11 @@ public:
 			// use the tracking state to update the layers (part of how timewarp works)
 			ovr_CalcEyePoses(pose, hmdToEyeViewOffset, layer.RenderPose);
 
+			float pos[3];
+			jit_attr_getfloat_array(this, gensym("position"), 3, pos);
+			t_jit_quat quat;
+			jit_attr_getfloat_array(this, gensym("quat"), 4, &quat.x);
+
 			// update the camera view matrices accordingly:
 			for (int eye = 0; eye < 2; eye++) {
 
@@ -392,16 +407,18 @@ public:
 
 				// modelview
 				const ovrVector3f p = layer.RenderPose[eye].Position;
-				atom_setfloat(a + 0, p.x);
-				atom_setfloat(a + 1, p.y);
-				atom_setfloat(a + 2, p.z);
+				atom_setfloat(a + 0, p.x + pos[0]);
+				atom_setfloat(a + 1, p.y + pos[1]);
+				atom_setfloat(a + 2, p.z + pos[2]);
 				outlet_anything(outlet_eye[eye], _jit_sym_position, 3, a);
 
 				const ovrQuatf q = layer.RenderPose[eye].Orientation;
-				atom_setfloat(a + 0, q.x);
-				atom_setfloat(a + 1, q.y);
-				atom_setfloat(a + 2, q.z);
-				atom_setfloat(a + 3, q.w);
+				t_jit_quat q1;
+				jit_quat_mult(&q1, (t_jit_quat *)&q, &quat);
+				atom_setfloat(a + 0, q1.x);
+				atom_setfloat(a + 1, q1.y);
+				atom_setfloat(a + 2, q1.z);
+				atom_setfloat(a + 3, q1.w);
 				outlet_anything(outlet_eye[eye], _jit_sym_quat, 4, a);
 
 				// TODO: proj matrix doesn't need to be calculated every frame; only when near/far/layer data changes
@@ -442,6 +459,7 @@ public:
 
 	// send the current texture to the Oculus driver:
 	void submit() {
+		t_atom a[1];
 		if (!session) return;
 
 		void * texob = jit_object_findregistered(intexture);
@@ -456,90 +474,24 @@ public:
 		jit_attr_getlong_array(texob, _sym_dim, 2, texdim);
 		//post("submit texture id %ld dim %ld %ld\n", glid, texdim[0], texdim[1]);
 
-		if (!fbo1) {
+		if (!fbo) {
 			object_error(&ob, "no fbo yet");
 			return;	// no texture to copy from.
 		}
 
 		if (!pTextureSet) {
 			object_error(&ob, "no texture set yet");
-			return;	
+			return;
 		}
 
 		// Increment to use next texture, just before writing
 		pTextureSet->CurrentIndex = (pTextureSet->CurrentIndex + 1) % pTextureSet->TextureCount;
 		// TODO? Clear and set up render-target.    
 
-		// TODO: move stuff out of here if we can:
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo1);
 		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
 		GLuint dstId = tex->OGL.TexId;
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, dstId, 0);
-		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
-		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, pTextureDim.w, pTextureDim.h);
-		// following shouldn't be necessary so long as the texture has matching dimensions:
-		glBindTexture(GL_TEXTURE_2D, dstId);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		if (!fbo_check()) {
-			object_error(&ob, "falied to create FBO");
-			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
-			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-			return;
-		}
 
-		glViewport(0, 0, pTextureDim.w, pTextureDim.h);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO -- do we even need a depth buffer?
-
-		// TODO are all these necessary?
-		//glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-
-		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity();
-
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		glOrtho(-1.0, 1., 1.0, -1., -1.0, 1.0);
-
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-
-		//-------------------------
-		glDisable(GL_BLEND);
-		glDisable(GL_DEPTH_TEST);
-		glDisable(GL_LIGHTING);
-
-
-		glEnable(GL_TEXTURE_RECTANGLE_ARB);
-		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, glid);
-		//glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		//glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-		// render quad:
-		glBegin(GL_QUADS);
-		glTexCoord2i(0, 0);
-		glVertex2d(-1., -1.);
-		glTexCoord2i(texdim[0], 0);
-		glVertex2d(1., -1.);
-		glTexCoord2i(texdim[0], texdim[1]);
-		glVertex2d(1., 1.);
-		glTexCoord2i(0, texdim[1]);
-		glVertex2d(-1., 1.);
-		glEnd();
-
-		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
-
-		//glPopClientAttrib();
-
-		//glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-
-		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
-
+		submit_copy(glid, texdim[0], texdim[1], dstId, pTextureDim.w, pTextureDim.h);
 		
 		// Submit frame with one layer we have.
 		// ovr_SubmitFrame returns once frame present is queued up and the next texture slot in the ovrSwapTextureSet is available for the next frame. 
@@ -556,92 +508,246 @@ public:
 			object_error(&ob, "fatal error connection lost.");
 
 			disconnect();
-		} 
+		}
+		else {
+			frameIndex++;
 
-		frameIndex++;
+			t_atom a[1];
+			atom_setsym(a, intexture);
 
-		// copy mirrorTexture back, or just pass input texture through
-		// TODO: implement copying mirror texture back to Jitter
+			mirror_output(a);
 
+			outlet_anything(outlet_tex, ps_jit_gl_texture, 1, a);
+		}
+	}
+	
 
-		// TODO: move stuff out of here if we can:
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo1);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, glid, 0);
-		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
-		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, texdim[0], texdim[1]);
-		// following shouldn't be necessary so long as the texture has matching dimensions:
-		glBindTexture(GL_TEXTURE_2D, glid);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		if (!fbo_check()) {
-			object_error(&ob, "falied to create FBO");
-			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
-			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-			return;
+	void submit_copy(GLuint srcID, int srcWidth, int srcHeight, GLuint dstID, int width, int height) {
+
+		// save some state
+		GLint previousFBO;	// make sure we pop out to the right FBO
+		GLint previousMatrixMode;
+
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &previousFBO);
+		glGetIntegerv(GL_MATRIX_MODE, &previousMatrixMode);
+
+		// save texture state, client state, etc.
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
+		// TODO use rectangle 1?
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, dstID, 0);
+		if (fbo_check()) {	
+			glMatrixMode(GL_TEXTURE);
+			glPushMatrix();
+			glLoadIdentity();
+
+			glViewport(0, 0, width, height);
+
+			glMatrixMode(GL_PROJECTION);
+			glPushMatrix();
+			glLoadIdentity();
+			glOrtho(0.0, width, 0.0, height, -1, 1);
+
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadIdentity();
+
+			glColor4f(0.0, 1.0, 1.0, 1.0);
+
+			glActiveTexture(GL_TEXTURE0);
+			glClientActiveTexture(GL_TEXTURE0);
+			glEnable(GL_TEXTURE_RECTANGLE_ARB);
+			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, srcID);
+
+			// do not need blending if we use black border for alpha and replace env mode, saves a buffer wipe
+			// we can do this since our image draws over the complete surface of the FBO, no pixel goes untouched.
+
+			glDisable(GL_BLEND);
+			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+			// move to VA for rendering
+			GLfloat tex_coords[] = {
+				srcWidth, 0.,
+				0.0, 0.,
+				0.0, srcHeight,
+				srcWidth, srcHeight
+			};
+
+			GLfloat verts[] = {
+				width, height,
+				0.0, height,
+				0.0, 0.0,
+				width, 0.0
+			};
+
+			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+			glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(2, GL_FLOAT, 0, verts);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+
+			glMatrixMode(GL_MODELVIEW);
+			glPopMatrix();
+			glMatrixMode(GL_PROJECTION);
+			glPopMatrix();
+
+			glMatrixMode(GL_TEXTURE);
+			glPopMatrix();
+		}
+		else {
+			object_error(&ob, "falied to create submit FBO");
 		}
 
-		glViewport(0, 0, texdim[0], texdim[1]);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO -- do we even need a depth buffer?
-
-		// TODO are all these necessary?
-		//glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-
-		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity();
-
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		glOrtho(-1.0, 1., 1.0, -1., -1.0, 1.0);
-
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-
-		//-------------------------
-		glDisable(GL_BLEND);
-		glDisable(GL_DEPTH_TEST);
-		glDisable(GL_LIGHTING);
-
-
-		glEnable(GL_TEXTURE_RECTANGLE_ARB);
-
-		tex = (ovrGLTexture*)mirrorTexture;
-		ovrSizei mirrorTexDim = mirrorTexture->Header.TextureSize;
-		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, tex->OGL.TexId); // is this GL_TEXTURE_2D?
-
-		//glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		//glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-		// render quad:
-		glBegin(GL_QUADS);
-		glTexCoord2i(0, 0);
-		glVertex2d(-1., -1.);
-		glTexCoord2i(mirrorTexDim.w, 0);
-		glVertex2d(1., -1.);
-		glTexCoord2i(mirrorTexDim.w, mirrorTexDim.h);
-		glVertex2d(1., 1.);
-		glTexCoord2i(0, mirrorTexDim.h);
-		glVertex2d(-1., 1.);
-		glEnd();
-
-		glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
-
-		//glPopClientAttrib();
-
-		//glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
-		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+		glPopAttrib();
+		glPopClientAttrib();
 
+		glMatrixMode(previousMatrixMode);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, previousFBO);
 
-
-		t_atom a[1];
-		atom_setsym(a, intexture);
-		outlet_anything(outlet_tex, ps_jit_gl_texture, 1, a);
+		//jit_ob3d_set_context(ctx);
 	}
+
+	bool mirror_output(t_atom * a) {
+		if (!mirror) return false;
+		if (!mirrorTexture) {
+			 object_error(&ob, "no mirror texture");
+			 return false;
+		 }
+
+		t_symbol * dst = outname;
+		void * outtexture = jit_object_findregistered(dst);
+		if (!outtexture) {
+			object_error(&ob, "no texture to draw");
+			return false;	// no texture to copy from.
+		}
+		long glid = jit_attr_getlong(outtexture, ps_glid);
+		// get output texture dimensions
+		//t_atom_long outdim[2];
+		//jit_attr_getlong_array(texob, _sym_dim, 2, outdim);
+
+
+		// get source texture:
+		ovrGLTexture * tex = (ovrGLTexture*)mirrorTexture;
+		ovrSizei mirrorTexDim = mirrorTexture->Header.TextureSize;
+
+		// cache/restore context in case in capture mode
+		// TODO: necessary ? JKC says no unless context changed above? should be set during draw for you. 
+		//t_jit_gl_context ctx = jit_gl_get_context();
+		//jit_ob3d_set_context(this);
+
+		// add texture to OB3D list.
+		jit_attr_setsym(this, gensym("texture"), dst);
+
+		// update texture dim to match mirror:
+		outdim[0] = mirrorTexDim.w;
+		outdim[1] = mirrorTexDim.h;
+		jit_attr_setlong_array(outtexture, _jit_sym_dim, 2, outdim);
+
+		// save some state
+		GLint previousFBO;	// make sure we pop out to the right FBO
+		GLint previousMatrixMode;
+
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &previousFBO);
+		glGetIntegerv(GL_MATRIX_MODE, &previousMatrixMode);
+
+		// save texture state, client state, etc.
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbomirror);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, glid, 0);
+		if (fbo_check()) {
+			t_atom_long width = outdim[0];
+			t_atom_long height = outdim[1];
+
+			glMatrixMode(GL_TEXTURE);
+			glPushMatrix();
+			glLoadIdentity();
+
+			glViewport(0, 0, width, height);
+
+			glMatrixMode(GL_PROJECTION);
+			glPushMatrix();
+			glLoadIdentity();
+			glOrtho(0.0, width, 0.0, height, -1, 1);
+
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadIdentity();
+
+			glColor4f(0.0, 1.0, 1.0, 1.0);
+
+			glActiveTexture(GL_TEXTURE0);
+			glClientActiveTexture(GL_TEXTURE0);
+			glEnable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
+
+			// do not need blending if we use black border for alpha and replace env mode, saves a buffer wipe
+			// we can do this since our image draws over the complete surface of the FBO, no pixel goes untouched.
+
+			glDisable(GL_BLEND);
+			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+			GLfloat tex_coords[] = {
+				1., 1.,
+				0.0, 1.,
+				0.0, 0.0,
+				1., 0.0
+			};
+
+			GLfloat verts[] = {
+				width, height,
+				0.0, height,
+				0.0, 0.0,
+				width, 0.0
+			};
+
+			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+			glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(2, GL_FLOAT, 0, verts);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			glMatrixMode(GL_MODELVIEW);
+			glPopMatrix();
+			glMatrixMode(GL_PROJECTION);
+			glPopMatrix();
+
+			glMatrixMode(GL_TEXTURE);
+			glPopMatrix();
+
+			// success!
+			atom_setsym(a, dst);
+		}
+		else {
+			object_error(&ob, "falied to create mirror FBO");
+		}
+
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+		glPopAttrib();
+		glPopClientAttrib();
+
+		glMatrixMode(previousMatrixMode);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, previousFBO);
+
+		//jit_ob3d_set_context(ctx);
+
+		return true;
+	}
+
 
 	void perf() {
 		// just toggle through the various perf modes
@@ -660,12 +766,32 @@ public:
 	t_jit_err dest_changed() {
 		object_post(&ob, "dest_changed");
 
-		glGenFramebuffersEXT(1, &fbo1);
-		glGenRenderbuffersEXT(1, &rbo);
+		t_symbol *context = jit_attr_getsym(this, gensym("drawto"));
+
+		glGenFramebuffersEXT(1, &fbo);
+		glGenFramebuffersEXT(1, &fbomirror);
 
 		// create a jit.gl.texture to copy mirror to
-		// create fbo to do that copy??
-		
+		outtexture = jit_object_new(gensym("jit_gl_texture"), context);
+		if (outtexture) {
+			// set texture attributes.
+			outname = jit_attr_getsym(outtexture, gensym("name"));
+			if (jit_attr_setlong_array(outtexture, _jit_sym_dim, 2, outdim)) object_error(&ob, "failed to set mirror dim");
+			if (jit_attr_setlong(outtexture, gensym("rectangle"), 1)) object_error(&ob, "failed to set mirror rectangle mode");
+			//if (jit_attr_setsym(outtexture, _jit_sym_name, outname)) object_error(&ob, "failed to set mirror texture name");
+			jit_attr_setsym(outtexture, gensym("defaultimage"), gensym("black"));
+			//jit_attr_setlong(outtexture, gensym("flip"), 0);
+
+			// our texture has to be bound in the new context before we can use it
+			// http://cycling74.com/forums/topic.php?id=29197
+			t_jit_gl_drawinfo drawInfo;
+			if (jit_gl_drawinfo_setup(this, &drawInfo)) object_error(&ob, "failed to get draw info");
+			jit_gl_bindtexture(&drawInfo, outname, 0);
+			jit_gl_unbindtexture(&drawInfo, outname, 0);
+		}
+		else {
+			object_error(&ob, "failed to create Jitter mirror texture");
+		}
 		return JIT_ERR_NONE;
 	}
 
@@ -674,13 +800,17 @@ public:
 		object_post(&ob, "dest_closing");
 		disconnect();
 
-		if (fbo1) {
-			glDeleteFramebuffersEXT(1, &fbo1);
-			fbo1 = 0;
+		if (fbo) {
+			glDeleteFramebuffersEXT(1, &fbo);
+			fbo = 0;
 		}
-		if (rbo) {
-			glDeleteRenderbuffersEXT(1, &rbo);
-			rbo = 0;
+		if (fbomirror) {
+			glDeleteFramebuffersEXT(1, &fbomirror);
+			fbomirror = 0;
+		}
+		if (outtexture) {
+			jit_object_free(outtexture);
+			outtexture = 0;
 		}
 
 		return JIT_ERR_NONE;
@@ -748,7 +878,9 @@ public:
 			}
 		}
 	}
+
 };
+
 
 void * oculusrift_new(t_symbol *s, long argc, t_atom *argv) {
 	oculusrift *x = NULL;
@@ -784,7 +916,7 @@ void oculusrift_assist(oculusrift *x, void *b, long m, long a, char *s)
 		case 0: sprintf(s, "output/mirror texture"); break;
 		case 1: sprintf(s, "to left eye camera"); break;
 		case 2: sprintf(s, "to right eye camera"); break;
-		case 3: sprintf(s, "to scene node"); break;
+		case 3: sprintf(s, "to scene node (set texture dim)"); break;
 		case 4: sprintf(s, "tracking state"); break;
 		case 5: sprintf(s, "other messages"); break;
 		//default: sprintf(s, "I am outlet %ld", a); break;
@@ -968,6 +1100,10 @@ void ext_main(void *r)
 	// TODO: why is Rift not using max FOV (seems like the black overlay is not being made bigger - oculus bug?)
 	CLASS_ATTR_LONG(c, "max_fov", 0, oculusrift, max_fov);
 	CLASS_ATTR_ACCESSORS(c, "max_fov", NULL, oculusrift_max_fov_set);
+	CLASS_ATTR_STYLE_LABEL(c, "max_fov", 0, "onoff", "use maximum field of view");
+
+	CLASS_ATTR_LONG(c, "mirror", 0, oculusrift, mirror);
+	CLASS_ATTR_STYLE_LABEL(c, "mirror", 0, "onoff", "mirror oculus display in main window");
 
 	
 	class_register(CLASS_BOX, c);
