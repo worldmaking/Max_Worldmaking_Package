@@ -7,13 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		22CF114E0EE9A6A70054F513 /* oculusrift.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 22CF114D0EE9A6A70054F513 /* oculusrift.cpp */; };
+		22CF114E0EE9A6A70054F513 /* oculusfake.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 22CF114D0EE9A6A70054F513 /* oculusfake.cpp */; };
+		8987091D1C53986F0098F05B /* commonsyms.c in Sources */ = {isa = PBXBuildFile; fileRef = 8987091C1C53986F0098F05B /* commonsyms.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		22CF10220EE984600054F513 /* maxmspsdk.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = maxmspsdk.xcconfig; path = ../maxmspsdk.xcconfig; sourceTree = SOURCE_ROOT; };
-		22CF114D0EE9A6A70054F513 /* oculusrift.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = oculusrift.cpp; sourceTree = "<group>"; };
+		22CF114D0EE9A6A70054F513 /* oculusfake.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = oculusfake.cpp; sourceTree = "<group>"; };
 		2FBBEAE508F335360078DB84 /* oculusrift.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = oculusrift.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
+		8987091C1C53986F0098F05B /* commonsyms.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = commonsyms.c; path = "../../../max-sdk/source/c74support/max-includes/common/commonsyms.c"; sourceTree = "<group>"; };
+		8987091E1C5399E50098F05B /* JitterAPI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JitterAPI.framework; path = "../../../max-sdk/source/c74support/jit-includes/JitterAPI.framework"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -30,8 +33,10 @@
 		089C166AFE841209C02AAC07 /* iterator */ = {
 			isa = PBXGroup;
 			children = (
+				8987091E1C5399E50098F05B /* JitterAPI.framework */,
+				8987091C1C53986F0098F05B /* commonsyms.c */,
 				22CF10220EE984600054F513 /* maxmspsdk.xcconfig */,
-				22CF114D0EE9A6A70054F513 /* oculusrift.cpp */,
+				22CF114D0EE9A6A70054F513 /* oculusfake.cpp */,
 				19C28FB4FE9D528D11CA2CBB /* Products */,
 			);
 			name = iterator;
@@ -126,7 +131,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				22CF114E0EE9A6A70054F513 /* oculusrift.cpp in Sources */,
+				8987091D1C53986F0098F05B /* commonsyms.c in Sources */,
+				22CF114E0EE9A6A70054F513 /* oculusfake.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -151,7 +157,6 @@
 			buildSettings = {
 				COPY_PHASE_STRIP = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
 				PRODUCT_NAME = oculusrift;
 			};
 			name = Development;
@@ -161,7 +166,6 @@
 			baseConfigurationReference = 22CF10220EE984600054F513 /* maxmspsdk.xcconfig */;
 			buildSettings = {
 				COPY_PHASE_STRIP = YES;
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
 				PRODUCT_NAME = oculusrift;
 			};
 			name = Deployment;
