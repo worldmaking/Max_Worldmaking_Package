@@ -35,6 +35,10 @@ extern "C" {
 
 #include "NuiApi.h"
 
+using glm::quat;
+using glm::vec2;
+using glm::vec3;
+
 
 #pragma pack(push, 1)
 struct BGRA {
@@ -51,7 +55,7 @@ struct DepthPlayer {
 };
 #pragma pack(pop)
 
-struct vec3c { uint8_t x, y, z; };
+//struct vec3c { uint8_t x, y, z; };
 
 #include <new> // for in-place constructor
 
@@ -84,6 +88,7 @@ public:
 
 	t_systhread capture_thread;
 	int capturing;
+	int hasColorMap;
 
 	// local copies of the data
 
@@ -103,31 +108,39 @@ public:
 	void *		cloud_mat;
 	void *		cloud_mat_wrapper;
 	t_atom		cloud_name[1];
-	glm::vec3 *	cloud_back;
+	vec3 *		cloud_back;
 
 	// cloud matrix for output:
 	void *		texcoord_mat;
 	void *		texcoord_mat_wrapper;
 	t_atom		texcoord_name[1];
-	glm::vec2 *	texcoord_back;
+	vec2 *		texcoord_back;
+
+	// calibration
+	vec2 rgb_focal, rgb_center;
 
 	// pose of cloud:
-	glm::vec3	cloud_position;
+	vec3	cloud_position;
 	glm::quat	cloud_quat;
 
 	// attrs:
+	int			index; // device index
 	int			unique;	// whether we output whenever there is a bang, or only when there is new data
 	int			use_rgb; // whether to output RGB, or depth only
+	int			use_player; // whether to output player IDs
+	int			use_skeleton; // whether to output skeleton data
+	int			seated;
 	int			align_rgb_to_cloud;	// output RGB image warped to fit cloud
 	int			mirror;	// flip the X axis
 	int			near_mode;
+	int			timeout;
 
 	volatile char new_rgb_data;
 	volatile char new_depth_data;
 	volatile char new_cloud_data;
 
-	// attrs
-	int index;
+	uint16_t unmappedDepthTmp[DEPTH_CELLS];
+	long colorCoordinates[DEPTH_CELLS * 2];
 
 	kinect() {
 		device = 0;
@@ -138,12 +151,17 @@ public:
 		new_depth_data = 0;
 		new_cloud_data = 0;
 
-		mirror = 0;
+		mirror = 1;
+
 
 		use_rgb = 1;
+		use_player = 0;
+		use_skeleton = 0;
+		seated = 0;
 		align_rgb_to_cloud = 0;
-
 		near_mode = 0;
+
+		timeout = 30;
 
 		outlet_msg = outlet_new(&ob, 0);
 		outlet_skeleton = outlet_new(&ob, 0);
@@ -270,7 +288,7 @@ public:
 		}
 	}
 
-	
+
 	~kinect() {
 		close();
 
@@ -347,53 +365,59 @@ public:
 		HRESULT result = 0;
 		DWORD dwImageFrameFlags;
 		DWORD initFlags = 0;
+		hasColorMap = 0;
 
 		initFlags |= NUI_INITIALIZE_FLAG_USES_COLOR;
-		//		if (player) {
-		//			initFlags |= NUI_INITIALIZE_FLAG_USES_DEPTH_AND_PLAYER_INDEX;
-		//		} else {
-		initFlags |= NUI_INITIALIZE_FLAG_USES_DEPTH;
-		//		}
-		//		if (skeleton) {
-		//			initFlags |= NUI_INITIALIZE_FLAG_USES_SKELETON;
-		//		}
+		if (use_player) {
+			initFlags |= NUI_INITIALIZE_FLAG_USES_DEPTH_AND_PLAYER_INDEX;
+		}
+		else {
+			initFlags |= NUI_INITIALIZE_FLAG_USES_DEPTH;
+		}
+		if (use_skeleton) {
+			initFlags |= NUI_INITIALIZE_FLAG_USES_SKELETON;
+		}
 		result = device->NuiInitialize(initFlags);
+
 		if (result != S_OK) {
 			object_error(&ob, "failed to initialize sensor");
 			goto done;
 		}
-	
-		//		if (skeleton) {
-		//			if (seated) {
-		//				NuiSkeletonTrackingEnable(NULL, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT);
-		//			} else {
-		//				NuiSkeletonTrackingEnable(NULL, 0);
-		//			}
-		//		}
+
+		if (use_skeleton) {
+			if (seated) {
+				NuiSkeletonTrackingEnable(NULL, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT);
+			}
+			else {
+				NuiSkeletonTrackingEnable(NULL, 0);
+			}
+		}
 
 		object_post(&ob, "device initialized");
 
-		dwImageFrameFlags = 0;
-		//		if (near_mode) dwImageFrameFlags |= NUI_IMAGE_STREAM_FLAG_ENABLE_NEAR_MODE;
-		result = device->NuiImageStreamOpen(
-			NUI_IMAGE_TYPE_COLOR, //NUI_IMAGE_TYPE eImageType,
-			NUI_IMAGE_RESOLUTION_640x480, // NUI_IMAGE_RESOLUTION eResolution,
-			dwImageFrameFlags,
-			2, //DWORD dwFrameLimit,
-			0,
-			&colorStreamHandle);
-		if (result != S_OK) {
-			object_error(&ob, "failed to open stream");
-			goto done;
+		if (use_rgb) {
+			dwImageFrameFlags = 0;
+			if (near_mode) dwImageFrameFlags |= NUI_IMAGE_STREAM_FLAG_ENABLE_NEAR_MODE;
+			result = device->NuiImageStreamOpen(
+				NUI_IMAGE_TYPE_COLOR, //NUI_IMAGE_TYPE eImageType,
+				NUI_IMAGE_RESOLUTION_640x480, // NUI_IMAGE_RESOLUTION eResolution,
+				dwImageFrameFlags,
+				2, //DWORD dwFrameLimit,
+				0,
+				&colorStreamHandle);
+			if (result != S_OK) {
+				object_error(&ob, "failed to open stream");
+				goto done;
+			}
 		}
 
 		object_post(&ob, "opened color stream");
 
 		dwImageFrameFlags = 0;
 		dwImageFrameFlags |= NUI_IMAGE_STREAM_FLAG_DISTINCT_OVERFLOW_DEPTH_VALUES;
-		//		if (near_mode) dwImageFrameFlags |= NUI_IMAGE_STREAM_FLAG_ENABLE_NEAR_MODE;
+		if (near_mode) dwImageFrameFlags |= NUI_IMAGE_STREAM_FLAG_ENABLE_NEAR_MODE;
 		NUI_IMAGE_TYPE eImageType = NUI_IMAGE_TYPE_DEPTH;
-		//		if (player) eImageType = NUI_IMAGE_TYPE_DEPTH_AND_PLAYER_INDEX;
+		if (use_player) eImageType = NUI_IMAGE_TYPE_DEPTH_AND_PLAYER_INDEX;
 		result = device->NuiImageStreamOpen(
 			eImageType,
 			NUI_IMAGE_RESOLUTION_640x480, // NUI_IMAGE_RESOLUTION eResolution,
@@ -405,8 +429,9 @@ public:
 			object_error(&ob, "failed to open stream");
 			goto done;
 		}
-
 		object_post(&ob, "opened depth stream");
+
+		// estimateCalibration();
 
 		//id = (CString)(device->NuiUniqueId());
 
@@ -421,7 +446,7 @@ public:
 		while (capturing) {
 			pollDepth();
 			pollColor();
-			//			if (skeleton) pollSkeleton();
+			//if (use_skeleton) pollSkeleton();
 			//systhread_sleep(0);
 		}
 		post("finished processing");
@@ -429,18 +454,46 @@ public:
 	done:
 		shutdown();
 	}
+
+	vec3 realWorldToDepth(const vec3& p) {
+		const Vector4 v = { p.x, p.y, p.z, 1.f };
+		LONG x = 0;
+		LONG y = 0;
+		USHORT d = 0;
+		NuiTransformSkeletonToDepthImage(v, &x, &y, &d, NUI_IMAGE_RESOLUTION_640x480);
+		d >>= 3;
+		return vec3(x, y, d * 0.001f);
+	}
+
+	void estimateCalibration() {
+		// deduce focal depth from depth-to-world transform
+		vec3 p = realWorldToDepth(vec3(0.f, 0.f, 1.f));
+		// image center
+		float cx = p.x;
+		float cy = p.y;
+		p = realWorldToDepth(vec3(1.f, 1.f, 1.f));
+		float fx = (p.x - cx);
+		float fy = -(p.y - cy);
+		const float correction = NUI_CAMERA_COLOR_NOMINAL_FOCAL_LENGTH_IN_PIXELS
+			/ (NUI_CAMERA_DEPTH_NOMINAL_FOCAL_LENGTH_IN_PIXELS * 2.f);
+		// pixels are square
+		rgb_focal.x = fx * correction;
+		rgb_focal.y = rgb_focal.x;
+		rgb_center.x = cx;
+		rgb_center.y = cy;
+	}
 	
 	void pollDepth() {
-
 		if (!device) return;
 
 		HRESULT result;
 		NUI_IMAGE_FRAME imageFrame;
-		DWORD dwMillisecondsToWait = 200;
+		DWORD dwMillisecondsToWait = timeout;
 
 		result = device->NuiImageStreamGetNextFrame(depthStreamHandle, dwMillisecondsToWait, &imageFrame);
 		if (result == E_NUI_FRAME_NO_DATA) {
 			// timeout with no data. bail or continue?
+			systhread_sleep(30);
 			return;
 		}
 		else if (FAILED(result)) {
@@ -449,9 +502,12 @@ public:
 				object_error(&ob, "arg stream error"); break;
 			case E_POINTER:
 				object_error(&ob, "pointer stream error"); break;
+			case S_FALSE:
+				object_warn(&ob, "timeout"); break;
 			default:
 				object_error(&ob, "stream error"); break;
 			}
+			systhread_sleep(30);
 			return;
 		}
 		INuiFrameTexture * imageTexture = NULL;
@@ -467,20 +523,43 @@ public:
 		}
 		
 		NUI_LOCKED_RECT LockedRect;
-
 		// Lock the frame data so the Kinect knows not to modify it while we're reading it
 		imageTexture->LockRect(0, &LockedRect, NULL, 0);
-
 		
 		// Make sure we've received valid data 
 		if (LockedRect.Pitch != 0) {
+
+			
+			NUI_DEPTH_IMAGE_PIXEL * src = reinterpret_cast<NUI_DEPTH_IMAGE_PIXEL *>(LockedRect.pBits);
+			uint32_t * dst = depth_back;
+			// char * dstp = player_mat.back;
+			static const int cells = DEPTH_HEIGHT * DEPTH_WIDTH;
+
+			// first generate packed depth values fom extended depth values (which include near pixels)
+			for (int i = 0; i < cells; i++) {
+				unmappedDepthTmp[i] = src[i].depth << NUI_IMAGE_PLAYER_INDEX_SHIFT;
+			}
+
+			if (!hasColorMap) {
+				// use it to generate the color map:
+				device->NuiImageGetColorPixelCoordinateFrameFromDepthPixelFrameAtResolution(
+					NUI_IMAGE_RESOLUTION_640x480,
+					NUI_IMAGE_RESOLUTION_640x480,
+					cells,
+					unmappedDepthTmp,
+					cells * 2,
+					colorCoordinates);
+				hasColorMap = 1;
+			}
+
+			//if (uselock) systhread_mutex_lock(depth_mutex);
+
 			if (mirror) {
-				uint32_t * dst = depth_back;
-				NUI_DEPTH_IMAGE_PIXEL * src = (NUI_DEPTH_IMAGE_PIXEL *)LockedRect.pBits;
+				// convert to Jitter-friendly RGB layout
 				int cells = DEPTH_HEIGHT * DEPTH_WIDTH;
 				do {
 					*dst++ = src->depth;
-					//					*dstp++ = (char)src->playerIndex;
+					//*dstp++ = (char)src->playerIndex;
 					src++;
 				} while (--cells);
 			}
@@ -491,7 +570,7 @@ public:
 					int cells = DEPTH_WIDTH;
 					do {
 						*dst++ = src->depth;
-						//						*dstp++ = (char)src->playerIndex;
+						//*dstp++ = (char)src->playerIndex;
 						src--;
 					} while (--cells);
 				}
@@ -572,7 +651,7 @@ public:
 
 		HRESULT result;
 		NUI_IMAGE_FRAME imageFrame;
-		DWORD dwMillisecondsToWait = 200;
+		DWORD dwMillisecondsToWait = timeout;
 
 		result = device->NuiImageStreamGetNextFrame(colorStreamHandle, dwMillisecondsToWait, &imageFrame);
 		if (result == E_NUI_FRAME_NO_DATA) {
@@ -724,6 +803,15 @@ void ext_main(void *r)
 	class_addmethod(c, (method)kinect_open, "open", A_GIMME, 0);
 
 	class_addmethod(c, (method)kinect_bang, "bang", 0);
+
+
+	CLASS_ATTR_LONG(c, "use_rgb", 0, kinect, use_rgb);
+	CLASS_ATTR_LONG(c, "use_player", 0, kinect, use_player);
+	CLASS_ATTR_LONG(c, "use_skeleton", 0, kinect, use_skeleton);
+	CLASS_ATTR_LONG(c, "timeout", 0, kinect, timeout);
+
+	CLASS_ATTR_LONG(c, "mirror", 0, kinect, mirror);
+	CLASS_ATTR_STYLE_LABEL(c, "mirror", 0, "onoff", "flip the color image around Y");
 	
 	class_register(CLASS_BOX, c);
 	max_class = c;
