@@ -631,31 +631,19 @@ public:
 			case E_OUTOFMEMORY:
 				object_error(&ob, "Ran out of memory"); break;
 			case E_NOINTERFACE:
-				object_error(&ob, "unsupported"); break; 
+				object_error(&ob, "unsupported"); break;
 			case E_ABORT:
 				object_error(&ob, "Operation aborted"); break;
 			case E_ACCESSDENIED:
-				object_error(&ob, "General access denied error"); break; 
+				object_error(&ob, "General access denied error"); break;
 			case E_POINTER:
 				object_error(&ob, "pointer stream error"); break;
 			case E_HANDLE:
 				object_error(&ob, "invalid handle"); break;
 			case E_PENDING:
-				object_error(&ob, "The data necessary to complete this operation is not yet available."); break; 
+				object_error(&ob, "The data necessary to complete this operation is not yet available."); break;
 			case S_FALSE:
 				object_error(&ob, "timeout"); break;
-<<<<<<< HEAD
-			
-=======
-			case E_FAIL:
-				object_error(&ob, "acsess deined error"); break;
-			case E_NOINTERFACE:
-				object_error(&ob, "invalid pointerr"); break;
-			case E_OUTOFMEMORY:
-				object_error(&ob, "one or more arguments are invalid"); break;
-			case E_HANDLE:
-				object_error(&ob, "operation aborted"); break;
->>>>>>> origin/master
 			default:
 				object_error(&ob, "stream error %x"); break;
 			}
@@ -872,25 +860,14 @@ public:
 				object_error(&ob, "General access denied error"); break;
 			case E_POINTER:
 				object_error(&ob, "pointer stream error"); break;
-<<<<<<< HEAD
 			case E_HANDLE:
 				object_error(&ob, "invalid handle"); break;
 			case E_PENDING:
 				object_error(&ob, "The data necessary to complete this operation is not yet available."); break;
 			case S_FALSE:
 				object_error(&ob, "timeout"); break;
-=======
-			case S_FALSE:
-				object_error(&ob, "timeout"); break;
 			case E_FAIL:
 				object_error(&ob, "acsess deined error"); break;
-			case E_NOINTERFACE:
-				object_error(&ob, "invalid pointerr"); break;
-			case E_OUTOFMEMORY:
-				object_error(&ob, "one or more arguments are invalid"); break;
-			case E_HANDLE:
-				object_error(&ob, "operation aborted"); break;
->>>>>>> origin/master
 			default:
 				object_error(&ob, "stream error %x"); break;
 			}
@@ -1019,8 +996,8 @@ public:
 		atom_setfloat(a + 1, skeleton_back.vFloorClipPlane.y);
 		atom_setfloat(a + 2, skeleton_back.vFloorClipPlane.z);
 		atom_setfloat(a + 3, skeleton_back.vFloorClipPlane.w);
-		
-		outlet_anything(outlet_msg, ps_accel , 4, a);
+
+		outlet_anything(outlet_msg, ps_accel, 4, a);
 		outlet_anything(outlet_msg, ps_floor_plane, 4, a);
 		outlet_anything(outlet_msg, ps_hip_center, 4, a);
 		outlet_anything(outlet_msg, ps_spine, 4, a);
