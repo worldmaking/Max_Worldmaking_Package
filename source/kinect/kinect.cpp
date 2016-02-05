@@ -388,9 +388,6 @@ public:
 			else if (E_NUI_NOTREADY == result) {
 				error("Kinect for Windows is not ready.");
 			}
-			else if (E_NUI_SKELETAL_ENGINE_BUSY == result) {
-				error(" Skeletal engine is already in use");
-			}
 			else if (E_NUI_NOTPOWERED == result) {
 				error("Kinect for Windows is not powered.");
 			}
@@ -492,13 +489,6 @@ public:
 			else {
 				NuiSkeletonTrackingEnable(NULL, 0);
 			}
-		}
-		if (audio) {
-			initFlags |= NUI_INITIALIZE_FLAG_USES_AUDIO;
-		}
-
-		if (high_quality_color) {
-			initFlags |= NUI_INITIALIZE_FLAG_USES_HIGH_QUALITY_COLOR;
 		}
 		object_post(&ob, "device initialized");
 
@@ -631,19 +621,20 @@ public:
 			case E_OUTOFMEMORY:
 				object_error(&ob, "Ran out of memory"); break;
 			case E_NOINTERFACE:
-				object_error(&ob, "unsupported"); break;
+				object_error(&ob, "unsupported"); break; 
 			case E_ABORT:
 				object_error(&ob, "Operation aborted"); break;
 			case E_ACCESSDENIED:
-				object_error(&ob, "General access denied error"); break;
+				object_error(&ob, "General access denied error"); break; 
 			case E_POINTER:
 				object_error(&ob, "pointer stream error"); break;
 			case E_HANDLE:
 				object_error(&ob, "invalid handle"); break;
 			case E_PENDING:
-				object_error(&ob, "The data necessary to complete this operation is not yet available."); break;
+				object_error(&ob, "The data necessary to complete this operation is not yet available."); break; 
 			case S_FALSE:
 				object_error(&ob, "timeout"); break;
+			
 			default:
 				object_error(&ob, "stream error %x"); break;
 			}
@@ -866,10 +857,8 @@ public:
 				object_error(&ob, "The data necessary to complete this operation is not yet available."); break;
 			case S_FALSE:
 				object_error(&ob, "timeout"); break;
-			case E_FAIL:
-				object_error(&ob, "acsess deined error"); break;
 			default:
-				object_error(&ob, "stream error %x"); break;
+				object_error(&ob, "stream error"); break;
 			}
 			return;
 		}
@@ -996,8 +985,8 @@ public:
 		atom_setfloat(a + 1, skeleton_back.vFloorClipPlane.y);
 		atom_setfloat(a + 2, skeleton_back.vFloorClipPlane.z);
 		atom_setfloat(a + 3, skeleton_back.vFloorClipPlane.w);
-
-		outlet_anything(outlet_msg, ps_accel, 4, a);
+		
+		outlet_anything(outlet_msg, ps_accel , 4, a);
 		outlet_anything(outlet_msg, ps_floor_plane, 4, a);
 		outlet_anything(outlet_msg, ps_hip_center, 4, a);
 		outlet_anything(outlet_msg, ps_spine, 4, a);
