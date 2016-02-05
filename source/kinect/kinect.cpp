@@ -223,7 +223,7 @@ public:
 
 	// attrs
 	int unique, usecolor, align_depth_to_color, uselock;
-	int player, skeleton, seated, near_mode;
+	int player, skeleton, seated, near_mode, audio, high_quality_color;
 	int device_count;
 	int timeout;
 	vec2 rgb_focal, rgb_center;
@@ -271,7 +271,10 @@ public:
 		usecolor = 1;
 		uselock = 1;
 		align_depth_to_color = 1;
-		player = skeleton = seated = near_mode = 0;
+		player = 0;
+		skeleton = 0;
+		seated = 0;
+		near_mode = 0;
 
 		timeout = 30;
 
@@ -465,6 +468,14 @@ public:
 		if (skeleton) {
 			initFlags |= NUI_INITIALIZE_FLAG_USES_SKELETON;
 		}
+		if (audio) {
+			initFlags |= NUI_INITIALIZE_FLAG_USES_AUDIO;
+		}
+		if (high_quality_color) {
+			initFlags |= NUI_INITIALIZE_FLAG_USES_HIGH_QUALITY_COLOR;
+		}
+
+
 		result = device->NuiInitialize(initFlags);
 
 		if (result != S_OK) {
@@ -607,10 +618,23 @@ public:
 			switch (result) {
 			case E_INVALIDARG:
 				object_error(&ob, "arg stream error"); break;
+			case E_OUTOFMEMORY:
+				object_error(&ob, "Ran out of memory"); break;
+			case E_NOINTERFACE:
+				object_error(&ob, "unsupported"); break; 
+			case E_ABORT:
+				object_error(&ob, "Operation aborted"); break;
+			case E_ACCESSDENIED:
+				object_error(&ob, "General access denied error"); break; 
 			case E_POINTER:
 				object_error(&ob, "pointer stream error"); break;
+			case E_HANDLE:
+				object_error(&ob, "invalid handle"); break;
+			case E_PENDING:
+				object_error(&ob, "The data necessary to complete this operation is not yet available."); break; 
 			case S_FALSE:
 				object_error(&ob, "timeout"); break;
+			
 			default:
 				object_error(&ob, "stream error %x"); break;
 			}
@@ -817,8 +841,22 @@ public:
 			switch (result) {
 			case E_INVALIDARG:
 				object_error(&ob, "arg stream error"); break;
+			case E_OUTOFMEMORY:
+				object_error(&ob, "Ran out of memory"); break;
+			case E_NOINTERFACE:
+				object_error(&ob, "unsupported"); break;
+			case E_ABORT:
+				object_error(&ob, "Operation aborted"); break;
+			case E_ACCESSDENIED:
+				object_error(&ob, "General access denied error"); break;
 			case E_POINTER:
 				object_error(&ob, "pointer stream error"); break;
+			case E_HANDLE:
+				object_error(&ob, "invalid handle"); break;
+			case E_PENDING:
+				object_error(&ob, "The data necessary to complete this operation is not yet available."); break;
+			case S_FALSE:
+				object_error(&ob, "timeout"); break;
 			default:
 				object_error(&ob, "stream error"); break;
 			}
@@ -947,7 +985,31 @@ public:
 		atom_setfloat(a + 1, skeleton_back.vFloorClipPlane.y);
 		atom_setfloat(a + 2, skeleton_back.vFloorClipPlane.z);
 		atom_setfloat(a + 3, skeleton_back.vFloorClipPlane.w);
+		
+		outlet_anything(outlet_msg, ps_accel , 4, a);
 		outlet_anything(outlet_msg, ps_floor_plane, 4, a);
+		outlet_anything(outlet_msg, ps_hip_center, 4, a);
+		outlet_anything(outlet_msg, ps_spine, 4, a);
+		outlet_anything(outlet_msg, ps_shoulder_center, 4, a);
+		outlet_anything(outlet_msg, ps_head, 4, a);
+		outlet_anything(outlet_msg, ps_shoulder_left, 4, a);
+		outlet_anything(outlet_msg, ps_elbow_left, 4, a);
+		outlet_anything(outlet_msg, ps_wrist_left, 4, a);
+		outlet_anything(outlet_msg, ps_hand_left, 4, a);
+		outlet_anything(outlet_msg, ps_shoulder_right, 4, a);
+		outlet_anything(outlet_msg, ps_elbow_right, 4, a);
+		outlet_anything(outlet_msg, ps_wrist_right, 4, a);
+		outlet_anything(outlet_msg, ps_hand_right, 4, a);
+		outlet_anything(outlet_msg, ps_shoulder_left, 4, a);
+		outlet_anything(outlet_msg, ps_elbow_left, 4, a);
+		outlet_anything(outlet_msg, ps_hip_left, 4, a);
+		outlet_anything(outlet_msg, ps_knee_left, 4, a);
+		outlet_anything(outlet_msg, ps_ankle_left, 4, a);
+		outlet_anything(outlet_msg, ps_foot_left, 4, a);
+		outlet_anything(outlet_msg, ps_hip_right, 4, a);
+		outlet_anything(outlet_msg, ps_knee_right, 4, a);
+		outlet_anything(outlet_msg, ps_ankle_right, 4, a);
+		outlet_anything(outlet_msg, ps_foot_right, 4, a);
 
 		for (int i = 0; i < NUI_SKELETON_COUNT; i++) {
 			const NUI_SKELETON_DATA & skeleton = skeleton_back.SkeletonData[i];
@@ -957,6 +1019,24 @@ public:
 			// 19 joints (4 arm, 4 arm, 4 leg, 4 leg, 3 spine)
 			// to make it an even 4x5 matrix friendly for mesh lines, could add a duplicate spine joint (neck)
 			// to make it sensible, each should arc out from the center (hip or shoulder)
+			//___________________________________________________________________________
+			// Some smoothing with little latency (defaults).
+			// Only filters out small jitters.
+			// Good for gesture recognition in games.
+			const NUI_TRANSFORM_SMOOTH_PARAMETERS defaultParams = { 0.5f, 0.5f, 0.5f, 0.05f, 0.04f };
+
+			// Smoothed with some latency.
+			// Filters out medium jitters.
+			// Good for a menu system that needs to be smooth but
+			// doesn't need the reduced latency as much as gesture recognition does.
+			const NUI_TRANSFORM_SMOOTH_PARAMETERS somewhatLatentParams = { 0.5f, 0.1f, 0.5f, 0.1f, 0.1f };
+
+			// Very smooth, but with a lot of latency.
+			// Filters out large jitters.
+			// Good for situations where smooth data is absolutely required
+			// and latency is not an issue.
+			const NUI_TRANSFORM_SMOOTH_PARAMETERS verySmoothParams = { 0.7f, 0.3f, 1.0f, 1.0f, 1.0f };
+
 			switch (skeleton.eTrackingState) {
 			case NUI_SKELETON_TRACKED:
 				outputBone(id, ps_hip_center, skeleton, NUI_SKELETON_POSITION_HIP_CENTER);
