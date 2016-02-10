@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 2446.0, 140.0, 825.0, 807.0 ],
+		"rect" : [ 979.0, 117.0, 825.0, 807.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -37,6 +37,33 @@
 		"style" : "",
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
+				"box" : 				{
+					"fontface" : 1,
+					"id" : "obj-32",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 457.0, 47.0, 309.0, 20.0 ],
+					"style" : "",
+					"text" : "Learn more about 360 video at making360.com"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-30",
+					"linecount" : 2,
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 457.0, 70.0, 236.0, 36.0 ],
+					"style" : "",
+					"text" : ";\r\nmax launchbrowser http://making360.com/"
+				}
+
+			}
+, 			{
 				"box" : 				{
 					"id" : "obj-24",
 					"maxclass" : "comment",
@@ -5232,7 +5259,7 @@
 							"modernui" : 1
 						}
 ,
-						"rect" : [ 2747.0, 142.0, 985.0, 583.0 ],
+						"rect" : [ 2086.0, 143.0, 785.0, 583.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -5261,13 +5288,37 @@
 						"subpatcher_template" : "",
 						"boxes" : [ 							{
 								"box" : 								{
+									"id" : "obj-5",
+									"maxclass" : "button",
+									"numinlets" : 1,
+									"numoutlets" : 1,
+									"outlettype" : [ "bang" ],
+									"patching_rect" : [ 15.0, 116.0, 24.0, 24.0 ],
+									"style" : ""
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-2",
+									"maxclass" : "message",
+									"numinlets" : 2,
+									"numoutlets" : 1,
+									"outlettype" : [ "" ],
+									"patching_rect" : [ 173.0, 90.0, 35.0, 22.0 ],
+									"style" : "",
+									"text" : "read"
+								}
+
+							}
+, 							{
+								"box" : 								{
 									"id" : "obj-35",
 									"linecount" : 5,
 									"maxclass" : "comment",
 									"numinlets" : 1,
 									"numoutlets" : 0,
 									"patching_rect" : [ 648.0, 264.0, 98.0, 75.0 ],
-									"presentation_rect" : [ 648.0, 264.0, 0.0, 0.0 ],
 									"style" : "",
 									"text" : "need to position the sphere around the viewer at all times"
 								}
@@ -5281,7 +5332,6 @@
 									"numinlets" : 1,
 									"numoutlets" : 0,
 									"patching_rect" : [ 544.0, 371.0, 87.0, 48.0 ],
-									"presentation_rect" : [ 546.0, 370.0, 0.0, 0.0 ],
 									"style" : "",
 									"text" : "don't want the grey tint jit.gl.* puts by default"
 								}
@@ -5295,7 +5345,6 @@
 									"numinlets" : 1,
 									"numoutlets" : 0,
 									"patching_rect" : [ 452.0, 371.0, 93.0, 131.0 ],
-									"presentation_rect" : [ 452.0, 369.0, 0.0, 0.0 ],
 									"style" : "",
 									"text" : "scaled up to nearly far_clip range, to make it work like a skybox, and prevent parallax artefacts when moving head"
 								}
@@ -5309,7 +5358,6 @@
 									"numinlets" : 1,
 									"numoutlets" : 0,
 									"patching_rect" : [ 348.0, 371.0, 87.0, 48.0 ],
-									"presentation_rect" : [ 348.0, 371.0, 0.0, 0.0 ],
 									"style" : "",
 									"text" : "rotated to match Y is up convention"
 								}
@@ -5323,7 +5371,6 @@
 									"numinlets" : 1,
 									"numoutlets" : 0,
 									"patching_rect" : [ 172.0, 371.0, 82.0, 75.0 ],
-									"presentation_rect" : [ 172.0, 371.0, 0.0, 0.0 ],
 									"style" : "",
 									"text" : "used sphere shape for a spherical panormamic image"
 								}
@@ -5337,7 +5384,6 @@
 									"numinlets" : 1,
 									"numoutlets" : 0,
 									"patching_rect" : [ 261.0, 371.0, 75.0, 103.0 ],
-									"presentation_rect" : [ 76.0, 378.0, 0.0, 0.0 ],
 									"style" : "",
 									"text" : "increased geometry vertices to get more accurate texture mapping"
 								}
@@ -5454,6 +5500,15 @@
 							}
 , 							{
 								"patchline" : 								{
+									"destination" : [ "obj-19", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"source" : [ "obj-2", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
 									"destination" : [ "obj-11", 0 ],
 									"disabled" : 0,
 									"hidden" : 0,
@@ -5476,6 +5531,15 @@
 									"disabled" : 0,
 									"hidden" : 0,
 									"source" : [ "obj-27", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-19", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"source" : [ "obj-5", 0 ]
 								}
 
 							}
