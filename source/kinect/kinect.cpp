@@ -224,6 +224,7 @@ public:
 	// attrs
 	int unique, usecolor, align_depth_to_color, uselock;
 	int player, skeleton, seated, near_mode, audio, high_quality_color;
+	int skeleton_smoothing;
 	int device_count;
 	int timeout;
 	vec2 rgb_focal, rgb_center;
@@ -239,6 +240,8 @@ public:
 	jitmat<RGB> rgb_mat;
 	jitmat<vec3> cloud_mat;
 	jitmat<vec2> rectify_mat, tmp_mat;
+
+	jitmat<vec3> skel_mat;
 
 	// Current Kinect
 	INuiSensor* device;
@@ -273,6 +276,7 @@ public:
 		align_depth_to_color = 1;
 		player = 0;
 		skeleton = 0;
+		skeleton_smoothing = 1;
 		seated = 0;
 		near_mode = 0;
 
@@ -299,6 +303,8 @@ public:
 		cloud_mat.init(3, _jit_sym_float32, KINECT_DEPTH_WIDTH, KINECT_DEPTH_HEIGHT);
 		rectify_mat.init(2, _jit_sym_float32, KINECT_DEPTH_WIDTH, KINECT_DEPTH_HEIGHT);
 		tmp_mat.init(2, _jit_sym_float32, KINECT_DEPTH_WIDTH, KINECT_DEPTH_HEIGHT);
+
+		skel_mat.init(3, _jit_sym_float32, 4, 5);
 
 		colorCoordinates = new long[KINECT_DEPTH_WIDTH*KINECT_DEPTH_HEIGHT * 2];
 		mappedDepthTmp = new uint16_t[KINECT_DEPTH_WIDTH*KINECT_DEPTH_HEIGHT];
@@ -729,6 +735,8 @@ public:
 						if (depth_in_mm > 0) {
 							// set the output depth value:
 							dst[idx] = depth_in_mm;
+							//Player index
+							dstp[idx] = (char)src[i].playerIndex;
 
 							// derive the output 3D position
 							//out = depthToRealWorld(vec3(c, r, depth_in_mm << 3));
@@ -785,7 +793,7 @@ public:
 					for (int x = 0; x<KINECT_DEPTH_WIDTH; x++, i++) {
 						uint32_t d = src[i].depth;
 						dst[i] = d;
-						//dstp[i] = (char)src[i].playerIndex;
+						dstp[i] = (char)src[i].playerIndex;
 						if (d > 0) {
 							vec3 v = depthToRealWorld(vec3(x, y, d << 3));
 							cloudTransform(v);
@@ -930,7 +938,7 @@ public:
 
 		HRESULT result;
 		NUI_SKELETON_FRAME frame = { 0 };
-		DWORD dwMillisecondsToWait = 200;
+		DWORD dwMillisecondsToWait = timeout;
 
 		result = device->NuiSkeletonGetNextFrame(dwMillisecondsToWait, &frame);
 		if (result == E_NUI_FRAME_NO_DATA || result == S_FALSE) {
@@ -947,6 +955,37 @@ public:
 			return;
 		}
 
+		
+		// ALSO SEE http://msdn.microsoft.com/en-us/library/jj131024.aspx
+		
+		//___________________________________________________________________________
+		// Some smoothing with little latency (defaults).
+		// Only filters out small jitters.
+		// Good for gesture recognition in games.
+		const NUI_TRANSFORM_SMOOTH_PARAMETERS defaultParams = { 0.5f, 0.5f, 0.5f, 0.05f, 0.04f };
+
+		// Smoothed with some latency.
+		// Filters out medium jitters.
+		// Good for a menu system that needs to be smooth but
+		// doesn't need the reduced latency as much as gesture recognition does.
+		const NUI_TRANSFORM_SMOOTH_PARAMETERS somewhatLatentParams = { 0.5f, 0.1f, 0.5f, 0.1f, 0.1f };
+
+		// Very smooth, but with a lot of latency.
+		// Filters out large jitters.
+		// Good for situations where smooth data is absolutely required
+		// and latency is not an issue.
+		const NUI_TRANSFORM_SMOOTH_PARAMETERS verySmoothParams = { 0.7f, 0.3f, 1.0f, 1.0f, 1.0f };
+		
+		//Smoothing
+		switch (skeleton_smoothing) {
+		case 1:
+			device->NuiTransformSmooth(&frame, &defaultParams); break;
+		case 2:
+			device->NuiTransformSmooth(&frame, &somewhatLatentParams); break;
+		case 3:
+			device->NuiTransformSmooth(&frame, &verySmoothParams); break;
+		};
+		
 		// success: copy the data:
 		memcpy(&skeleton_back, &frame, sizeof(NUI_SKELETON_FRAME));
 	}
@@ -985,60 +1024,40 @@ public:
 		atom_setfloat(a + 1, skeleton_back.vFloorClipPlane.y);
 		atom_setfloat(a + 2, skeleton_back.vFloorClipPlane.z);
 		atom_setfloat(a + 3, skeleton_back.vFloorClipPlane.w);
-		
-		outlet_anything(outlet_msg, ps_accel , 4, a);
 		outlet_anything(outlet_msg, ps_floor_plane, 4, a);
-		outlet_anything(outlet_msg, ps_hip_center, 4, a);
-		outlet_anything(outlet_msg, ps_spine, 4, a);
-		outlet_anything(outlet_msg, ps_shoulder_center, 4, a);
-		outlet_anything(outlet_msg, ps_head, 4, a);
-		outlet_anything(outlet_msg, ps_shoulder_left, 4, a);
-		outlet_anything(outlet_msg, ps_elbow_left, 4, a);
-		outlet_anything(outlet_msg, ps_wrist_left, 4, a);
-		outlet_anything(outlet_msg, ps_hand_left, 4, a);
-		outlet_anything(outlet_msg, ps_shoulder_right, 4, a);
-		outlet_anything(outlet_msg, ps_elbow_right, 4, a);
-		outlet_anything(outlet_msg, ps_wrist_right, 4, a);
-		outlet_anything(outlet_msg, ps_hand_right, 4, a);
-		outlet_anything(outlet_msg, ps_shoulder_left, 4, a);
-		outlet_anything(outlet_msg, ps_elbow_left, 4, a);
-		outlet_anything(outlet_msg, ps_hip_left, 4, a);
-		outlet_anything(outlet_msg, ps_knee_left, 4, a);
-		outlet_anything(outlet_msg, ps_ankle_left, 4, a);
-		outlet_anything(outlet_msg, ps_foot_left, 4, a);
-		outlet_anything(outlet_msg, ps_hip_right, 4, a);
-		outlet_anything(outlet_msg, ps_knee_right, 4, a);
-		outlet_anything(outlet_msg, ps_ankle_right, 4, a);
-		outlet_anything(outlet_msg, ps_foot_right, 4, a);
+		
+		/*
+		outlet_anything(outlet_skeleton, ps_accel , 4, a);
+		outlet_anything(outlet_skeleton, ps_hip_center, 4, a);
+		outlet_anything(outlet_skeleton, ps_spine, 4, a);
+		outlet_anything(outlet_skeleton, ps_shoulder_center, 4, a);
+		outlet_anything(outlet_skeleton, ps_head, 4, a);
+		outlet_anything(outlet_skeleton, ps_shoulder_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_elbow_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_wrist_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_hand_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_shoulder_right, 4, a);
+		outlet_anything(outlet_skeleton, ps_elbow_right, 4, a);
+		outlet_anything(outlet_skeleton, ps_wrist_right, 4, a);
+		outlet_anything(outlet_skeleton, ps_hand_right, 4, a);
+		outlet_anything(outlet_skeleton, ps_shoulder_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_elbow_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_hip_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_knee_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_ankle_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_foot_left, 4, a);
+		outlet_anything(outlet_skeleton, ps_hip_right, 4, a);
+		outlet_anything(outlet_skeleton, ps_knee_right, 4, a);
+		outlet_anything(outlet_skeleton, ps_ankle_right, 4, a);
+		outlet_anything(outlet_skeleton, ps_foot_right, 4, a);
+		*/
 
 		for (int i = 0; i < NUI_SKELETON_COUNT; i++) {
 			const NUI_SKELETON_DATA & skeleton = skeleton_back.SkeletonData[i];
 			uint32_t id = skeleton.dwUserIndex;//skeleton.dwTrackingID;
-			// ALSO SEE http://msdn.microsoft.com/en-us/library/jj131024.aspx
-			// 20 points
-			// 19 joints (4 arm, 4 arm, 4 leg, 4 leg, 3 spine)
-			// to make it an even 4x5 matrix friendly for mesh lines, could add a duplicate spine joint (neck)
-			// to make it sensible, each should arc out from the center (hip or shoulder)
-			//___________________________________________________________________________
-			// Some smoothing with little latency (defaults).
-			// Only filters out small jitters.
-			// Good for gesture recognition in games.
-			const NUI_TRANSFORM_SMOOTH_PARAMETERS defaultParams = { 0.5f, 0.5f, 0.5f, 0.05f, 0.04f };
-
-			// Smoothed with some latency.
-			// Filters out medium jitters.
-			// Good for a menu system that needs to be smooth but
-			// doesn't need the reduced latency as much as gesture recognition does.
-			const NUI_TRANSFORM_SMOOTH_PARAMETERS somewhatLatentParams = { 0.5f, 0.1f, 0.5f, 0.1f, 0.1f };
-
-			// Very smooth, but with a lot of latency.
-			// Filters out large jitters.
-			// Good for situations where smooth data is absolutely required
-			// and latency is not an issue.
-			const NUI_TRANSFORM_SMOOTH_PARAMETERS verySmoothParams = { 0.7f, 0.3f, 1.0f, 1.0f, 1.0f };
 
 			switch (skeleton.eTrackingState) {
-			case NUI_SKELETON_TRACKED:
+			case NUI_SKELETON_TRACKED: {
 				outputBone(id, ps_hip_center, skeleton, NUI_SKELETON_POSITION_HIP_CENTER);
 				outputBone(id, ps_spine, skeleton, NUI_SKELETON_POSITION_SPINE);
 				outputBone(id, ps_shoulder_center, skeleton, NUI_SKELETON_POSITION_SHOULDER_CENTER);
@@ -1059,11 +1078,53 @@ public:
 				outputBone(id, ps_knee_right, skeleton, NUI_SKELETON_POSITION_KNEE_RIGHT);
 				outputBone(id, ps_ankle_right, skeleton, NUI_SKELETON_POSITION_ANKLE_RIGHT);
 				outputBone(id, ps_foot_right, skeleton, NUI_SKELETON_POSITION_FOOT_RIGHT);
+
+				// 20 points
+				// 19 joints (4 arm, 4 arm, 4 leg, 4 leg, 3 spine)
+				// to make it an even 4x5 matrix friendly for mesh lines, could add a duplicate spine joint (neck)
+				// to make it sensible, each should arc out from the center (hip or shoulder)
+
+				Vector4 pos;
+
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_HIP_CENTER]; skel_mat.back[0] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_SPINE]; skel_mat.back[1] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_SHOULDER_CENTER]; skel_mat.back[2] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_HEAD]; skel_mat.back[3] = vec3(pos.x, pos.y, pos.z);
+
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_SHOULDER_LEFT]; skel_mat.back[4] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_ELBOW_LEFT]; skel_mat.back[5] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_WRIST_LEFT]; skel_mat.back[6] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_HAND_LEFT]; skel_mat.back[7] = vec3(pos.x, pos.y, pos.z);
+
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_SHOULDER_RIGHT]; skel_mat.back[8] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_ELBOW_RIGHT]; skel_mat.back[9] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_WRIST_RIGHT]; skel_mat.back[10] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_HAND_RIGHT]; skel_mat.back[11] = vec3(pos.x, pos.y, pos.z);
+
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_HIP_LEFT]; skel_mat.back[12] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_KNEE_LEFT]; skel_mat.back[13] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_ANKLE_LEFT]; skel_mat.back[14] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_LEFT]; skel_mat.back[15] = vec3(pos.x, pos.y, pos.z);
+
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_HIP_RIGHT]; skel_mat.back[16] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_KNEE_RIGHT]; skel_mat.back[17] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_ANKLE_RIGHT]; skel_mat.back[18] = vec3(pos.x, pos.y, pos.z);
+				pos = skeleton.SkeletonPositions[NUI_SKELETON_POSITION_FOOT_RIGHT]; skel_mat.back[19] = vec3(pos.x, pos.y, pos.z);
+
+				// output the matrix with player ID
+				atom_setlong(a + 0, id);
+				atom_setsym(a + 1, _jit_sym_jit_matrix);
+				atom_setsym(a + 2, skel_mat.sym);
+				outlet_anything(outlet_skeleton, gensym("matrix"), 3, a);
+			}
 				break;
 			case NUI_SKELETON_POSITION_ONLY:
 				//DrawSkeletonPosition(skeleton.Position);
 				break;
 			}
+
+			
+			
 		}
 	}
 
@@ -1261,6 +1322,7 @@ void ext_main(void *r) {
 	CLASS_ATTR_LONG(this_class, "usecolor", 0, t_kinect, usecolor);
 	CLASS_ATTR_STYLE(this_class, "usecolor", 0, "onoff");
 
+	CLASS_ATTR_LONG(this_class, "skeleton_smoothing", 0, t_kinect, skeleton_smoothing);
 
 	CLASS_ATTR_FLOAT_ARRAY(this_class, "rgb_focal", 0, t_kinect, rgb_focal, 2);
 	CLASS_ATTR_FLOAT_ARRAY(this_class, "rgb_center", 0, t_kinect, rgb_center, 2);
