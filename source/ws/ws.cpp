@@ -210,11 +210,16 @@ void Server::on_message(websocketpp::connection_hdl hdl, server::message_ptr msg
 void * ws_new(t_symbol *s, long argc, t_atom *argv) {
 	ws *x = NULL;
 	if ((x = (ws *)object_alloc(max_class))) {
-		x = new (x) ws();
-		// apply attrs:
-		attr_args_process(x, (short)argc, argv);
-		// invoke any initialization after the attrs are set from here:
-		x->post_attr_init();
+		try {
+			x = new (x) ws();
+			// apply attrs:
+			attr_args_process(x, (short)argc, argv);
+			// invoke any initialization after the attrs are set from here:
+			x->post_attr_init();
+		} catch (const std::exception& e) {			
+			post(e.what());
+			return NULL;
+		}
 	}
 	return (x);
 }
