@@ -46,6 +46,8 @@ class Server {
 		server.start_accept();
 		server.clear_access_channels(websocketpp::log::alevel::all); // this will turn off everything in console output
 		
+		post("maximum message size %d", server.get_max_message_size());
+		
 		received_dict_name = symbol_unique();
 		received_dict = dictionary_new();
 		atom_setsym(&received_dict_name_atom, received_dict_name);
@@ -119,7 +121,19 @@ public:
 		while (limit-- && server.poll_one()) {};
 	}
 	
+	void forward(websocketpp::connection_hdl hdl, const std::string& msg) {
+		websocketpp::lib::error_code ec;
+		auto con = server.get_con_from_hdl(hdl, ec);
+		//server.get_connection_pt
+		for (websocketpp::connection_hdl client : clients) {
+			if (server.get_con_from_hdl(client, ec) != con) {
+				server.send(client, msg, websocketpp::frame::opcode::text);
+			}
+		}
+	}
+	
 	void send(const std::string& msg) {
+		//post("sending string length %d", msg.size());
 		for (auto client : clients) {
 			server.send(client, msg, websocketpp::frame::opcode::text);
 		}
@@ -133,7 +147,26 @@ public:
 		clients.erase(hdl);
 	}
 	
-	void on_message(websocketpp::connection_hdl hdl, server::message_ptr msg);
+	void on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
+		const char * buf = msg->get_payload().c_str();
+		
+		// if a broadcast...
+		if (buf[0] == '*') {
+			const char * trimmed = &buf[1];
+			
+			// immediately forward to all *other* clients
+			forward(hdl, trimmed);
+			
+			// also share with server:
+			to_max_objects(trimmed);
+			
+		} else {
+			to_max_objects(buf);
+		}
+
+	}
+	
+	void to_max_objects(const char * buf);
 };
 
 
@@ -178,32 +211,14 @@ public:
 	}
 };
 
-void Server::on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
+void Server::to_max_objects(const char * buf) {
+	//post("on_message string length %d", msg->get_payload().size());
 	
-	const char * buf = msg->get_payload().c_str();
-	
-//	// attempt to parse as dict?
-//	//dictobj_unregister(received_dict);
-//	char errstring[256];
-//	t_dictionary * result = NULL;
-//	if (0 == dictobj_dictionaryfromstring(&result, buf, 1, errstring)) {
-//		object_release((t_object *)received_dict);
-//		received_dict = result;
-//		dictobj_register(received_dict, &received_dict_name);
-//		
-//		for (auto x : maxobjects) {
-//			outlet_anything(x->outlet_frame, _sym_dictionary, 1, &received_dict_name_atom);
-//		}
-//	} else {
-//		error("error parsing received message as JSON: %s", errstring);
-	
-		// just output as string:
-		t_symbol * sym = gensym(buf);
-		for (auto x : maxobjects) {
-			outlet_anything(x->outlet_frame, sym, 0, 0);
-		}
-	
-//	}
+	// just output as string:
+	t_symbol * sym = gensym(buf);
+	for (auto x : maxobjects) {
+		outlet_anything(x->outlet_frame, sym, 0, 0);
+	}
 }
 
 
@@ -249,6 +264,9 @@ void ws_send(ws * x, t_symbol * s) {
 	x->send(std::string(s->s_name));
 }
 
+// kind of useless...
+//extern "C" t_max_err compression_compressjson_headless(char *json, long srclen, t_handle compressedjson);
+
 void ws_dictionary(ws * x, t_symbol * s) {
 	t_dictionary *d = dictobj_findregistered_retain(s);
 	if (d) {
@@ -256,6 +274,21 @@ void ws_dictionary(ws * x, t_symbol * s) {
 		t_handle json;
 		object_method(jsonwriter, _sym_writedictionary, d);
 		object_method(jsonwriter, _sym_getoutput, &json);
+		
+		/*
+		// this compresses the JSON into a hash like maxpats
+		// only useful if we can uncompress at the browser end...
+		{
+			t_handle	compressed_json = sysmem_newhandle(0);
+			t_max_err	err;
+			err = compression_compressjson_headless(*json, strlen(*json), compressed_json);
+			if (!err) {
+				x->send(std::string(*compressed_json));
+				sysmem_freehandle(compressed_json);
+			}
+		
+		}
+		*/
 		
 		x->send(std::string(*json));
 		

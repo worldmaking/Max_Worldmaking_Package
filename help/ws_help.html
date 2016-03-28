@@ -35,7 +35,7 @@ var querystring = (function() {
 // debug messaging:
 function post(msg) {
 	console.log(msg);
-	document.getElementById("post").innerHTML = msg;
+	document.getElementById("post").innerHTML += msg + "<br>";
 }
 
 ///// websocket /////
@@ -74,7 +74,18 @@ function ws_connect() {
         };
 
         wsocket.onmessage = function(ev) {
-        	post("msg:" + ev.data);
+        	post("a msg:" + ev.data.length + ": " + ev.data.substr(0, 10) + "...");
+        	post(ev.data.charAt(0));
+        	if (ev.data.charAt(0) == "{") {
+        		// attempt to json parse it:
+        		post("parsing");
+        		var tree = JSON.parse(ev.data);
+        		console.log("parsed", tree);
+        	} else {
+        	
+        		// echo it back!
+        		send(ev.data);
+        	}
         };
 
         wsocket.onerror = function(ev) {
@@ -88,7 +99,8 @@ function ws_connect() {
 
 function send(msg) {
 	if(wsocket != undefined) wsocket.send(msg);
-	post(msg);
+	post("sent msg:" + msg.length + ": " + msg);
+        	
 }
 
 ///// sequencing /////
