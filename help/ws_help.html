@@ -58,12 +58,15 @@ function ws_connect() {
             // cancel the auto-reconnect task:
             if (connectTask != undefined) clearInterval(connectTask);
             // apparently this first reply is necessary
-            var message = 'hello from browser';
-            post('SENT: ' + message);
-            wsocket.send(message);
+            //var message = 'hello from browser';
+            //post('SENT: ' + message);
+            //wsocket.send(message);
 			
 			// send some JSON:
-			wsocket.send(JSON.stringify({ "hello": "world" }));
+			//wsocket.send(JSON.stringify({ "hello": "world" }));
+			
+			// broadcast a hello:
+			send("*hello"+Math.random());
         };
 
         wsocket.onclose = function(ev) {
@@ -74,8 +77,7 @@ function ws_connect() {
         };
 
         wsocket.onmessage = function(ev) {
-        	post("a msg:" + ev.data.length + ": " + ev.data.substr(0, 10) + "...");
-        	post(ev.data.charAt(0));
+        	post("received msg:" + ev.data.length + ": " + ev.data.substr(0, 50) + "...");
         	if (ev.data.charAt(0) == "{") {
         		// attempt to json parse it:
         		post("parsing");
@@ -84,7 +86,7 @@ function ws_connect() {
         	} else {
         	
         		// echo it back!
-        		send(ev.data);
+        		//send(ev.data);
         	}
         };
 
