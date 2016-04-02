@@ -35,7 +35,7 @@ var querystring = (function() {
 // debug messaging:
 function post(msg) {
 	console.log(msg);
-	document.getElementById("post").innerHTML += msg + "<br>";
+	document.getElementById("post").innerHTML = msg + "<br>";
 }
 
 ///// websocket /////
@@ -65,8 +65,10 @@ function ws_connect() {
 			// send some JSON:
 			//wsocket.send(JSON.stringify({ "hello": "world" }));
 			
+			// client messages sent with a "*" prefix will have the "*" stripped,
+			// but the server will broadcast them all back to all other clients
 			// broadcast a hello:
-			send("*hello"+Math.random());
+			send("*hello "+Math.floor(Math.random()*100));
         };
 
         wsocket.onclose = function(ev) {
@@ -77,16 +79,13 @@ function ws_connect() {
         };
 
         wsocket.onmessage = function(ev) {
-        	post("received msg:" + ev.data.length + ": " + ev.data.substr(0, 50) + "...");
+        	// was it a dict?
         	if (ev.data.charAt(0) == "{") {
         		// attempt to json parse it:
-        		post("parsing");
         		var tree = JSON.parse(ev.data);
-        		console.log("parsed", tree);
+        		post("parsed " + JSON.stringify(tree));
         	} else {
-        	
-        		// echo it back!
-        		//send(ev.data);
+        		post("received msg:" + ev.data.length + ": " + ev.data.substr(0, 50));
         	}
         };
 
