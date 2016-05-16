@@ -6,6 +6,7 @@ extern "C" {
 #include "ext_dictobj.h"
 #include "ext_systhread.h"
 
+
 #include "z_dsp.h"
 
 #include "jit.common.h"
@@ -24,6 +25,17 @@ typedef OLECHAR* WinStr;
 #include "kinect.h"
 
 #include <new> // for in-place constructor
+
+// Safe release for interfaces
+template<class Interface>
+inline void SafeRelease(Interface *& pInterfaceToRelease)
+{
+	if (pInterfaceToRelease != NULL)
+	{
+		pInterfaceToRelease->Release();
+		pInterfaceToRelease = NULL;
+	}
+}
 
 // how many glm headers do we really need?
 #define GLM_FORCE_RADIANS
@@ -176,6 +188,9 @@ struct ARGB {
 struct RGB {
 	unsigned char r, g, b;
 };
+struct RGBA {
+	unsigned char r, g, b, a;
+};
 struct DepthPlayer {
 	uint16_t d, p;
 };
@@ -198,8 +213,38 @@ public:
 	void *		outlet_skeleton;
 	void *		outlet_msg;
 
+
+	jitmat<char> player_mat;
+	jitmat<vec3> cloud_mat;
+	jitmat<vec2> rectify_mat, tmp_mat;
+	jitmat<vec3> skel_mat;
 	jitmat<uint32_t> depth_mat;
 	jitmat<ARGB> rgb_mat;
+	int hasColorMap;
+	int capturing;
+	int new_depth_data, new_rgb_data;
+	t_systhread capture_thread;
+	t_systhread_mutex depth_mutex;
+	IKinectSensor * device;
+	// Color reader
+	IColorFrameReader*      m_pColorFrameReader;
+	RGBQUAD * rgb_buffer;
+
+	// attrs
+	int unique, usecolor, align_depth_to_color, uselock;
+	int player, skeleton, seated, near_mode, audio, high_quality_color;
+	int skeleton_smoothing;
+	int device_count;
+	int timeout;
+	vec2 rgb_focal, rgb_center;
+	vec2 rgb_radial, rgb_tangential;
+	vec3 position;
+	vec4 orientation;
+	quat orientation_glm;
+	t_symbol * serial;
+
+	
+
 
 	kinect2() {
 		
@@ -216,39 +261,229 @@ public:
 		rgb_mat.init(4, _jit_sym_char, cColorWidth, cColorHeight);
 
 		post("created matrices");
-	}
 
+		device = 0;
+		usecolor = 1;
+		unique = 1;
+	}
 
 	~kinect2() {
 		close();
 	}
 
 	void open(t_symbol *s, long argc, t_atom * argv) {
+		t_atom a[1];
+
+		if (device) {
+			object_warn(&ob, "device already opened");
+			return;
+		}
+
+		HRESULT result = 0;
+
+		result = GetDefaultKinectSensor(&device);
+
+		/*
+		// if sdk ever supports more than 1 kinect...
+		if (argc > 0) {
+			if (atom_gettype(argv) == A_SYM) {
+				OLECHAR instanceName[100];
+				char * s = atom_getsym(argv)->s_name;
+				mbstowcs(instanceName, s, strlen(s) + 1);
+				result = NuiCreateSensorById(instanceName, &dev);
+			}
+			else {
+				int index = atom_getlong(argv);
+				result = NuiCreateSensorByIndex(index, &dev);
+			}
+		}
+		else {
+			result = NuiCreateSensorByIndex(0, &dev);
+		}
+		*/
+
+		if (result != S_OK) {
+			// TODO: get meaningful error string from error code
+			error("Kinect for Windows could not initialize.");
+			return;
+		}
+
+		/*
+		
+		WinStr wstr = dev->NuiDeviceConnectionId();
+		std::mbstate_t state = std::mbstate_t();
+		int len = 1 + std::wcsrtombs((char *)nullptr, (const wchar_t **)&wstr, 0, &state);
+		char outname[128];
+		std::wcsrtombs(outname, (const wchar_t **)&wstr, len, &state);
+		serial = gensym(outname);
+		
+		device = dev;
+		post("init device %s", outname);
+		atom_setsym(a, serial);
+		outlet_anything(outlet_msg, gensym("serial"), 1, a);
+		*/
+
+		hasColorMap = 0;
+		long priority = 10; // maybe increase?
+		if (systhread_create((method)&capture_threadfunc, this, 0, priority, 0, &capture_thread)) {
+			object_error(&ob, "Failed to create capture thread.");
+			capturing = 0;
+			close();
+			return;
+		}
 
 	}
 
 	static void *capture_threadfunc(void *arg) {
-		
+		kinect2 *x = (kinect2 *)arg;
+		x->run();
+		systhread_exit(NULL);
 		return NULL;
 	}
 
-	void poll() {
+	void run() {
+		if (!device) return;
+
+		// Initialize the Kinect and get the color reader
+		IColorFrameSource* pColorFrameSource = NULL;
+
+		HRESULT hr = device->Open();
+
+		post("device opened");
+
+		if (SUCCEEDED(hr))
+		{
+			hr = device->get_ColorFrameSource(&pColorFrameSource);
+		}
+
+		if (SUCCEEDED(hr))
+		{
+			hr = pColorFrameSource->OpenReader(&m_pColorFrameReader);
+		}
+		capturing = 1;
+		post("starting processing");
+		while (capturing) {
+
+			if (usecolor) processColor();
+			//processDepth();
+			//if (skeleton) pollSkeleton();
+		}
+		post("finished processing");
+
+		SafeRelease(pColorFrameSource);
 		
-		object_post(&ob, "polled");
+	}
+
+	void processColor() {
+		if (!device) return;
+		if (!m_pColorFrameReader) return;
+		
+		IColorFrame* pColorFrame = NULL;
+		HRESULT hr = m_pColorFrameReader->AcquireLatestFrame(&pColorFrame);
+		if (SUCCEEDED(hr)) {
+			INT64 nTime = 0;
+			IFrameDescription* pFrameDescription = NULL;
+			int nWidth = 0;
+			int nHeight = 0;
+			ColorImageFormat imageFormat = ColorImageFormat_None;
+			UINT nBufferSize = 0;
+			RGBQUAD *src = NULL;
+
+			hr = pColorFrame->get_RelativeTime(&nTime);
+			if (SUCCEEDED(hr)) {
+				hr = pColorFrame->get_FrameDescription(&pFrameDescription);
+			}
+			if (SUCCEEDED(hr)) {
+				hr = pFrameDescription->get_Width(&nWidth);
+			}
+			if (SUCCEEDED(hr)) {
+				hr = pFrameDescription->get_Height(&nHeight);
+			}
+			if (SUCCEEDED(hr)) {
+				hr = pColorFrame->get_RawColorImageFormat(&imageFormat);
+			}
+
+			if (imageFormat != ColorImageFormat_Bgra)
+			{
+				if (!rgb_buffer) {
+					rgb_buffer = new RGBQUAD[nWidth * nHeight];
+				}
+
+				//post("image format %d", imageFormat);
+				//error("not brga");
+				nBufferSize = nWidth * nHeight * sizeof(RGBQUAD);
+				hr = pColorFrame->CopyConvertedFrameDataToArray(nBufferSize, reinterpret_cast<BYTE*>(rgb_buffer), ColorImageFormat_Rgba);
+				if (FAILED(hr)) {
+					error("failed to convert image");
+					return;
+				}
+
+				src = rgb_buffer;
+			}
+
+
+			hr = pColorFrame->AccessRawUnderlyingBuffer(&nBufferSize, reinterpret_cast<BYTE**>(&src));
+			ARGB * dst = (ARGB *)rgb_mat.back;
+			int cells = nWidth * nHeight;
+
+			//if (align_depth_to_color) {
+				for (int i = 0; i < cells; ++i) {
+					dst[i].r = src[i].rgbRed;
+					dst[i].g = src[i].rgbGreen;
+					dst[i].b = src[i].rgbBlue;
+				}
+			/*}
+			else {
+				// align color to depth:
+				//std::fill(dst, dst + cells, RGB(0, 0, 0));
+				for (int i = 0; i < cells; ++i) {
+					int c = colorCoordinates[i * 2];
+					int r = colorCoordinates[i * 2 + 1];
+					if (c >= 0 && c < KINECT_DEPTH_WIDTH
+						&& r >= 0 && r < KINECT_DEPTH_HEIGHT) {
+						// valid location: depth value:
+						int idx = r*KINECT_DEPTH_WIDTH + c;
+						dst[i].r = src[idx].r;
+						dst[i].g = src[idx].g;
+						dst[i].b = src[idx].b;
+					}
+				}
+			}*/
+
+			new_rgb_data = 1;
+
+		}
+
+		
 	}
 
 	void close() {
-		
+		// done with color frame reader
+		SafeRelease(m_pColorFrameReader);
+		// close the Kinect Sensor
+		if (device)
+		{
+			device->Close();
+			SafeRelease(device);
+			device = 0;
+		}
 	}
 
-	void shutdown() {
-		
-	}
-
-	////
 
 	void bang() {
-		
+		if (usecolor && (new_rgb_data || unique == 0)) {
+			outlet_anything(outlet_rgb, _jit_sym_jit_matrix, 1, rgb_mat.name);
+			new_rgb_data = 0;
+		}
+		if (new_depth_data || unique == 0) {
+			//if (skeleton) outputSkeleton();
+			if (player) outlet_anything(outlet_player, _jit_sym_jit_matrix, 1, player_mat.name);
+			if (uselock) systhread_mutex_lock(depth_mutex);
+			//outlet_anything(outlet_depth, _jit_sym_jit_matrix, 1, depth_mat.name);
+			//outlet_anything(outlet_cloud, _jit_sym_jit_matrix, 1, cloud_mat.name);
+			if (uselock) systhread_mutex_unlock(depth_mutex);
+			new_depth_data = 0;
+		}
 	}
 };
 
