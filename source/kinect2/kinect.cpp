@@ -1263,10 +1263,6 @@ void * kinect_new(t_symbol * s, long argc, t_atom * argv) {
 
 void ext_main(void *r) {
 	if (this_class) return;
-
-	// just a hack to get jitter initialized:
-	post("GL: %s", jit_gl_get_version());
-
 	ps_accel = gensym("accel");
 	ps_floor_plane = gensym("floor_plane");
 	ps_hip_center = gensym("hip_center");
