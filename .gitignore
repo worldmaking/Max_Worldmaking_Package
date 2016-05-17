@@ -298,3 +298,5 @@ FakesAssemblies/
 *.opt
 *.props
 source/kinect/kinect.VC.opendb
+*.xcworkspacedata
+source/kinect2/kinect2.VC.opendb

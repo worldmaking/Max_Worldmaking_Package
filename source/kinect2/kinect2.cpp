@@ -526,10 +526,6 @@ void ext_main(void *r)
 {
 	t_class *c;
 
-	// just a hack to get jitter initialized:
-	post("GL: %s", jit_gl_get_version());
-
-
 	c = class_new("kinect2", (method)kinect_new, (method)kinect_free, (long)sizeof(kinect2), 0L, A_GIMME, 0);
 
 	class_addmethod(c, (method)kinect_assist, "assist", A_CANT, 0);
@@ -542,4 +538,7 @@ void ext_main(void *r)
 
 	class_register(CLASS_BOX, c);
 	max_class = c;
+
+	// dummy:
+	kinect_new(NULL, 0, NULL);
 }
