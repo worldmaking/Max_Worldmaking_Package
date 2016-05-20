@@ -6,11 +6,20 @@ extern "C" {
 #include "ext_dictobj.h"
 #include "ext_systhread.h"
 
-
 #include "z_dsp.h"
 
 #include "jit.common.h"
 #include "jit.gl.h"
+}
+
+// used in ext_main
+// a dummy call just to get jitter initialized, otherwise _jit_sym_* symbols etc. won't be populated
+// (normally this isn't necessary because jit_class_new does it, but I"m not using jit_class_new)
+void initialize_jitlib() {
+	t_jit_matrix_info info;
+	jit_matrix_info_default(&info);
+	info.type = gensym("char");
+	object_free(jit_object_new(gensym("jit_matrix"), &info));
 }
 
 #ifdef __GNUC__
@@ -243,9 +252,6 @@ public:
 	quat orientation_glm;
 	t_symbol * serial;
 
-	
-
-
 	kinect2() {
 		
 		outlet_msg = outlet_new(&ob, 0);
@@ -255,12 +261,8 @@ public:
 		outlet_depth = outlet_new(&ob, "jit_matrix");
 		outlet_cloud = outlet_new(&ob, "jit_matrix");
 
-		post("create matrices");
 		depth_mat.init(1, _jit_sym_long, cDepthWidth, cDepthHeight);
-		post("test");
 		rgb_mat.init(4, _jit_sym_char, cColorWidth, cColorHeight);
-
-		post("created matrices");
 
 		device = 0;
 		usecolor = 1;
@@ -282,46 +284,11 @@ public:
 		HRESULT result = 0;
 
 		result = GetDefaultKinectSensor(&device);
-
-		/*
-		// if sdk ever supports more than 1 kinect...
-		if (argc > 0) {
-			if (atom_gettype(argv) == A_SYM) {
-				OLECHAR instanceName[100];
-				char * s = atom_getsym(argv)->s_name;
-				mbstowcs(instanceName, s, strlen(s) + 1);
-				result = NuiCreateSensorById(instanceName, &dev);
-			}
-			else {
-				int index = atom_getlong(argv);
-				result = NuiCreateSensorByIndex(index, &dev);
-			}
-		}
-		else {
-			result = NuiCreateSensorByIndex(0, &dev);
-		}
-		*/
-
 		if (result != S_OK) {
 			// TODO: get meaningful error string from error code
 			error("Kinect for Windows could not initialize.");
 			return;
 		}
-
-		/*
-		
-		WinStr wstr = dev->NuiDeviceConnectionId();
-		std::mbstate_t state = std::mbstate_t();
-		int len = 1 + std::wcsrtombs((char *)nullptr, (const wchar_t **)&wstr, 0, &state);
-		char outname[128];
-		std::wcsrtombs(outname, (const wchar_t **)&wstr, len, &state);
-		serial = gensym(outname);
-		
-		device = dev;
-		post("init device %s", outname);
-		atom_setsym(a, serial);
-		outlet_anything(outlet_msg, gensym("serial"), 1, a);
-		*/
 
 		hasColorMap = 0;
 		long priority = 10; // maybe increase?
@@ -371,7 +338,6 @@ public:
 		post("finished processing");
 
 		SafeRelease(pColorFrameSource);
-		
 	}
 
 	void processColor() {
@@ -524,21 +490,17 @@ void kinect_assist(kinect2 *x, void *b, long m, long a, char *s)
 
 void ext_main(void *r)
 {
+	initialize_jitlib();
+
 	t_class *c;
 
 	c = class_new("kinect2", (method)kinect_new, (method)kinect_free, (long)sizeof(kinect2), 0L, A_GIMME, 0);
-
 	class_addmethod(c, (method)kinect_assist, "assist", A_CANT, 0);
-
-
 	class_addmethod(c, (method)kinect_open, "open", A_GIMME, 0);
-
 	class_addmethod(c, (method)kinect_bang, "bang", 0);
 	class_addmethod(c, (method)kinect_close, "close", 0);
 
 	class_register(CLASS_BOX, c);
 	max_class = c;
 
-	// dummy:
-	kinect_new(NULL, 0, NULL);
 }
