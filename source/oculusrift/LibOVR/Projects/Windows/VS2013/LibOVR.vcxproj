@@ -37,7 +37,8 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\Include\Extras\OVR_CAPI_Util.h" />
     <ClInclude Include="..\..\..\Include\Extras\OVR_StereoProjection.h" />
-    <ClInclude Include="..\..\..\Include\OVR_CAPI_0_8_0.h" />
+    <ClInclude Include="..\..\..\Include\OVR_CAPI.h" />
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_Audio.h" />
     <ClInclude Include="..\..\..\Include\OVR_CAPI_D3D.h" />
     <ClInclude Include="..\..\..\Include\OVR_CAPI_GL.h" />
     <ClInclude Include="..\..\..\Include\OVR_CAPI_Keys.h" />

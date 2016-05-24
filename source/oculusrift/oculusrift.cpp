@@ -72,14 +72,17 @@ public:
 	int reconnect_wait;
 
 	ovrSession session;
+	ovrHmdDesc hmd;
 	ovrGraphicsLuid luid;
 	ovrEyeRenderDesc eyeRenderDesc[2];
 	ovrVector3f      hmdToEyeViewOffset[2];
 	ovrLayerEyeFov layer;
 	ovrSizei pTextureDim;
-	ovrSwapTextureSet * pTextureSet;
-	ovrTexture * mirrorTexture;
+	ovrTextureSwapChain textureChain;
+	ovrMirrorTexture mirrorTexture;
 	long long frameIndex;
+	double sensorSampleTime;    // sensorSampleTime is fed into the layer later
+
 
 	GLuint fbo, fbomirror;
 
@@ -98,7 +101,7 @@ public:
 		// init state
 		fbo = 0;
 		fbomirror = 0;
-		pTextureSet = 0;
+		textureChain = 0;
 		frameIndex = 0;
 		pTextureDim.w = 0;
 		pTextureDim.h = 0;
@@ -121,7 +124,6 @@ public:
 
 	// attempt to connect to the OVR runtime, creating a session:
 	bool connect() {
-		post("connect");
 		if (session) {
 			object_warn(&ob, "already connected");
 			return true;
@@ -139,6 +141,7 @@ public:
 			return false;
 		}
 
+
 		object_post(&ob, "LibOVR runtime version %s", ovr_GetVersionString());
 
 		outlet_anything(outlet_msg, gensym("connected"), 0, NULL);
@@ -148,7 +151,6 @@ public:
 	}
 
 	void disconnect() {
-		post("disconnect");
 		if (session) {
 			// destroy any OVR resources tied to the session:
 			textureset_destroy();
@@ -169,7 +171,6 @@ public:
 	// usually called after session is created, and when important attributes are changed
 	// invokes info() to send configuration results 
 	void configure() {
-		post("configure");
 		if (!session) {
 			object_error(&ob, "no session to configure");
 			return;
@@ -177,7 +178,7 @@ public:
 
 		// maybe never: support disabling tracking options via ovr_ConfigureTracking()
 
-		ovrHmdDesc hmd = ovr_GetHmdDesc(session);
+		hmd = ovr_GetHmdDesc(session);
 		// Use hmd members and ovr_GetFovTextureSize() to determine graphics configuration
 
 		ovrSizei recommenedTex0Size, recommenedTex1Size;
@@ -191,23 +192,14 @@ public:
 			recommenedTex1Size = ovr_GetFovTextureSize(session, ovrEye_Right, hmd.DefaultEyeFov[1], pixel_density);
 		}
 
-
 		// assumes a single shared texture for both eyes:
 		pTextureDim.w = recommenedTex0Size.w + recommenedTex1Size.w;
 		pTextureDim.h = max(recommenedTex0Size.h, recommenedTex1Size.h);
 
-		// Initialize VR structures, filling out description.
-		if (max_fov) {
-			eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.MaxEyeFov[0]);
-			eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.MaxEyeFov[1]);
+		
 
-		}
-		else {
-			eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.DefaultEyeFov[0]);
-			eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.DefaultEyeFov[1]);
-		}
-		hmdToEyeViewOffset[0] = eyeRenderDesc[0].HmdToEyeViewOffset;
-		hmdToEyeViewOffset[1] = eyeRenderDesc[1].HmdToEyeViewOffset;
+		// FloorLevel will give tracking poses where the floor height is 0
+		ovr_SetTrackingOriginType(session, ovrTrackingOrigin_FloorLevel);
 
 		// in case this is a re-configure, clear out the previous ones:
 		textureset_destroy();
@@ -219,11 +211,7 @@ public:
 		// Initialize our single full screen Fov layer.
 		// (needs to happen after textureset_create)
 		layer.Header.Type = ovrLayerType_EyeFov;
-		layer.Header.Flags = 0;
-		layer.ColorTexture[0] = pTextureSet;
-		layer.ColorTexture[1] = pTextureSet;
-		layer.Fov[0] = eyeRenderDesc[0].Fov;
-		layer.Fov[1] = eyeRenderDesc[1].Fov;
+		layer.Header.Flags = 0;// ovrLayerFlag_TextureOriginAtBottomLeft;   // Because OpenGL. was 0.
 		layer.Viewport[0].Pos.x = 0;
 		layer.Viewport[0].Pos.y = 0;
 		layer.Viewport[0].Size.w = pTextureDim.w / 2;
@@ -233,13 +221,12 @@ public:
 		layer.Viewport[1].Size.w = pTextureDim.w / 2;
 		layer.Viewport[1].Size.h = pTextureDim.h;
 
-		// ld.RenderPose and ld.SensorSampleTime are updated later per frame.
+		// other layer properties are updated later per frame.
 		
 		info();
 	}
 
 	void info() {
-		post("info");
 		if (!session) {
 			object_warn(&ob, "no session");
 			return;
@@ -255,6 +242,7 @@ public:
             break; \
 			        }
 		switch (hmd.Type) {
+			HMD_CASE(ovrHmd_CV1)
 			HMD_CASE(ovrHmd_DK1)
 				HMD_CASE(ovrHmd_DKHD)
 				HMD_CASE(ovrHmd_DK2)
@@ -277,6 +265,8 @@ public:
 		outlet_anything(outlet_msg, gensym("VendorId"), 1, a);
 		atom_setlong(a, (hmd.ProductId));
 		outlet_anything(outlet_msg, gensym("ProductId"), 1, a);
+		/*
+		// TODO: enable
 		atom_setfloat(a, (hmd.CameraFrustumHFovInRadians));
 		outlet_anything(outlet_msg, gensym("CameraFrustumHFovInRadians"), 1, a);
 		atom_setfloat(a, (hmd.CameraFrustumVFovInRadians));
@@ -285,6 +275,7 @@ public:
 		outlet_anything(outlet_msg, gensym("CameraFrustumNearZInMeters"), 1, a);
 		atom_setfloat(a, (hmd.CameraFrustumFarZInMeters));
 		outlet_anything(outlet_msg, gensym("CameraFrustumFarZInMeters"), 1, a);
+		*/
 		atom_setlong(a, (hmd.AvailableHmdCaps));
 		outlet_anything(outlet_msg, gensym("AvailableHmdCaps"), 1, a);
 		atom_setlong(a, (hmd.DefaultHmdCaps));
@@ -323,9 +314,8 @@ public:
 	}
 
 	bool textureset_create() {
-		post("textureset_create");
 		if (!session) return false; 
-		if (pTextureSet) return true; // already exists
+		if (textureChain) return true; // already exists
 
 		// TODO problem here: Jitter API GL headers don't export GL_SRGB8_ALPHA8
 		// might also need  GL_EXT_framebuffer_sRGB for the copy
@@ -337,8 +327,18 @@ public:
 		// Request an sRGB format(e.g.GL_SRGB8_ALPHA8) swap - texture - set.
 		// Do not call glEnable(GL_FRAMEBUFFER_SRGB); when rendering into the swap texture.
 		
-		auto result = ovr_CreateSwapTextureSetGL(session, GL_RGBA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
-		//auto result = ovr_CreateSwapTextureSetGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &pTextureSet);
+		//auto result = ovr_CreateSwatextureChainGL(session, GL_RGBA8, pTextureDim.w, pTextureDim.h, &textureChain);
+		//auto result = ovr_CreateSwatextureChainGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &textureChain);
+		ovrTextureSwapChainDesc desc = {};
+		desc.Type = ovrTexture_2D;
+		desc.ArraySize = 1;
+		desc.Width = pTextureDim.w;
+		desc.Height = pTextureDim.h;
+		desc.MipLevels = 1;
+		desc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
+		desc.SampleCount = 1;
+		desc.StaticImage = ovrFalse;
+		ovrResult result = ovr_CreateTextureSwapChainGL(session, &desc, &textureChain); 
 		if (result != ovrSuccess) {
 			ovrErrorInfo errInfo;
 			ovr_GetLastErrorInfo(&errInfo);
@@ -346,14 +346,20 @@ public:
 			return false;
 		}
 
+		int length = 0;
+		ovr_GetTextureSwapChainLength(session, textureChain, &length);
+
+		// we can update the layer too here:
+		layer.ColorTexture[0] = textureChain;
+		layer.ColorTexture[1] = textureChain;
+		
 		return true;
 	}
 
 	void textureset_destroy() {
-		post("textureset_destroy");
-		if (session && pTextureSet) {
-			ovr_DestroySwapTextureSet(session, pTextureSet);
-			pTextureSet = 0;
+		if (session && textureChain) {
+			ovr_DestroyTextureSwapChain(session, textureChain);
+			textureChain = 0;
 		}
 	}
 
@@ -368,6 +374,7 @@ public:
 		if (!session) {
 			// TODO: does SDK provide notification of Rift being reconnected?
 
+			/*
 			if (reconnect_wait) {
 				reconnect_wait--;
 			}
@@ -378,12 +385,73 @@ public:
 					
 				}
 				return;
-			}
+			}*/
+			return;
 		}
-
 
 		t_atom a[6];
 
+		// get 'modelview'
+		float pos[3];
+		jit_attr_getfloat_array(this, gensym("position"), 3, pos);
+		t_jit_quat quat;
+		jit_attr_getfloat_array(this, gensym("quat"), 4, &quat.x);
+
+		//////////////////////////////
+
+		// Call ovr_GetRenderDesc each frame to get the ovrEyeRenderDesc, as the returned values (e.g. HmdToEyeOffset) may change at runtime.
+		if (max_fov) {
+			eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.MaxEyeFov[0]);
+			eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.MaxEyeFov[1]);
+
+		}
+		else {
+			eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmd.DefaultEyeFov[0]);
+			eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmd.DefaultEyeFov[1]);
+		}
+		hmdToEyeViewOffset[0] = eyeRenderDesc[0].HmdToEyeOffset;
+		hmdToEyeViewOffset[1] = eyeRenderDesc[1].HmdToEyeOffset;
+
+		// Get eye poses, feeding in correct IPD offset
+		ovr_GetEyePoses(session, frameIndex, ovrTrue, hmdToEyeViewOffset, layer.RenderPose, &sensorSampleTime);
+
+		// update the camera view matrices accordingly:
+		for (int eye = 0; eye < 2; ++eye)
+		{
+			// let's update the layer info too:
+			layer.Fov[eye] = eyeRenderDesc[eye].Fov;
+			layer.SensorSampleTime = sensorSampleTime;
+			
+			// modelview
+			const ovrVector3f p = layer.RenderPose[eye].Position;
+			atom_setfloat(a + 0, p.x + pos[0]);
+			atom_setfloat(a + 1, p.y + pos[1]);
+			atom_setfloat(a + 2, p.z + pos[2]);
+			outlet_anything(outlet_eye[eye], _jit_sym_position, 3, a);
+
+			const ovrQuatf q = layer.RenderPose[eye].Orientation;
+			t_jit_quat q1;
+			jit_quat_mult(&q1, (t_jit_quat *)&q, &quat);
+			atom_setfloat(a + 0, q1.x);
+			atom_setfloat(a + 1, q1.y);
+			atom_setfloat(a + 2, q1.z);
+			atom_setfloat(a + 3, q1.w);
+			outlet_anything(outlet_eye[eye], _jit_sym_quat, 4, a);
+
+			// TODO: proj matrix doesn't need to be calculated every frame; only when near/far/layer data changes
+			// projection
+			const ovrFovPort& fov = layer.Fov[eye];
+			atom_setfloat(a + 0, -fov.LeftTan * near_clip);
+			atom_setfloat(a + 1, fov.RightTan * near_clip);
+			atom_setfloat(a + 2, -fov.DownTan * near_clip);
+			atom_setfloat(a + 3, fov.UpTan * near_clip);
+			atom_setfloat(a + 4, near_clip);
+			atom_setfloat(a + 5, far_clip);
+			outlet_anything(outlet_eye[eye], ps_frustum, 6, a);
+		}
+		//////////////////////////////
+
+		/*
 		// Query the HMD for the current tracking state.
 		// Get both eye poses simultaneously, with IPD offset already included.
 		double displayMidpointSeconds = ovr_GetPredictedDisplayTime(session, frameIndex);
@@ -448,6 +516,7 @@ public:
 			atom_setfloat(a + 3, q.w);
 			outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
 		}
+		*/
 	}
 
 	// receive a texture
@@ -479,29 +548,47 @@ public:
 			return;	// no texture to copy from.
 		}
 
-		if (!pTextureSet) {
+		if (!textureChain) {
 			object_error(&ob, "no texture set yet");
 			return;
 		}
 
+		///////////////////////////
+
+		// get our next destination texture in the texture chain:
+		int curIndex;
+		ovr_GetTextureSwapChainCurrentIndex(session, textureChain, &curIndex);
+		GLuint dstId;
+		ovr_GetTextureSwapChainBufferGL(session, textureChain, curIndex, &dstId);
+
+		// copy our input texture into this:
+		submit_copy(glid, texdim[0], texdim[1], dstId, pTextureDim.w, pTextureDim.h);
+
+		// and commit it
+		ovr_CommitTextureSwapChain(session, textureChain);
+
+		///////////////////////////
+
+		/*
 		// Increment to use next texture, just before writing
-		pTextureSet->CurrentIndex = (pTextureSet->CurrentIndex + 1) % pTextureSet->TextureCount;
+		textureChain->CurrentIndex = (textureChain->CurrentIndex + 1) % textureChain->TextureCount;
 		// TODO? Clear and set up render-target.    
 
-		ovrGLTexture* tex = (ovrGLTexture*)&pTextureSet->Textures[pTextureSet->CurrentIndex];
+		ovrGLTexture* tex = (ovrGLTexture*)&textureChain->Textures[textureChain->CurrentIndex];
 		GLuint dstId = tex->OGL.TexId;
 
 		submit_copy(glid, texdim[0], texdim[1], dstId, pTextureDim.w, pTextureDim.h);
-		
+		*/
+
 		// Submit frame with one layer we have.
-		// ovr_SubmitFrame returns once frame present is queued up and the next texture slot in the ovrSwapTextureSet is available for the next frame. 
+		// ovr_SubmitFrame returns once frame present is queued up and the next texture slot in the ovrSwatextureChain is available for the next frame. 
 		ovrLayerHeader* layers = &layer.Header;
 		ovrResult       result = ovr_SubmitFrame(session, frameIndex, nullptr, &layers, 1);
 		if (result == ovrError_DisplayLost) {
 			/*
 			TODO: If you receive ovrError_DisplayLost, the device was removed and the session is invalid.
-			Release the shared resources (ovr_DestroySwapTextureSet), destroy the session (ovr_Destory),
-			recreate it (ovr_Create), and create new resources (ovr_CreateSwapTextureSetXXX).
+			Release the shared resources (ovr_DestroySwatextureChain), destroy the session (ovr_Destory),
+			recreate it (ovr_Create), and create new resources (ovr_CreateSwatextureChainXXX).
 			The application's existing private graphics resources do not need to be recreated unless
 			the new ovr_Create call returns a different GraphicsLuid.
 			*/
@@ -635,8 +722,12 @@ public:
 
 
 		// get source texture:
-		ovrGLTexture * tex = (ovrGLTexture*)mirrorTexture;
-		ovrSizei mirrorTexDim = mirrorTexture->Header.TextureSize;
+		GLuint texId;
+		ovr_GetMirrorTextureBufferGL(session, mirrorTexture, &texId);
+
+		//ovrGLTexture * tex = (ovrGLTexture*)mirrorTexture;
+		ovrSizei mirrorTexDim = pTextureDim; // mirrorTexture->Header.TextureSize;
+		
 
 		// cache/restore context in case in capture mode
 		// TODO: necessary ? JKC says no unless context changed above? should be set during draw for you. 
@@ -688,7 +779,7 @@ public:
 			glActiveTexture(GL_TEXTURE0);
 			glClientActiveTexture(GL_TEXTURE0);
 			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, tex->OGL.TexId);
+			glBindTexture(GL_TEXTURE_2D, texId);
 
 			// do not need blending if we use black border for alpha and replace env mode, saves a buffer wipe
 			// we can do this since our image draws over the complete surface of the FBO, no pixel goes untouched.
@@ -764,7 +855,7 @@ public:
 	}
 
 	t_jit_err dest_changed() {
-		object_post(&ob, "dest_changed");
+		//object_post(&ob, "dest_changed");
 
 		t_symbol *context = jit_attr_getsym(this, gensym("drawto"));
 
@@ -797,7 +888,7 @@ public:
 
 	// free any locally-allocated GL resources
 	t_jit_err dest_closing() {
-		object_post(&ob, "dest_closing");
+		//object_post(&ob, "dest_closing");
 		disconnect();
 
 		if (fbo) {
@@ -854,8 +945,14 @@ public:
 
 	void mirror_create() {
 		if (session && !mirrorTexture) {
+			ovrMirrorTextureDesc desc;
+			memset(&desc, 0, sizeof(desc));
+			desc.Width = pTextureDim.w;
+			desc.Height = pTextureDim.h;
+			desc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
+			
 			// TODO SRGB?
-			auto result = ovr_CreateMirrorTextureGL(session, GL_SRGB8_ALPHA8, pTextureDim.w, pTextureDim.h, &mirrorTexture);
+			auto result = ovr_CreateMirrorTextureGL(session, &desc, &mirrorTexture);
 			if (result != ovrSuccess) {
 				ovrErrorInfo errInfo;
 				ovr_GetLastErrorInfo(&errInfo);
@@ -953,7 +1050,7 @@ void oculusrift_perf(oculusrift * x) {
 }
 
 void oculusrift_recenter(oculusrift * x) {
-	if (x->session) ovr_RecenterPose(x->session);
+	if (x->session) ovr_RecenterTrackingOrigin(x->session);
 }
 
 t_max_err oculusrift_pixel_density_set(oculusrift *x, t_object *attr, long argc, t_atom *argv) {

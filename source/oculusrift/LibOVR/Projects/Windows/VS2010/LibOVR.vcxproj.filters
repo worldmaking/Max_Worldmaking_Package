@@ -6,7 +6,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\Include\OVR_CAPI_0_8_0.h">
+    <ClInclude Include="..\..\..\Include\OVR_CAPI.h">
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Include\OVR_CAPI_D3D.h">
@@ -28,6 +28,7 @@
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Src\OVR_StereoProjection.h" />
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_Audio.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Src\OVR_CAPIShim.c" />
