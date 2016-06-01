@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 1115.0, 153.0, 763.0, 711.0 ],
+		"rect" : [ 935.0, 136.0, 880.0, 734.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -38,24 +38,82 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
-					"id" : "obj-12",
-					"maxclass" : "button",
+					"id" : "obj-22",
+					"linecount" : 6,
+					"maxclass" : "comment",
 					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 692.25, 35.0, 93.0, 89.0 ],
+					"presentation_rect" : [ 328.25, 83.5, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "A bit crashy currently but usually works the second time. Not sure the cause yet."
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-21",
+					"linecount" : 2,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 44.75, 495.5, 93.0, 34.0 ],
+					"presentation_rect" : [ 45.75, 500.5, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "^ hmd mirror texture (TODO)"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-6",
+					"linecount" : 2,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 250.75, 495.5, 93.0, 34.0 ],
+					"presentation_rect" : [ 254.25, 504.5, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "^ hmd position & orientation"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-20",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 100.25, 387.0, 60.0, 22.0 ],
+					"style" : "",
+					"text" : "configure"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-16",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 106.0, 86.0, 24.0, 24.0 ],
-					"style" : ""
+					"patching_rect" : [ 100.25, 91.0, 63.0, 22.0 ],
+					"style" : "",
+					"text" : "delay 400"
 				}
 
 			}
 , 			{
 				"box" : 				{
 					"id" : "obj-2",
-					"maxclass" : "jit.pwindow",
+					"maxclass" : "newobj",
 					"numinlets" : 1,
-					"numoutlets" : 2,
-					"outlettype" : [ "", "" ],
-					"patching_rect" : [ 555.0, 467.0, 210.0, 84.0 ]
+					"numoutlets" : 1,
+					"outlettype" : [ "bang" ],
+					"patching_rect" : [ 100.25, 61.0, 60.0, 22.0 ],
+					"style" : "",
+					"text" : "loadbang"
 				}
 
 			}
@@ -89,7 +147,7 @@
 							"modernui" : 1
 						}
 ,
-						"rect" : [ 492.0, 195.0, 674.0, 583.0 ],
+						"rect" : [ 889.0, 204.0, 674.0, 583.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -117,6 +175,20 @@
 						"style" : "",
 						"subpatcher_template" : "",
 						"boxes" : [ 							{
+								"box" : 								{
+									"id" : "obj-7",
+									"linecount" : 2,
+									"maxclass" : "newobj",
+									"numinlets" : 1,
+									"numoutlets" : 2,
+									"outlettype" : [ "jit_matrix", "" ],
+									"patching_rect" : [ 312.0, 352.0, 326.0, 36.0 ],
+									"style" : "",
+									"text" : "jit.gl.gridshape vive_world @poly_mode 1 1 @shape plane @scale 9 9 @dim 9 9 @rotate 90 1 0 0"
+								}
+
+							}
+, 							{
 								"box" : 								{
 									"id" : "obj-17",
 									"maxclass" : "comment",
@@ -210,9 +282,9 @@
 									"numinlets" : 8,
 									"numoutlets" : 2,
 									"outlettype" : [ "", "" ],
-									"patching_rect" : [ 88.0, 460.0, 422.0, 22.0 ],
+									"patching_rect" : [ 88.0, 460.0, 138.0, 22.0 ],
 									"style" : "",
-									"text" : "jit.gl.material vive_world @mat_emission 0.1 0.1 0.1 0 @matfile rockbed.jitmtl"
+									"text" : "jit.gl.material vive_world"
 								}
 
 							}
@@ -572,8 +644,30 @@
 								}
 
 							}
+, 							{
+								"box" : 								{
+									"attr" : "enable",
+									"id" : "obj-10",
+									"maxclass" : "attrui",
+									"numinlets" : 1,
+									"numoutlets" : 1,
+									"outlettype" : [ "" ],
+									"patching_rect" : [ 161.5, 272.0, 150.0, 22.0 ],
+									"style" : ""
+								}
+
+							}
  ],
 						"lines" : [ 							{
+								"patchline" : 								{
+									"destination" : [ "obj-39", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"source" : [ "obj-10", 0 ]
+								}
+
+							}
+, 							{
 								"patchline" : 								{
 									"destination" : [ "obj-8", 0 ],
 									"disabled" : 0,
@@ -686,34 +780,9 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 463.0, 623.0, 179.0, 20.0 ],
+					"patching_rect" : [ 489.0, 622.0, 179.0, 20.0 ],
 					"style" : "",
 					"text" : "the left & right scene cameras"
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-46",
-					"maxclass" : "comment",
-					"numinlets" : 1,
-					"numoutlets" : 0,
-					"patching_rect" : [ 207.0, 559.0, 165.0, 20.0 ],
-					"style" : "",
-					"text" : "recommended capture dim"
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-44",
-					"maxclass" : "message",
-					"numinlets" : 2,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 104.050003, 559.0, 95.0, 22.0 ],
-					"style" : "",
-					"text" : "dim 2664 1586"
 				}
 
 			}
@@ -724,7 +793,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "jit_gl_texture", "" ],
-					"patching_rect" : [ 79.25, 592.0, 403.0, 22.0 ],
+					"patching_rect" : [ 143.649994, 594.0, 403.0, 22.0 ],
 					"style" : "",
 					"text" : "jit.gl.camera vive_world @viewport 0.5 0 0.5 1 @projection_mode frustum"
 				}
@@ -737,7 +806,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "jit_gl_texture", "" ],
-					"patching_rect" : [ 60.25, 623.0, 393.0, 22.0 ],
+					"patching_rect" : [ 92.449997, 622.0, 393.0, 22.0 ],
 					"style" : "",
 					"text" : "jit.gl.camera vive_world @viewport 0 0 0.5 1 @projection_mode frustum"
 				}
@@ -746,12 +815,13 @@
 , 			{
 				"box" : 				{
 					"id" : "obj-17",
+					"linecount" : 2,
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 403.0, 203.0, 150.0, 20.0 ],
+					"patching_rect" : [ 396.0, 193.0, 212.0, 34.0 ],
 					"style" : "",
-					"text" : "navigation:"
+					"text" : "set position/orientation of world origin (e.g. for navigation)"
 				}
 
 			}
@@ -763,14 +833,14 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 403.0, 231.0, 251.0, 22.0 ],
+					"patching_rect" : [ 396.0, 231.0, 251.0, 22.0 ],
 					"style" : ""
 				}
 
 			}
 , 			{
 				"box" : 				{
-					"attr" : "quat",
+					"attr" : "rotatexyz",
 					"id" : "obj-19",
 					"maxclass" : "attrui",
 					"numinlets" : 1,
@@ -789,9 +859,9 @@
 					"numinlets" : 1,
 					"numoutlets" : 3,
 					"outlettype" : [ "jit_gl_texture", "", "" ],
-					"patching_rect" : [ 434.0, 395.0, 317.0, 36.0 ],
+					"patching_rect" : [ 439.0, 387.0, 411.0, 36.0 ],
 					"style" : "",
-					"text" : "jit.gl.node vive @name vive_world @capture 1 @adapt 0 @dim 2664 1586 @erase_color 0 0 0 1"
+					"text" : "jit.gl.node vive @name vive_world @capture 1 @adapt 0 @dim 1512 1680 @fsaa 1 @erase_color 0 0 0 1"
 				}
 
 			}
@@ -802,7 +872,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "jit_matrix", "" ],
-					"patching_rect" : [ 41.25, 651.0, 279.0, 22.0 ],
+					"patching_rect" : [ 439.0, 444.0, 279.0, 22.0 ],
 					"style" : "",
 					"text" : "jit.gl.videoplane vive @transform_reset 2 @layer 1"
 				}
@@ -869,9 +939,9 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "bang", "" ],
-					"patching_rect" : [ 174.25, 231.0, 137.0, 22.0 ],
+					"patching_rect" : [ 65.25, 259.0, 221.0, 22.0 ],
 					"style" : "",
-					"text" : "jit.window vive @sync 0"
+					"text" : "jit.window vive @sync 0 @size 756 420"
 				}
 
 			}
@@ -921,7 +991,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 335.25, 343.0, 68.0, 22.0 ],
+					"patching_rect" : [ 284.0, 387.0, 68.0, 22.0 ],
 					"style" : "",
 					"text" : "disconnect"
 				}
@@ -933,7 +1003,7 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 162.25, 467.0, 57.0, 22.0 ],
+					"patching_rect" : [ 325.25, 462.5, 57.0, 22.0 ],
 					"style" : "",
 					"text" : "print info"
 				}
@@ -946,7 +1016,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 258.25, 343.0, 53.0, 22.0 ],
+					"patching_rect" : [ 207.0, 387.0, 53.0, 22.0 ],
 					"style" : "",
 					"text" : "connect"
 				}
@@ -960,9 +1030,35 @@
 					"numinlets" : 1,
 					"numoutlets" : 6,
 					"outlettype" : [ "jit_gl_texture", "", "", "", "", "" ],
-					"patching_rect" : [ 41.25, 458.0, 114.0, 31.0 ],
+					"patching_rect" : [ 41.25, 458.0, 275.0, 31.0 ],
 					"style" : "",
-					"text" : "htcvive vive"
+					"text" : "htcvive vive @position 0 1.5 1"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"attr" : "near_clip",
+					"id" : "obj-12",
+					"maxclass" : "attrui",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 65.25, 303.0, 150.0, 22.0 ],
+					"style" : ""
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"attr" : "far_clip",
+					"id" : "obj-23",
+					"maxclass" : "attrui",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 222.25, 303.0, 150.0, 22.0 ],
+					"style" : ""
 				}
 
 			}
@@ -972,7 +1068,8 @@
 					"destination" : [ "obj-15", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"source" : [ "obj-1", 4 ]
+					"midpoints" : [ 204.350006, 545.0, 865.424988, 545.0, 865.424988, 376.0, 448.5, 376.0 ],
+					"source" : [ "obj-1", 3 ]
 				}
 
 			}
@@ -1005,15 +1102,6 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-44", 1 ],
-					"disabled" : 0,
-					"hidden" : 0,
-					"source" : [ "obj-1", 3 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
@@ -1041,9 +1129,10 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-11", 0 ],
+					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
+					"midpoints" : [ 74.75, 335.0, 50.75, 335.0 ],
 					"source" : [ "obj-12", 0 ]
 				}
 
@@ -1053,7 +1142,6 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 443.5, 442.0, 50.75, 442.0 ],
 					"source" : [ "obj-15", 0 ]
 				}
 
@@ -1069,10 +1157,19 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-2", 0 ],
+					"destination" : [ "obj-20", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"source" : [ "obj-15", 0 ]
+					"source" : [ "obj-16", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-7", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-16", 0 ]
 				}
 
 			}
@@ -1088,9 +1185,39 @@
 			}
 , 			{
 				"patchline" : 				{
+					"destination" : [ "obj-16", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-2", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
+					"midpoints" : [ 109.75, 433.0, 50.75, 433.0 ],
+					"source" : [ "obj-20", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-1", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"midpoints" : [ 231.75, 334.0, 50.75, 334.0 ],
+					"source" : [ "obj-23", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-1", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"midpoints" : [ 216.5, 433.0, 50.75, 433.0 ],
 					"source" : [ "obj-3", 0 ]
 				}
 
@@ -1100,7 +1227,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 412.5, 434.5, 50.75, 434.5 ],
+					"midpoints" : [ 405.5, 434.5, 50.75, 434.5 ],
 					"source" : [ "obj-33", 0 ]
 				}
 
@@ -1110,6 +1237,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
+					"midpoints" : [ 293.5, 433.0, 50.75, 433.0 ],
 					"source" : [ "obj-5", 0 ]
 				}
 

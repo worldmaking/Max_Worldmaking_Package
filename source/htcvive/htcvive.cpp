@@ -8,6 +8,7 @@
 
 */
 
+
 // a bunch of likely Max includes:
 extern "C" {
 #include "ext.h"
@@ -17,12 +18,24 @@ extern "C" {
 #include "ext_systhread.h"
 	
 #include "z_dsp.h"
-	
 #include "jit.common.h"
 #include "jit.vecmath.h"
+
 #include "jit.gl.h"
+
 }
 
+//
+/*
+// things we need from the GL headers
+typedef void (APIENTRY * PFNGLTEXIMAGE2DMULTISAMPLEPROC)(GLenum target, GLsizei samples, GLint internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
+extern PFNGLTEXIMAGE2DMULTISAMPLEPROC _funcptr_glTexImage2DMultisample;
+#define glTexImage2DMultisample _funcptr_glTexImage2DMultisample
+typedef void (APIENTRY * PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
+extern PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC _funcptr_glRenderbufferStorageMultisample;
+#define glRenderbufferStorageMultisample _funcptr_glRenderbufferStorageMultisample
+#define GL_TEXTURE_2D_MULTISAMPLE 0x9100
+*/
 // The OpenVR SDK:
 #include "openvr.h"
 
@@ -67,21 +80,21 @@ inline glm::quat quat_to_jitter(glm::quat const & v) {
 	return glm::quat(v.x, v.y, v.z, v.w);
 }
 
-glm::mat4 mat4_from_openvr(const vr::HmdMatrix34_t &matPose) {
+glm::mat4 mat4_from_openvr(const vr::HmdMatrix34_t &m) {
 	return glm::mat4(
-		matPose.m[0][0], matPose.m[1][0], matPose.m[2][0], 0.0,
-		matPose.m[0][1], matPose.m[1][1], matPose.m[2][1], 0.0,
-		matPose.m[0][2], matPose.m[1][2], matPose.m[2][2], 0.0,
-		matPose.m[0][3], matPose.m[1][3], matPose.m[2][3], 1.0f
+		m.m[0][0], m.m[1][0], m.m[2][0], 0.0,
+		m.m[0][1], m.m[1][1], m.m[2][1], 0.0,
+		m.m[0][2], m.m[1][2], m.m[2][2], 0.0,
+		m.m[0][3], m.m[1][3], m.m[2][3], 1.0f
 		);
 }
 
-glm::mat4 mat4_from_openvr(const vr::HmdMatrix44_t &matPose) {
+glm::mat4 mat4_from_openvr(const vr::HmdMatrix44_t &m) {
 	return glm::mat4(
-		matPose.m[0][0], matPose.m[1][0], matPose.m[2][0], matPose.m[3][0],
-		matPose.m[0][1], matPose.m[1][1], matPose.m[2][1], matPose.m[3][1],
-		matPose.m[0][2], matPose.m[1][2], matPose.m[2][2], matPose.m[3][2],
-		matPose.m[0][3], matPose.m[1][3], matPose.m[2][3], matPose.m[3][3]
+		m.m[0][0], m.m[1][0], m.m[2][0], m.m[3][0],
+		m.m[0][1], m.m[1][1], m.m[2][1], m.m[3][1],
+		m.m[0][2], m.m[1][2], m.m[2][2], m.m[3][2],
+		m.m[0][3], m.m[1][3], m.m[2][3], m.m[3][3]
 		);
 }
 
@@ -156,6 +169,7 @@ public:
 
 	// OpenGL
 	GLuint fbo, fbomirror;
+	GLuint inFBO, inRBO, inFBOtex;
 
 	// OpenVR SDK:
 	vr::IVRSystem *	mHMD;
@@ -190,8 +204,8 @@ public:
 
 		intexture = _sym_nothing;
 		outname = _sym_nothing;
-		outdim[0] = 1024;
-		outdim[1] = 768;
+		outdim[0] = 1512;
+		outdim[1] = 1680;
 
 		// attrs:
 		near_clip = 0.15f;
@@ -216,9 +230,10 @@ public:
 			return false;
 		}
 
-		outlet_anything(outlet_msg, gensym("connected"), 0, NULL);
 
 		configure();
+
+		outlet_anything(outlet_msg, gensym("connected"), 0, NULL);
 		return true;
 	}
 
@@ -243,29 +258,28 @@ public:
 
 		// setup cameras:
 		for (int i = 0; i < 2; i++) {
-			m_mat4viewEye[i] = glm::inverse(mat4_from_openvr(mHMD->GetEyeToHeadTransform((vr::Hmd_Eye)i)));
 
-			/*
-			auto mat = mHMD->GetProjectionMatrix((vr::Hmd_Eye)i, near_clip, far_clip, vr::API_OpenGL);
-			m_mat4projectionEye[i] = glm::mat4(
-				mat.m[0][0], mat.m[1][0], mat.m[2][0], mat.m[3][0],
-				mat.m[0][1], mat.m[1][1], mat.m[2][1], mat.m[3][1],
-				mat.m[0][2], mat.m[1][2], mat.m[2][2], mat.m[3][2],
-				mat.m[0][3], mat.m[1][3], mat.m[2][3], mat.m[3][3]
-			);*/
+			vr::HmdMatrix34_t matEyeRight = mHMD->GetEyeToHeadTransform((vr::Hmd_Eye)i);
+			glm::mat4 matrixObj(
+				matEyeRight.m[0][0], matEyeRight.m[1][0], matEyeRight.m[2][0], 0.0,
+				matEyeRight.m[0][1], matEyeRight.m[1][1], matEyeRight.m[2][1], 0.0,
+				matEyeRight.m[0][2], matEyeRight.m[1][2], matEyeRight.m[2][2], 0.0,
+				matEyeRight.m[0][3], matEyeRight.m[1][3], matEyeRight.m[2][3], 1.0f
+				);
+
+			m_mat4viewEye[i] = matrixObj;
 			float l, r, t, b;
 			mHMD->GetProjectionRaw((vr::Hmd_Eye)i, &l, &r, &t, &b);
-			// TODO: are signs and scales appropriate?
-			atom_setfloat(a + 0, -l * near_clip);
+			atom_setfloat(a + 0, l * near_clip);
 			atom_setfloat(a + 1, r * near_clip);
 			atom_setfloat(a + 2, -b * near_clip);
-			atom_setfloat(a + 3, t * near_clip);
+			atom_setfloat(a + 3, -t * near_clip);
 			atom_setfloat(a + 4, near_clip);
 			atom_setfloat(a + 5, far_clip);
 			outlet_anything(outlet_eye[i], ps_frustum, 6, a);
 		}
 
-
+		info();
 	}
 
 	void info() {
@@ -299,15 +313,16 @@ public:
 	void bang() {
 		t_atom a[4];
 
+		if (!mHMD) return;
+
+		
 		// get desired model matrix (for navigation)
 		glm::vec3 m_position;
 		jit_attr_getfloat_array(this, gensym("position"), 3, &m_position.x);
 		t_jit_quat m_jitquat;
 		jit_attr_getfloat_array(this, gensym("quat"), 4, &m_jitquat.x);
 		
-		glm::mat4 model_mat = glm::translate(glm::mat4(1.0f), m_position) 
-							* mat4_cast(quat_from_jitter(m_jitquat));
-
+		glm::mat4 modelview_mat = glm::translate(glm::mat4(1.0f), m_position) * mat4_cast(quat_from_jitter(m_jitquat));
 
 		vr::VREvent_t event;
 		while (mHMD->PollNextEvent(&event, sizeof(event))) {
@@ -336,19 +351,25 @@ public:
 		}
 		
 		// get the tracking data here
-		vr::VRCompositor()->WaitGetPoses(pRenderPoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+		vr::EVRCompositorError err = vr::VRCompositor()->WaitGetPoses(pRenderPoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+		if (err != vr::VRCompositorError_None) {
+			object_error(&ob, "WaitGetPoses error");
+			return;
+		}
+
 
 		// check each device:
 		for (int i = 0; i < vr::k_unMaxTrackedDeviceCount; i++) {
 			const vr::TrackedDevicePose_t& trackedDevicePose = pRenderPoseArray[i];
 			if (trackedDevicePose.bPoseIsValid && trackedDevicePose.bDeviceIsConnected) {
 				mDevicePose[i] = mat4_from_openvr(trackedDevicePose.mDeviceToAbsoluteTracking);
-			
+				
+				
 				switch (mHMD->GetTrackedDeviceClass(i)) {
 				case vr::TrackedDeviceClass_HMD: {
 					// this is the view matrix relative to the 'chaperone' space origin
 					// (the center of the floor space in the real world)
-					mHMDPose = glm::inverse(mDevicePose[i]);
+					mHMDPose = mDevicePose[i];
 					
 					// probably want to output this for navigation etc. use
 					glm::vec3 p = glm::vec3(mHMDPose[3]); // the translation component
@@ -358,6 +379,7 @@ public:
 					outlet_anything(outlet_tracking, _jit_sym_position, 3, a);
 
 					glm::quat q = glm::quat_cast(mHMDPose);
+					//q = glm::normalize(q);
 					atom_setfloat(a + 0, q.x);
 					atom_setfloat(a + 1, q.y);
 					atom_setfloat(a + 2, q.z);
@@ -369,6 +391,7 @@ public:
 				break;
 				}
 
+				/*
 				// TODO: output controller states here?
 				// check role to see if these are hands
 				vr::ETrackedControllerRole role = mHMD->GetControllerRoleForTrackedDeviceIndex(i);
@@ -381,18 +404,16 @@ public:
 				default:
 					break;
 				}
+				*/
 			}
 		}
 
-		
-		// transform our world pose into the HMD space:
-		glm::mat4 modelview_mat = mHMDPose * model_mat;
 
 		
 		// now update cameras:
 		for (int i = 0; i < 2; i++) {
 			// left:
-			glm::mat4 modelvieweye_mat = m_mat4viewEye[i] * modelview_mat;
+			glm::mat4 modelvieweye_mat = modelview_mat * mHMDPose * m_mat4viewEye[i]; 
 
 			// modelview
 			glm::vec3 p = glm::vec3(modelvieweye_mat[3]); // the translation component
@@ -421,6 +442,7 @@ public:
 	void submit() {
 		if (!mHMD) return;
 
+		
 		void * texob = jit_object_findregistered(intexture);
 		if (!texob) {
 			object_error(&ob, "no texture to draw");
@@ -438,7 +460,108 @@ public:
 			object_error(&ob, "no fbo yet");
 			return;	// no texture to copy from.
 		}
+		if (!inFBOtex) {
+			object_error(&ob, "no fbo tex yet");
+			return;	// no texture to copy from.
+		}
 
+		{
+			// copy our glid source into the inFBO destination
+			// save some state
+			GLint previousFBO;	// make sure we pop out to the right FBO
+			GLint previousMatrixMode;
+
+			glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &previousFBO);
+			glGetIntegerv(GL_MATRIX_MODE, &previousMatrixMode);
+
+			// save texture state, client state, etc.
+			glPushAttrib(GL_ALL_ATTRIB_BITS);
+			glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
+			// TODO use rectangle 1?
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, inFBO);
+			glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, inFBOtex, 0);
+			if (fbo_check()) {
+				glMatrixMode(GL_TEXTURE);
+				glPushMatrix();
+				glLoadIdentity();
+
+				glViewport(0, 0, texdim_w, texdim_h);
+
+				glMatrixMode(GL_PROJECTION);
+				glPushMatrix();
+				glLoadIdentity();
+				glOrtho(0.0, texdim_w, 0.0, texdim_h, -1, 1);
+
+				glMatrixMode(GL_MODELVIEW);
+				glPushMatrix();
+				glLoadIdentity();
+
+				glClearColor(0, 0, 0, 1);
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+				glColor4f(1.0, 0.0, 1.0, 1.0);
+
+				glActiveTexture(GL_TEXTURE0);
+				glClientActiveTexture(GL_TEXTURE0);
+				glEnable(GL_TEXTURE_RECTANGLE_ARB);
+				glBindTexture(GL_TEXTURE_RECTANGLE_ARB, glid);
+
+				// do not need blending if we use black border for alpha and replace env mode, saves a buffer wipe
+				// we can do this since our image draws over the complete surface of the FBO, no pixel goes untouched.
+
+				glDisable(GL_BLEND);
+				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+				// move to VA for rendering
+				GLfloat tex_coords[] = {
+					texdim[0], texdim[1],
+					0.0, texdim[1],
+					0.0, 0.,
+					texdim[0], 0.
+				};
+
+				GLfloat verts[] = {
+					texdim_w, texdim_h,
+					0.0, texdim_h,
+					0.0, 0.0,
+					texdim_w, 0.0
+				};
+
+				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+				glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
+				glEnableClientState(GL_VERTEX_ARRAY);
+				glVertexPointer(2, GL_FLOAT, 0, verts);
+				glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+				glDisableClientState(GL_VERTEX_ARRAY);
+				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+				glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+
+				glMatrixMode(GL_MODELVIEW);
+				glPopMatrix();
+				glMatrixMode(GL_PROJECTION);
+				glPopMatrix();
+
+				glMatrixMode(GL_TEXTURE);
+				glPopMatrix();
+			}
+			else {
+				object_error(&ob, "falied to create submit FBO");
+			}
+
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+			glPopAttrib();
+			glPopClientAttrib();
+
+			glMatrixMode(previousMatrixMode);
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, previousFBO);
+
+			//jit_ob3d_set_context(ctx);
+		}
+
+		/**/
 		// ready to submit:
 
 		// getting problems here, my guess it is likely due to the gl funkiness. might need to create another fbo of the desired format to make this work
@@ -448,26 +571,38 @@ public:
 
 		// or it might be that jitter's textures are built on pre-dx11 support... 
 
+		// anyway, let's try submitting what we already have
+
 		/** Updated scene texture to display. If pBounds is NULL the entire texture will be used.  If called from an OpenGL app, consider adding a glFlush after
 		* Submitting both frames to signal the driver to start processing, otherwise it may wait until the command buffer fills up, causing the app to miss frames.
 		*
 		* OpenGL dirty state:
 		*	glBindTexture
 		*/
+
+
+		
 		vr::EVRCompositorError err;
-		vr::Texture_t vrTexture = { (void*)glid, vr::API_OpenGL, vr::ColorSpace_Gamma }; //ColorSpace_Gamma
+		vr::Texture_t vrTexture = { (void*)inFBOtex, vr::API_OpenGL, vr::ColorSpace_Gamma }; 
+
 		vr::VRTextureBounds_t leftBounds = { 0.f, 0.f, 0.5f, 1.f };
 		vr::VRTextureBounds_t rightBounds = { 0.5f, 0.f, 1.f, 1.f };
-		err = vr::VRCompositor()->Submit(vr::Eye_Left, &vrTexture);
-		//err = vr::VRCompositor()->Submit(vr::Eye_Left, &vrTexture, &leftBounds, vr::Submit_GlRenderBuffer);
+
+		err = vr::VRCompositor()->Submit(vr::Eye_Left, &vrTexture, &leftBounds);
 		if (err != 0) object_error(&ob, "submit error");
-		if (err == vr::VRCompositorError_InvalidTexture) object_error(&ob, "that one error");
-		
-		//err = vr::VRCompositor()->Submit(vr::Eye_Right, &vrTexture, &rightBounds, vr::Submit_GlRenderBuffer);
-		//if (err != 0) object_error(&ob, "submit error %d", err);
+
+		err = vr::VRCompositor()->Submit(vr::Eye_Right, &vrTexture, &rightBounds);
+		if (err != 0) object_error(&ob, "submit error");
+
+		//glBindTexture(GL_TEXTURE_2D, 0);
+
+		glClearColor(0, 0, 0, 1);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
 		// openvr header recommends this after submit:
 		glFlush();
+		glFinish();
+	
 /*
 		// submission done:
 
@@ -477,6 +612,124 @@ public:
 		if (mirror) mirror_output(a);
 
 		outlet_anything(outlet_tex, ps_jit_gl_texture, 1, a);*/
+	}
+
+
+	void submit_copy(GLuint srcID, int srcWidth, int srcHeight, GLuint dstID, int width, int height) {
+
+		// save some state
+		GLint previousFBO;	// make sure we pop out to the right FBO
+		GLint previousMatrixMode;
+
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &previousFBO);
+		glGetIntegerv(GL_MATRIX_MODE, &previousMatrixMode);
+
+		// save texture state, client state, etc.
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
+		// TODO use rectangle 1?
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, dstID, 0);
+		if (fbo_check()) {
+			glMatrixMode(GL_TEXTURE);
+			glPushMatrix();
+			glLoadIdentity();
+
+			glViewport(0, 0, width, height);
+
+			glMatrixMode(GL_PROJECTION);
+			glPushMatrix();
+			glLoadIdentity();
+			glOrtho(0.0, width, 0.0, height, -1, 1);
+
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadIdentity();
+
+			glColor4f(0.0, 1.0, 1.0, 1.0);
+
+			glActiveTexture(GL_TEXTURE0);
+			glClientActiveTexture(GL_TEXTURE0);
+			glEnable(GL_TEXTURE_RECTANGLE_ARB);
+			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, srcID);
+
+			// do not need blending if we use black border for alpha and replace env mode, saves a buffer wipe
+			// we can do this since our image draws over the complete surface of the FBO, no pixel goes untouched.
+
+			glDisable(GL_BLEND);
+			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+			// move to VA for rendering
+			GLfloat tex_coords[] = {
+				srcWidth, 0.,
+				0.0, 0.,
+				0.0, srcHeight,
+				srcWidth, srcHeight
+			};
+
+			GLfloat verts[] = {
+				width, height,
+				0.0, height,
+				0.0, 0.0,
+				width, 0.0
+			};
+
+			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+			glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(2, GL_FLOAT, 0, verts);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+			glDisableClientState(GL_VERTEX_ARRAY);
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
+
+			glMatrixMode(GL_MODELVIEW);
+			glPopMatrix();
+			glMatrixMode(GL_PROJECTION);
+			glPopMatrix();
+
+			glMatrixMode(GL_TEXTURE);
+			glPopMatrix();
+		}
+		else {
+			object_error(&ob, "falied to create submit FBO");
+		}
+
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+		glPopAttrib();
+		glPopClientAttrib();
+
+		glMatrixMode(previousMatrixMode);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, previousFBO);
+
+		//jit_ob3d_set_context(ctx);
+	}
+
+
+	bool fbo_check() {
+		GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
+		if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
+			if (status == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT_EXT) {
+				object_error(&ob, "failed to create render to texture target GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT");
+			}
+			else if (status == GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT) {
+				object_error(&ob, "failed to create render to texture target GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS");
+			}
+			else if (status == GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT_EXT) {
+				object_error(&ob, "failed to create render to texture target GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT");
+			}
+			else if (status == GL_FRAMEBUFFER_UNSUPPORTED_EXT) {
+				object_error(&ob, "failed to create render to texture target GL_FRAMEBUFFER_UNSUPPORTED");
+			}
+			else {
+				object_error(&ob, "failed to create render to texture target %d", status);
+			}
+			return false;
+		}
+		return true;
 	}
 
 	bool mirror_output(t_atom * a) {
@@ -490,7 +743,7 @@ public:
 	}
 
 	t_jit_err dest_changed() {
-		//object_post(&ob, "dest_changed");
+		object_post(&ob, "dest_changed %d %d", texdim_w, texdim_h);
 
 		t_symbol *context = jit_attr_getsym(this, gensym("drawto"));
 
@@ -518,6 +771,34 @@ public:
 		else {
 			object_error(&ob, "failed to create Jitter mirror texture");
 		}
+
+		
+		// make a framebuffer:
+
+
+		glGenFramebuffersEXT(1, &inFBO);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, inFBO);
+
+		glGenRenderbuffersEXT(1, &inRBO);
+		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, inRBO);
+		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT, texdim_w, texdim_h);
+		glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, inRBO);
+
+		glGenTextures(1, &inFBOtex);
+		glBindTexture(GL_TEXTURE_2D, inFBOtex);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texdim_w, texdim_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, inFBOtex, 0);
+
+		// check FBO status
+		GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
+		if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
+			object_error(&ob, "failed to create Jitter FBO"); 
+			return JIT_ERR_GENERIC;
+		}
+
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
 		return JIT_ERR_NONE;
 	}
@@ -564,12 +845,12 @@ void * htcvive_new(t_symbol *s, long argc, t_atom *argv) {
 	htcvive *x = NULL;
 	if ((x = (htcvive *)object_alloc(max_class))) {// get context:
 		t_symbol * dest_name = atom_getsym(argv);
-		
+
 		x = new (x)htcvive(dest_name);
-		
+
 		// apply attrs:
 		attr_args_process(x, (short)argc, argv);
-		
+
 		// invoke any initialization after the attrs are set from here:
 		x->connect();
 	}
