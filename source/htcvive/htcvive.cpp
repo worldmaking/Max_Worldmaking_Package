@@ -255,6 +255,8 @@ public:
 		//mDisplay = GetTrackedDeviceString(mHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_SerialNumber_String);
 
 		mHMD->GetRecommendedRenderTargetSize(&texdim_w, &texdim_h);
+		// we will send as side-by-side:
+		texdim_w *= 2;
 
 		// setup cameras:
 		for (int i = 0; i < 2; i++) {
@@ -561,26 +563,6 @@ public:
 			//jit_ob3d_set_context(ctx);
 		}
 
-		/**/
-		// ready to submit:
-
-		// getting problems here, my guess it is likely due to the gl funkiness. might need to create another fbo of the desired format to make this work
-		// but it shouldn't crash!
-
-		// might need to try something else here, like creating an internal fbo and splatting to that, and submitting it
-
-		// or it might be that jitter's textures are built on pre-dx11 support... 
-
-		// anyway, let's try submitting what we already have
-
-		/** Updated scene texture to display. If pBounds is NULL the entire texture will be used.  If called from an OpenGL app, consider adding a glFlush after
-		* Submitting both frames to signal the driver to start processing, otherwise it may wait until the command buffer fills up, causing the app to miss frames.
-		*
-		* OpenGL dirty state:
-		*	glBindTexture
-		*/
-
-
 		
 		vr::EVRCompositorError err;
 		vr::Texture_t vrTexture = { (void*)inFBOtex, vr::API_OpenGL, vr::ColorSpace_Gamma }; 
@@ -603,7 +585,7 @@ public:
 		glFlush();
 		glFinish();
 	
-/*
+
 		// submission done:
 
 		t_atom a[1];
@@ -611,102 +593,9 @@ public:
 
 		if (mirror) mirror_output(a);
 
-		outlet_anything(outlet_tex, ps_jit_gl_texture, 1, a);*/
+		outlet_anything(outlet_tex, ps_jit_gl_texture, 1, a);
 	}
 
-
-	void submit_copy(GLuint srcID, int srcWidth, int srcHeight, GLuint dstID, int width, int height) {
-
-		// save some state
-		GLint previousFBO;	// make sure we pop out to the right FBO
-		GLint previousMatrixMode;
-
-		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &previousFBO);
-		glGetIntegerv(GL_MATRIX_MODE, &previousMatrixMode);
-
-		// save texture state, client state, etc.
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-		glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-
-		// TODO use rectangle 1?
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, dstID, 0);
-		if (fbo_check()) {
-			glMatrixMode(GL_TEXTURE);
-			glPushMatrix();
-			glLoadIdentity();
-
-			glViewport(0, 0, width, height);
-
-			glMatrixMode(GL_PROJECTION);
-			glPushMatrix();
-			glLoadIdentity();
-			glOrtho(0.0, width, 0.0, height, -1, 1);
-
-			glMatrixMode(GL_MODELVIEW);
-			glPushMatrix();
-			glLoadIdentity();
-
-			glColor4f(0.0, 1.0, 1.0, 1.0);
-
-			glActiveTexture(GL_TEXTURE0);
-			glClientActiveTexture(GL_TEXTURE0);
-			glEnable(GL_TEXTURE_RECTANGLE_ARB);
-			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, srcID);
-
-			// do not need blending if we use black border for alpha and replace env mode, saves a buffer wipe
-			// we can do this since our image draws over the complete surface of the FBO, no pixel goes untouched.
-
-			glDisable(GL_BLEND);
-			glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-
-			// move to VA for rendering
-			GLfloat tex_coords[] = {
-				srcWidth, 0.,
-				0.0, 0.,
-				0.0, srcHeight,
-				srcWidth, srcHeight
-			};
-
-			GLfloat verts[] = {
-				width, height,
-				0.0, height,
-				0.0, 0.0,
-				width, 0.0
-			};
-
-			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-			glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
-			glEnableClientState(GL_VERTEX_ARRAY);
-			glVertexPointer(2, GL_FLOAT, 0, verts);
-			glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-			glDisableClientState(GL_VERTEX_ARRAY);
-			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-
-			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
-
-			glMatrixMode(GL_MODELVIEW);
-			glPopMatrix();
-			glMatrixMode(GL_PROJECTION);
-			glPopMatrix();
-
-			glMatrixMode(GL_TEXTURE);
-			glPopMatrix();
-		}
-		else {
-			object_error(&ob, "falied to create submit FBO");
-		}
-
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-
-		glPopAttrib();
-		glPopClientAttrib();
-
-		glMatrixMode(previousMatrixMode);
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, previousFBO);
-
-		//jit_ob3d_set_context(ctx);
-	}
 
 
 	bool fbo_check() {
@@ -733,6 +622,135 @@ public:
 	}
 
 	bool mirror_output(t_atom * a) {
+		if (!mirror) return false;
+
+		t_symbol * dst = outname;
+		void * outtexture = jit_object_findregistered(dst);
+		if (!outtexture) {
+			object_error(&ob, "no texture to draw");
+			return false;	// no texture to copy from.
+		}
+		long glid = jit_attr_getlong(outtexture, ps_glid);
+		// get output texture dimensions
+		//t_atom_long outdim[2];
+
+		//jit_attr_getlong_array(texob, _sym_dim, 2, outdim);
+		// add texture to OB3D list.
+		jit_attr_setsym(this, gensym("texture"), dst);
+
+		// update texture dim to match mirror:
+		outdim[0] = texdim_w;
+		outdim[1] = texdim_h;
+		jit_attr_setlong_array(outtexture, _jit_sym_dim, 2, outdim);
+
+		// get source texture:
+		GLuint texId;
+		vr::glSharedTextureHandle_t texhandle;
+		{
+			vr::EVRCompositorError err = vr::VRCompositor()->GetMirrorTextureGL(vr::Eye_Left, &texId, &texhandle);
+			if (err != vr::VRCompositorError_None) {
+				object_error(&ob, "failed to acquire mirror texture %d", (int)err); return false;
+			}
+			vr::VRCompositor()->LockGLSharedTextureForAccess(texhandle);
+
+			// save some state
+			GLint previousFBO;	// make sure we pop out to the right FBO
+			GLint previousMatrixMode;
+
+			glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &previousFBO);
+			glGetIntegerv(GL_MATRIX_MODE, &previousMatrixMode);
+
+			// save texture state, client state, etc.
+			glPushAttrib(GL_ALL_ATTRIB_BITS);
+			glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbomirror);
+			glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_RECTANGLE_ARB, glid, 0);
+			if (fbo_check()) {
+				t_atom_long width = outdim[0];
+				t_atom_long height = outdim[1];
+
+				glMatrixMode(GL_TEXTURE);
+				glPushMatrix();
+				glLoadIdentity();
+
+				glViewport(0, 0, width, height);
+
+				glMatrixMode(GL_PROJECTION);
+				glPushMatrix();
+				glLoadIdentity();
+				glOrtho(0.0, width, 0.0, height, -1, 1);
+
+				glMatrixMode(GL_MODELVIEW);
+				glPushMatrix();
+				glLoadIdentity();
+
+				glColor4f(0.0, 1.0, 1.0, 1.0);
+
+				glActiveTexture(GL_TEXTURE0);
+				glClientActiveTexture(GL_TEXTURE0);
+				glEnable(GL_TEXTURE_2D);
+				glBindTexture(GL_TEXTURE_2D, texId);
+
+				// do not need blending if we use black border for alpha and replace env mode, saves a buffer wipe
+				// we can do this since our image draws over the complete surface of the FBO, no pixel goes untouched.
+
+				glDisable(GL_BLEND);
+				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
+				GLfloat tex_coords[] = {
+					1., 1.,
+					0.0, 1.,
+					0.0, 0.0,
+					1., 0.0
+				};
+
+				GLfloat verts[] = {
+					width, height,
+					0.0, height,
+					0.0, 0.0,
+					width, 0.0
+				};
+
+				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+				glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
+				glEnableClientState(GL_VERTEX_ARRAY);
+				glVertexPointer(2, GL_FLOAT, 0, verts);
+				glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+				glDisableClientState(GL_VERTEX_ARRAY);
+				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+				glBindTexture(GL_TEXTURE_2D, 0);
+
+				glMatrixMode(GL_MODELVIEW);
+				glPopMatrix();
+				glMatrixMode(GL_PROJECTION);
+				glPopMatrix();
+
+				glMatrixMode(GL_TEXTURE);
+				glPopMatrix();
+
+				// success!
+				atom_setsym(a, dst);
+			}
+			else {
+				object_error(&ob, "falied to create mirror FBO");
+			}
+
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+			glPopAttrib();
+			glPopClientAttrib();
+
+			glMatrixMode(previousMatrixMode);
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, previousFBO);
+
+			//jit_ob3d_set_context(ctx);
+
+			vr::VRCompositor()->UnlockGLSharedTextureForAccess(texhandle);
+			vr::VRCompositor()->ReleaseSharedGLTexture(texId, texhandle);
+			
+		}
 		return true;
 	}
 

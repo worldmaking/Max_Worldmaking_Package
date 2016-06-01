@@ -38,29 +38,51 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-30",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 450.5, 354.0, 376.0, 20.0 ],
+					"style" : "",
+					"text" : "FSAA might make edges look softer, but also may impact frame rate"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-29",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 188.25, 567.0, 256.0, 20.0 ],
+					"style" : "",
+					"text" : "recommended texture dim"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-28",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 188.25, 543.0, 128.0, 22.0 ],
+					"style" : "",
+					"text" : "dim 3024 1680"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-22",
 					"linecount" : 6,
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 692.25, 35.0, 93.0, 89.0 ],
-					"presentation_rect" : [ 328.25, 83.5, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "A bit crashy currently but usually works the second time. Not sure the cause yet."
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-21",
-					"linecount" : 2,
-					"maxclass" : "comment",
-					"numinlets" : 1,
-					"numoutlets" : 0,
-					"patching_rect" : [ 44.75, 495.5, 93.0, 34.0 ],
-					"presentation_rect" : [ 45.75, 500.5, 0.0, 0.0 ],
-					"style" : "",
-					"text" : "^ hmd mirror texture (TODO)"
 				}
 
 			}
@@ -72,7 +94,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 250.75, 495.5, 93.0, 34.0 ],
-					"presentation_rect" : [ 254.25, 504.5, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "^ hmd position & orientation"
 				}
@@ -124,9 +145,9 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 531.0, 337.0, 201.0, 34.0 ],
+					"patching_rect" : [ 437.0, 84.0, 201.0, 34.0 ],
 					"style" : "",
-					"text" : "put all your oculus world content in the \"vive_world\" drawing context"
+					"text" : "put all your world content in the \"vive_world\" drawing context"
 				}
 
 			}
@@ -760,7 +781,7 @@
  ]
 					}
 ,
-					"patching_rect" : [ 439.0, 336.0, 90.0, 36.0 ],
+					"patching_rect" : [ 345.0, 84.0, 90.0, 36.0 ],
 					"saved_object_attributes" : 					{
 						"description" : "",
 						"digest" : "",
@@ -846,7 +867,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 416.333313, 259.0, 251.0, 22.0 ],
+					"patching_rect" : [ 417.0, 259.0, 251.0, 22.0 ],
 					"style" : ""
 				}
 
@@ -861,7 +882,7 @@
 					"outlettype" : [ "jit_gl_texture", "", "" ],
 					"patching_rect" : [ 439.0, 387.0, 411.0, 36.0 ],
 					"style" : "",
-					"text" : "jit.gl.node vive @name vive_world @capture 1 @adapt 0 @dim 1512 1680 @fsaa 1 @erase_color 0 0 0 1"
+					"text" : "jit.gl.node vive @name vive_world @capture 1 @adapt 0 @dim 3072 1536 @erase_color 0 0 0 1"
 				}
 
 			}
@@ -872,7 +893,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "jit_matrix", "" ],
-					"patching_rect" : [ 439.0, 444.0, 279.0, 22.0 ],
+					"patching_rect" : [ 41.25, 656.0, 279.0, 22.0 ],
 					"style" : "",
 					"text" : "jit.gl.videoplane vive @transform_reset 2 @layer 1"
 				}
@@ -1062,13 +1083,48 @@
 				}
 
 			}
+, 			{
+				"box" : 				{
+					"attr" : "fsaa",
+					"id" : "obj-24",
+					"maxclass" : "attrui",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 439.0, 330.0, 150.0, 22.0 ],
+					"style" : ""
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"attr" : "mirror",
+					"id" : "obj-26",
+					"maxclass" : "attrui",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 65.25, 354.0, 150.0, 22.0 ],
+					"style" : ""
+				}
+
+			}
  ],
 		"lines" : [ 			{
 				"patchline" : 				{
-					"destination" : [ "obj-15", 0 ],
+					"destination" : [ "obj-14", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 204.350006, 545.0, 865.424988, 545.0, 865.424988, 376.0, 448.5, 376.0 ],
+					"source" : [ "obj-1", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-28", 1 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"midpoints" : [ 204.350006, 536.5, 306.75, 536.5 ],
 					"source" : [ "obj-1", 3 ]
 				}
 
@@ -1142,15 +1198,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"source" : [ "obj-15", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-14", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
+					"midpoints" : [ 448.5, 440.0, 50.75, 440.0 ],
 					"source" : [ "obj-15", 0 ]
 				}
 
@@ -1178,7 +1226,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 425.833313, 435.5, 50.75, 435.5 ],
+					"midpoints" : [ 426.5, 435.5, 50.75, 435.5 ],
 					"source" : [ "obj-19", 0 ]
 				}
 
@@ -1209,6 +1257,25 @@
 					"hidden" : 0,
 					"midpoints" : [ 231.75, 334.0, 50.75, 334.0 ],
 					"source" : [ "obj-23", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-15", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-24", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-1", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"midpoints" : [ 74.75, 416.5, 50.75, 416.5 ],
+					"source" : [ "obj-26", 0 ]
 				}
 
 			}
