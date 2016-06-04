@@ -1053,7 +1053,7 @@
 					"outlettype" : [ "jit_gl_texture", "", "", "", "", "" ],
 					"patching_rect" : [ 41.25, 458.0, 275.0, 31.0 ],
 					"style" : "",
-					"text" : "htcvive vive @position 0 1.5 1"
+					"text" : "htcvive vive"
 				}
 
 			}
