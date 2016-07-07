@@ -64,6 +64,7 @@ public:
 	int max_fov;
 	int perfMode;
 	int mirror;
+	int tracking_level;
 
 	void * outtexture;
 	t_atom_long outdim[2];
@@ -114,6 +115,7 @@ public:
 		pixel_density = 1.f;
 		max_fov = 0;
 		mirror = 0;
+		tracking_level = (int)ovrTrackingOrigin_EyeLevel;
 
 		reconnect_wait = 0;
 
@@ -195,13 +197,19 @@ public:
 		// assumes a single shared texture for both eyes:
 		pTextureDim.w = recommenedTex0Size.w + recommenedTex1Size.w;
 		pTextureDim.h = max(recommenedTex0Size.h, recommenedTex1Size.h);
-
 		
-
-		// FloorLevel will give tracking poses where the floor height is 0
-		//ovr_SetTrackingOriginType(session, ovrTrackingOrigin_FloorLevel);
-		// KC: Floor mode does not seem to be working correctly just yet...
-		ovr_SetTrackingOriginType(session, ovrTrackingOrigin_EyeLevel);
+		switch (tracking_level) {
+		case int(ovrTrackingOrigin_FloorLevel): 
+			// FloorLevel will give tracking poses where the floor height is 0
+			// Tracking system origin reported at floor height.
+			// Prefer using this origin when your application requires the physical floor height to match the virtual floor height, such as standing experiences. When used, all poses in ovrTrackingState are reported as an offset transform from the profile calibrated floor pose. Calling ovr_RecenterTrackingOrigin will recenter the X & Z axes as well as yaw, but the Y-axis (i.e. height) will continue to be reported using the floor height as the origin for all poses.
+			ovr_SetTrackingOriginType(session, ovrTrackingOrigin_FloorLevel);
+			break;
+		default:
+			// Tracking system origin reported at eye (HMD) height.
+			// Prefer using this origin when your application requires matching user's current physical head pose to a virtual head pose without any regards to a the height of the floor. Cockpit-based, or 3rd-person experiences are ideal candidates. When used, all poses in ovrTrackingState are reported as an offset transform from the profile calibrated or recentered HMD pose. It is recommended that apps using this origin type call ovr_RecenterTrackingOrigin prior to starting the VR experience, but notify the user before doing so to make sure the user is in a comfortable pose, facing a comfortable direction.
+			ovr_SetTrackingOriginType(session, ovrTrackingOrigin_EyeLevel);
+		};
 
 		// in case this is a re-configure, clear out the previous ones:
 		textureset_destroy();
@@ -1070,6 +1078,13 @@ t_max_err oculusrift_max_fov_set(oculusrift *x, t_object *attr, long argc, t_ato
 	return 0;
 }
 
+t_max_err oculusrift_tracking_level_set(oculusrift *x, t_object *attr, long argc, t_atom *argv) {
+	x->tracking_level = atom_getlong(argv);
+
+	x->configure();
+	return 0;
+}
+
 void oculusrift_jit_gl_texture(oculusrift * x, t_symbol * s, long argc, t_atom * argv) {
 	if (argc > 0 && atom_gettype(argv) == A_SYM) {
 		x->jit_gl_texture(atom_getsym(argv));
@@ -1204,6 +1219,9 @@ void ext_main(void *r)
 
 	CLASS_ATTR_LONG(c, "mirror", 0, oculusrift, mirror);
 	CLASS_ATTR_STYLE_LABEL(c, "mirror", 0, "onoff", "mirror oculus display in main window");
+
+	CLASS_ATTR_LONG(c, "tracking_level", 0, oculusrift, tracking_level);
+	CLASS_ATTR_ACCESSORS(c, "tracking_level", NULL, oculusrift_tracking_level_set);
 
 	
 	class_register(CLASS_BOX, c);
