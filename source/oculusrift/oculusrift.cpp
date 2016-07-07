@@ -199,7 +199,9 @@ public:
 		
 
 		// FloorLevel will give tracking poses where the floor height is 0
-		ovr_SetTrackingOriginType(session, ovrTrackingOrigin_FloorLevel);
+		//ovr_SetTrackingOriginType(session, ovrTrackingOrigin_FloorLevel);
+		// KC: Floor mode does not seem to be working correctly just yet...
+		ovr_SetTrackingOriginType(session, ovrTrackingOrigin_EyeLevel);
 
 		// in case this is a re-configure, clear out the previous ones:
 		textureset_destroy();
@@ -451,7 +453,8 @@ public:
 		}
 		//////////////////////////////
 
-		/*
+		//KC: Seems to be working just fine(?)
+		
 		// Query the HMD for the current tracking state.
 		// Get both eye poses simultaneously, with IPD offset already included.
 		double displayMidpointSeconds = ovr_GetPredictedDisplayTime(session, frameIndex);
@@ -516,7 +519,7 @@ public:
 			atom_setfloat(a + 3, q.w);
 			outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
 		}
-		*/
+		
 	}
 
 	// receive a texture
