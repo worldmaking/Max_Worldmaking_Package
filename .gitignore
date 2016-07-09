@@ -300,3 +300,5 @@ FakesAssemblies/
 source/kinect/kinect.VC.opendb
 *.xcworkspacedata
 source/kinect2/kinect2.VC.opendb
+*.opendb
+source/oculusrift/oculusrift.VC.db

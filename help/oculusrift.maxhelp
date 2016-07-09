@@ -5,11 +5,11 @@
 			"major" : 7,
 			"minor" : 2,
 			"revision" : 3,
-			"architecture" : "x64",
+			"architecture" : "x86",
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 732.0, 125.0, 825.0, 807.0 ],
+		"rect" : [ 445.0, 95.0, 825.0, 807.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -37,6 +37,20 @@
 		"style" : "",
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
+				"box" : 				{
+					"id" : "obj-30",
+					"linecount" : 2,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 232.0, 503.0, 174.0, 34.0 ],
+					"presentation_rect" : [ 232.0, 508.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "Use eye (0) or floor-level (1) tracking space"
+				}
+
+			}
+, 			{
 				"box" : 				{
 					"id" : "obj-24",
 					"maxclass" : "comment",
@@ -88,7 +102,7 @@
 							"major" : 7,
 							"minor" : 2,
 							"revision" : 3,
-							"architecture" : "x64",
+							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
@@ -462,7 +476,7 @@
 											"major" : 7,
 											"minor" : 2,
 											"revision" : 3,
-											"architecture" : "x64",
+											"architecture" : "x86",
 											"modernui" : 1
 										}
 ,
@@ -958,7 +972,7 @@
 											"major" : 7,
 											"minor" : 2,
 											"revision" : 3,
-											"architecture" : "x64",
+											"architecture" : "x86",
 											"modernui" : 1
 										}
 ,
@@ -1075,7 +1089,7 @@
 															"major" : 7,
 															"minor" : 2,
 															"revision" : 3,
-															"architecture" : "x64",
+															"architecture" : "x86",
 															"modernui" : 1
 														}
 ,
@@ -1119,7 +1133,7 @@
 																			"major" : 7,
 																			"minor" : 2,
 																			"revision" : 3,
-																			"architecture" : "x64",
+																			"architecture" : "x86",
 																			"modernui" : 1
 																		}
 ,
@@ -1779,7 +1793,7 @@
 																			"major" : 7,
 																			"minor" : 2,
 																			"revision" : 3,
-																			"architecture" : "x64",
+																			"architecture" : "x86",
 																			"modernui" : 1
 																		}
 ,
@@ -2180,7 +2194,7 @@
 																			"major" : 7,
 																			"minor" : 2,
 																			"revision" : 3,
-																			"architecture" : "x64",
+																			"architecture" : "x86",
 																			"modernui" : 1
 																		}
 ,
@@ -2465,7 +2479,7 @@
 																			"major" : 7,
 																			"minor" : 2,
 																			"revision" : 3,
-																			"architecture" : "x64",
+																			"architecture" : "x86",
 																			"modernui" : 1
 																		}
 ,
@@ -2750,7 +2764,7 @@
 																			"major" : 7,
 																			"minor" : 2,
 																			"revision" : 3,
-																			"architecture" : "x64",
+																			"architecture" : "x86",
 																			"modernui" : 1
 																		}
 ,
@@ -3048,7 +3062,7 @@
 																			"major" : 7,
 																			"minor" : 2,
 																			"revision" : 3,
-																			"architecture" : "x64",
+																			"architecture" : "x86",
 																			"modernui" : 1
 																		}
 ,
@@ -3333,7 +3347,7 @@
 																			"major" : 7,
 																			"minor" : 2,
 																			"revision" : 3,
-																			"architecture" : "x64",
+																			"architecture" : "x86",
 																			"modernui" : 1
 																		}
 ,
@@ -5087,7 +5101,7 @@
 							"major" : 7,
 							"minor" : 2,
 							"revision" : 3,
-							"architecture" : "x64",
+							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
@@ -5228,7 +5242,7 @@
 							"major" : 7,
 							"minor" : 2,
 							"revision" : 3,
-							"architecture" : "x64",
+							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
@@ -5424,7 +5438,7 @@
 											"major" : 7,
 											"minor" : 2,
 											"revision" : 3,
-											"architecture" : "x64",
+											"architecture" : "x86",
 											"modernui" : 1
 										}
 ,
@@ -6127,13 +6141,26 @@
 				}
 
 			}
+, 			{
+				"box" : 				{
+					"attr" : "tracking_level",
+					"id" : "obj-29",
+					"maxclass" : "attrui",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 69.0, 509.0, 150.0, 22.0 ],
+					"style" : ""
+				}
+
+			}
  ],
 		"lines" : [ 			{
 				"patchline" : 				{
 					"destination" : [ "obj-107", 1 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 142.9, 645.0, 786.0, 645.0, 786.0, 235.0, 485.166667, 235.0 ],
+					"midpoints" : [ 142.899994, 645.0, 786.0, 645.0, 786.0, 235.0, 485.166656, 235.0 ],
 					"source" : [ "obj-1", 4 ]
 				}
 
@@ -6161,7 +6188,7 @@
 					"destination" : [ "obj-44", 1 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 121.3, 654.5, 204.5, 654.5 ],
+					"midpoints" : [ 121.300003, 654.5, 204.5, 654.5 ],
 					"source" : [ "obj-1", 3 ]
 				}
 
@@ -6189,7 +6216,7 @@
 					"destination" : [ "obj-57", 1 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 142.9, 646.5, 525.5, 646.5 ],
+					"midpoints" : [ 142.899994, 646.5, 525.5, 646.5 ],
 					"source" : [ "obj-1", 4 ]
 				}
 
@@ -6367,6 +6394,16 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
+					"midpoints" : [ 78.5, 538.0, 56.5, 538.0 ],
+					"source" : [ "obj-29", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-1", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
 					"midpoints" : [ 466.5, 387.0, 466.0, 387.0, 466.0, 582.0, 56.5, 582.0 ],
 					"source" : [ "obj-33", 0 ]
 				}
@@ -6468,8 +6505,8 @@
 			}
  ],
 		"dependency_cache" : [ 			{
-				"name" : "oculusrift.mxe64",
-				"type" : "mx64"
+				"name" : "oculusrift.mxe",
+				"type" : "iLaF"
 			}
  ],
 		"autosave" : 0
