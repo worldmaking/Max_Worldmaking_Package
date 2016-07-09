@@ -115,7 +115,7 @@ public:
 		pixel_density = 1.f;
 		max_fov = 0;
 		mirror = 0;
-		tracking_level = (int)ovrTrackingOrigin_EyeLevel;
+		tracking_level = (int)ovrTrackingOrigin_FloorLevel;
 
 		reconnect_wait = 0;
 
