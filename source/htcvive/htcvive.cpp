@@ -22,20 +22,8 @@ extern "C" {
 #include "jit.vecmath.h"
 
 #include "jit.gl.h"
-
 }
 
-//
-/*
-// things we need from the GL headers
-typedef void (APIENTRY * PFNGLTEXIMAGE2DMULTISAMPLEPROC)(GLenum target, GLsizei samples, GLint internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
-extern PFNGLTEXIMAGE2DMULTISAMPLEPROC _funcptr_glTexImage2DMultisample;
-#define glTexImage2DMultisample _funcptr_glTexImage2DMultisample
-typedef void (APIENTRY * PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
-extern PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC _funcptr_glRenderbufferStorageMultisample;
-#define glRenderbufferStorageMultisample _funcptr_glRenderbufferStorageMultisample
-#define GL_TEXTURE_2D_MULTISAMPLE 0x9100
-*/
 // The OpenVR SDK:
 #include "openvr.h"
 
@@ -43,14 +31,14 @@ extern PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC _funcptr_glRenderbufferStorageMul
 
 // how many glm headers do we really need?
 #define GLM_FORCE_RADIANS
-#include "glm/glm.hpp"
-#include "glm/gtc/quaternion.hpp"
-#include "glm/gtc/matrix_access.hpp"
-#include "glm/gtc/matrix_inverse.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-//#include "glm/gtc/noise.hpp"
-//#include "glm/gtc/random.hpp"
-//#include "glm/gtc/type_ptr.hpp"
+#include "glm.hpp"
+#include "gtc/quaternion.hpp"
+#include "gtc/matrix_access.hpp"
+#include "gtc/matrix_inverse.hpp"
+#include "gtc/matrix_transform.hpp"
+//#include "gtc/noise.hpp"
+//#include "gtc/random.hpp"
+//#include "gtc/type_ptr.hpp"
 
 // unstable extensions
 //#include "glm/gtx/norm.hpp"
@@ -143,6 +131,11 @@ static t_symbol * ps_warning;
 static t_symbol * ps_glid;
 static t_symbol * ps_jit_gl_texture;
 
+static t_symbol * ps_trigger;
+static t_symbol * ps_trackpad;
+static t_symbol * ps_buttons;
+static t_symbol * ps_velocity;
+static t_symbol * ps_angular_velocity;
 
 class htcvive {
 public:
@@ -152,6 +145,7 @@ public:
 	void * outlet_tracking;
 	void * outlet_node;
 	void * outlet_eye[2];
+	void * outlet_controller[2];
 	void * outlet_tex;
 
 	t_symbol * dest_name;
@@ -183,12 +177,17 @@ public:
 	glm::mat4 m_mat4viewEye[2];
 	glm::mat4 m_mat4projectionEye[2];
 
+	vr::IVRRenderModels * mRenderModels;
+
 	htcvive(t_symbol * dest_name) : dest_name(dest_name) {
+
 
 		// init Max object:
 		jit_ob3d_new(this, dest_name);
 		// outlets create in reverse order:
 		outlet_msg = outlet_new(&ob, NULL);
+		outlet_controller[1] = outlet_new(&ob, NULL);
+		outlet_controller[0] = outlet_new(&ob, NULL);
 		outlet_tracking = outlet_new(&ob, NULL);
 		outlet_node = outlet_new(&ob, NULL);
 		outlet_eye[1] = outlet_new(&ob, NULL);
@@ -230,6 +229,10 @@ public:
 			return false;
 		}
 
+		mRenderModels = (vr::IVRRenderModels *)vr::VR_GetGenericInterface(vr::IVRRenderModels_Version, &eError);
+		if (!mRenderModels) {
+			object_error(&ob, "Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
+		}
 
 		configure();
 
@@ -251,8 +254,9 @@ public:
 		t_atom a[6];
 		if (!mHMD) return;
 
-		//mDriver = gensym(vr::GetTrackedDeviceString(mHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_TrackingSystemName_String);
-		//mDisplay = GetTrackedDeviceString(mHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_SerialNumber_String);
+		t_symbol * display_name = GetTrackedDeviceString(mHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_TrackingSystemName_String);
+		t_symbol * driver_name = GetTrackedDeviceString(mHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_SerialNumber_String);
+		object_post(&ob, "display %s driver %s", display_name->s_name, driver_name->s_name);
 
 		mHMD->GetRecommendedRenderTargetSize(&texdim_w, &texdim_h);
 		// we will send as side-by-side:
@@ -303,6 +307,47 @@ public:
 		max_jit_object_free(this);
 	}
 
+	// TODO: complete this method
+	// grab the model & texture data for tracked devices from the SteamVR driver:
+	void loadModels() {
+		if (!mHMD) return;
+
+		t_atom a[2];
+		for (auto id = vr::k_unTrackedDeviceIndex_Hmd + 1; id < vr::k_unMaxTrackedDeviceCount; id++) {
+			if (!mHMD->IsTrackedDeviceConnected(id)) continue;
+
+			// try to load the model & texture data:
+			vr::RenderModel_t * pModel = NULL;
+			vr::RenderModel_TextureMap_t *pTexture = NULL;
+			t_symbol * sRenderModelName = GetTrackedDeviceString(mHMD, id, vr::Prop_RenderModelName_String);
+
+			if (!vr::VRRenderModels()->LoadRenderModel_Async(sRenderModelName->s_name, &pModel) || pModel == NULL) {
+				object_error(&ob, "unable to load render model %s", sRenderModelName->s_name);
+				continue;
+			}
+
+			if (!vr::VRRenderModels()->LoadTexture_Async(pModel->diffuseTextureId, &pTexture) || pTexture == NULL) {
+				vr::VRRenderModels()->FreeRenderModel(pModel);
+				object_error(&ob, "unable to load texture for model %s", sRenderModelName->s_name);
+				continue; // move on to the next tracked device
+			}
+
+			// TODO: export the model & texture data to Jitter
+			// model would be a series of jit.matrix creations, and messages to send to jit.gl.mesh to bind them
+			// texture: create an internal jit.gl.texture and export the name as above
+			// all messages prefixed by "model" <id> 
+			// such that it could be easily [route]d to a jit.gl.mesh per tracked device
+
+			// for now, just export the name to see if it is working
+			atom_setlong(a + 0, id);
+			atom_setsym(a + 1, sRenderModelName);
+			outlet_anything(outlet_msg, gensym("model"), 2, a);
+
+			vr::VRRenderModels()->FreeRenderModel(pModel);
+			vr::VRRenderModels()->FreeTexture(pTexture);
+		}
+	}
+
 	bool textureset_create() {
 		
 		return true;
@@ -320,9 +365,9 @@ public:
 		
 		// get desired model matrix (for navigation)
 		glm::vec3 m_position;
-		jit_attr_getfloat_array(this, gensym("position"), 3, &m_position.x);
+		jit_attr_getfloat_array(this, _jit_sym_position, 3, &m_position.x);
 		t_jit_quat m_jitquat;
-		jit_attr_getfloat_array(this, gensym("quat"), 4, &m_jitquat.x);
+		jit_attr_getfloat_array(this, _jit_sym_quat, 4, &m_jitquat.x);
 		
 		glm::mat4 modelview_mat = glm::translate(glm::mat4(1.0f), m_position) * mat4_cast(quat_from_jitter(m_jitquat));
 
@@ -359,13 +404,14 @@ public:
 			return;
 		}
 
+		// TODO: should we ignore button presses etc. if so?
+		bool inputCapturedByAnotherProcess = mHMD->IsInputFocusCapturedByAnotherProcess();
 
 		// check each device:
 		for (int i = 0; i < vr::k_unMaxTrackedDeviceCount; i++) {
 			const vr::TrackedDevicePose_t& trackedDevicePose = pRenderPoseArray[i];
-			if (trackedDevicePose.bPoseIsValid && trackedDevicePose.bDeviceIsConnected) {
+			if (trackedDevicePose.bPoseIsValid && trackedDevicePose.bDeviceIsConnected && trackedDevicePose.bPoseIsValid) {
 				mDevicePose[i] = mat4_from_openvr(trackedDevicePose.mDeviceToAbsoluteTracking);
-				
 				
 				switch (mHMD->GetTrackedDeviceClass(i)) {
 				case vr::TrackedDeviceClass_HMD: {
@@ -387,31 +433,71 @@ public:
 					atom_setfloat(a + 2, q.z);
 					atom_setfloat(a + 3, q.w);
 					outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
-				}
-				break;
-				default:
-				break;
-				}
+				} break;
+				case vr::TrackedDeviceClass_Controller: {
+					// check role to see if these are hands
+					vr::ETrackedControllerRole role = mHMD->GetControllerRoleForTrackedDeviceIndex(i);
+					switch (role) {
+					case vr::TrackedControllerRole_LeftHand:
+					case vr::TrackedControllerRole_RightHand: {
+						if (trackedDevicePose.eTrackingResult == vr::TrackingResult_Running_OK) {
 
-				/*
-				// TODO: output controller states here?
-				// check role to see if these are hands
-				vr::ETrackedControllerRole role = mHMD->GetControllerRoleForTrackedDeviceIndex(i);
-				switch (role)
-				{
-				case vr::TrackedControllerRole_LeftHand:
-					break;
-				case vr::TrackedControllerRole_RightHand:
-					break;
+							int hand = role == vr::TrackedControllerRole_RightHand;
+
+							glm::vec3 p = glm::vec3(mDevicePose[i][3]); // the translation component
+							atom_setfloat(a + 0, p.x);
+							atom_setfloat(a + 1, p.y);
+							atom_setfloat(a + 2, p.z);
+							outlet_anything(outlet_controller[hand], _jit_sym_position, 3, a);
+
+							glm::quat q = glm::quat_cast(mHMDPose);
+							//q = glm::normalize(q);
+							atom_setfloat(a + 0, q.x);
+							atom_setfloat(a + 1, q.y);
+							atom_setfloat(a + 2, q.z);
+							atom_setfloat(a + 3, q.w);
+							outlet_anything(outlet_controller[hand], _jit_sym_quat, 4, a);
+
+							atom_setfloat(a + 0, trackedDevicePose.vVelocity.v[0]);
+							atom_setfloat(a + 1, trackedDevicePose.vVelocity.v[1]);
+							atom_setfloat(a + 2, trackedDevicePose.vVelocity.v[2]);
+							outlet_anything(outlet_controller[hand], ps_velocity, 3, a);
+
+							atom_setfloat(a + 0, trackedDevicePose.vAngularVelocity.v[0]);
+							atom_setfloat(a + 1, trackedDevicePose.vAngularVelocity.v[1]);
+							atom_setfloat(a + 2, trackedDevicePose.vAngularVelocity.v[2]);
+							outlet_anything(outlet_controller[hand], ps_angular_velocity, 3, a);
+							
+							// TODO: should this be outside the if()?
+							vr::VRControllerState_t cs;
+							mHMD->GetControllerState(i, &cs);
+
+							atom_setlong(a + 0, (cs.ulButtonTouched & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Trigger)) != 0);
+							atom_setfloat(a + 1, cs.rAxis[1].x);
+							outlet_anything(outlet_controller[hand], ps_trigger, 2, a);
+
+							atom_setlong(a + 0, (cs.ulButtonTouched & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad)) != 0);
+							atom_setfloat(a + 1, cs.rAxis[1].x);
+							atom_setfloat(a + 2, cs.rAxis[1].y);
+							outlet_anything(outlet_controller[hand], ps_trackpad, 3, a);
+
+							atom_setlong(a + 0, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu)) != 0);
+							atom_setlong(a + 0, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_Grip)) != 0);
+							outlet_anything(outlet_controller[hand], ps_buttons, 2, a);
+
+						}
+					}
+						break;
+					default:
+						break;
+					}
+				} break;
 				default:
-					break;
+				break;
 				}
-				*/
 			}
 		}
 
-
-		
 		// now update cameras:
 		for (int i = 0; i < 2; i++) {
 			// left:
@@ -856,6 +942,18 @@ public:
 		
 	}
 
+	static t_symbol * GetTrackedDeviceString(vr::IVRSystem *pHmd, vr::TrackedDeviceIndex_t unDevice, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *peError = NULL)
+	{
+		uint32_t unRequiredBufferLen = pHmd->GetStringTrackedDeviceProperty(unDevice, prop, NULL, 0, peError);
+		if (unRequiredBufferLen == 0) return _sym_nothing;
+
+		char *pchBuffer = new char[unRequiredBufferLen];
+		unRequiredBufferLen = pHmd->GetStringTrackedDeviceProperty(unDevice, prop, pchBuffer, unRequiredBufferLen, peError);
+		t_symbol * sResult = gensym(pchBuffer);
+		delete[] pchBuffer;
+		return sResult;
+	}
+
 };
 
 
@@ -895,8 +993,9 @@ void htcvive_assist(htcvive *x, void *b, long m, long a, char *s)
 		case 2: sprintf(s, "to right eye camera"); break;
 		case 3: sprintf(s, "to scene node (set texture dim)"); break;
 		case 4: sprintf(s, "tracking state"); break;
-		case 5: sprintf(s, "other messages"); break;
-		//default: sprintf(s, "I am outlet %ld", a); break;
+		case 5: sprintf(s, "left controller"); break;
+		case 6: sprintf(s, "right controller"); break;
+		default: sprintf(s, "other messages"); break;
 		}
 	}
 }
@@ -972,6 +1071,12 @@ void ext_main(void *r)
 	ps_warning = gensym("warning");
 	ps_glid = gensym("glid");
 	ps_jit_gl_texture = gensym("jit_gl_texture");
+
+	ps_trigger = gensym("trigger");
+	ps_trackpad = gensym("trackpad");
+	ps_buttons = gensym("buttons");
+	ps_velocity = gensym("velocity");
+	ps_angular_velocity = gensym("angular_velocity");
 
 	// init
 	

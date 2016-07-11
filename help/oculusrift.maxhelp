@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 445.0, 95.0, 825.0, 807.0 ],
+		"rect" : [ 531.0, 85.0, 825.0, 807.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -43,8 +43,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 232.0, 503.0, 174.0, 34.0 ],
-					"presentation_rect" : [ 232.0, 508.0, 0.0, 0.0 ],
+					"patching_rect" : [ 232.0, 450.0, 174.0, 34.0 ],
 					"style" : "",
 					"text" : "Use eye (0) or floor-level (1) tracking space"
 				}
@@ -4888,7 +4887,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 232.0, 457.0, 170.0, 34.0 ],
+					"patching_rect" : [ 232.0, 410.0, 170.0, 34.0 ],
 					"style" : "",
 					"text" : "Set near & far clipping distances (meters)"
 				}
@@ -4938,7 +4937,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 200.999985, 279.0, 170.0, 34.0 ],
+					"patching_rect" : [ 200.999985, 287.0, 170.0, 34.0 ],
 					"style" : "",
 					"text" : "Output scene capture or actual oculus texture"
 				}
@@ -4988,7 +4987,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 593.0, 458.0, 184.0, 34.0 ],
+					"patching_rect" : [ 593.0, 443.0, 184.0, 34.0 ],
 					"style" : "",
 					"text" : "put all your oculus world content in the \"world\" drawing context"
 				}
@@ -5014,7 +5013,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 135.0, 546.0, 170.0, 34.0 ],
+					"patching_rect" : [ 135.0, 485.0, 170.0, 34.0 ],
 					"style" : "",
 					"text" : "Reset forward direction to current headset orientation"
 				}
@@ -5223,7 +5222,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 69.0, 552.0, 55.0, 22.0 ],
+					"patching_rect" : [ 69.0, 491.0, 55.0, 22.0 ],
 					"style" : "",
 					"text" : "recenter"
 				}
@@ -5380,9 +5379,9 @@
 									"numinlets" : 1,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 32.5, 95.0, 275.0, 22.0 ],
+									"patching_rect" : [ 32.5, 95.0, 243.0, 22.0 ],
 									"style" : "",
-									"text" : "jit.gl.light world @direction 3 2 -1 @diffuse 1 1 0.5"
+									"text" : "jit.gl.light @direction 3 2 -1 @diffuse 1 1 0.5"
 								}
 
 							}
@@ -5393,9 +5392,9 @@
 									"numinlets" : 1,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 32.5, 126.0, 281.0, 22.0 ],
+									"patching_rect" : [ 32.5, 124.0, 249.0, 22.0 ],
 									"style" : "",
-									"text" : "jit.gl.light world @direction 3 2 1 @diffuse 1 0.5 0.5"
+									"text" : "jit.gl.light @direction 3 2 1 @diffuse 1 0.5 0.5"
 								}
 
 							}
@@ -5406,9 +5405,9 @@
 									"numinlets" : 1,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 32.5, 64.0, 192.0, 22.0 ],
+									"patching_rect" : [ 32.5, 64.0, 160.0, 22.0 ],
 									"style" : "",
-									"text" : "jit.gl.light world @direction -1 -2 -3"
+									"text" : "jit.gl.light @direction -1 -2 -3"
 								}
 
 							}
@@ -5824,7 +5823,7 @@
  ]
 					}
 ,
-					"patching_rect" : [ 501.0, 457.0, 90.0, 36.0 ],
+					"patching_rect" : [ 501.0, 442.0, 90.0, 36.0 ],
 					"saved_object_attributes" : 					{
 						"description" : "",
 						"digest" : "",
@@ -5845,7 +5844,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 137.0, 316.0, 170.0, 34.0 ],
+					"patching_rect" : [ 200.999985, 347.0, 170.0, 34.0 ],
 					"style" : "",
 					"text" : "Show the performance HUD views"
 				}
@@ -5859,7 +5858,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 69.0, 448.0, 150.0, 22.0 ],
+					"patching_rect" : [ 69.0, 401.0, 150.0, 22.0 ],
 					"style" : ""
 				}
 
@@ -5883,9 +5882,9 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 193.0, 611.0, 57.0, 22.0 ],
+					"patching_rect" : [ 198.199982, 579.0, 109.0, 22.0 ],
 					"style" : "",
-					"text" : "print info"
+					"text" : "print oculusrift-info"
 				}
 
 			}
@@ -5923,7 +5922,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 3,
 					"outlettype" : [ "jit_gl_texture", "", "" ],
-					"patching_rect" : [ 501.0, 509.0, 264.0, 36.0 ],
+					"patching_rect" : [ 501.0, 494.0, 264.0, 36.0 ],
 					"style" : "",
 					"text" : "jit.gl.node o @name world @capture 2 @adapt 0 @dim 2364 1464 @erase_color 0 0 0 1"
 				}
@@ -5990,7 +5989,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 71.0, 320.0, 31.0, 22.0 ],
+					"patching_rect" : [ 155.0, 353.0, 31.0, 22.0 ],
 					"style" : "",
 					"text" : "perf"
 				}
@@ -6068,9 +6067,9 @@
 					"id" : "obj-1",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
-					"numoutlets" : 6,
-					"outlettype" : [ "jit_gl_texture", "", "", "", "", "" ],
-					"patching_rect" : [ 47.0, 597.0, 127.0, 36.0 ],
+					"numoutlets" : 8,
+					"outlettype" : [ "jit_gl_texture", "", "", "", "", "", "", "" ],
+					"patching_rect" : [ 47.0, 534.0, 170.199982, 36.0 ],
 					"style" : "",
 					"text" : "oculusrift o"
 				}
@@ -6083,7 +6082,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 71.0, 400.0, 50.0, 22.0 ],
+					"patching_rect" : [ 71.0, 353.0, 50.0, 22.0 ],
 					"style" : "",
 					"text" : "info"
 				}
@@ -6097,7 +6096,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 69.0, 474.0, 150.0, 22.0 ],
+					"patching_rect" : [ 69.0, 427.0, 150.0, 22.0 ],
 					"style" : ""
 				}
 
@@ -6149,7 +6148,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 69.0, 509.0, 150.0, 22.0 ],
+					"patching_rect" : [ 69.0, 456.0, 150.0, 22.0 ],
 					"style" : ""
 				}
 
@@ -6188,7 +6187,7 @@
 					"destination" : [ "obj-44", 1 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 121.300003, 654.5, 204.5, 654.5 ],
+					"midpoints" : [ 121.299995, 654.5, 204.5, 654.5 ],
 					"source" : [ "obj-1", 3 ]
 				}
 
@@ -6198,7 +6197,7 @@
 					"destination" : [ "obj-49", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"source" : [ "obj-1", 5 ]
+					"source" : [ "obj-1", 7 ]
 				}
 
 			}
@@ -6226,7 +6225,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 80.5, 434.0, 56.5, 434.0 ],
+					"midpoints" : [ 80.5, 385.0, 56.5, 385.0 ],
 					"source" : [ "obj-10", 0 ]
 				}
 
@@ -6309,7 +6308,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 510.5, 592.0, 56.5, 592.0 ],
+					"midpoints" : [ 510.5, 525.0, 56.5, 525.0 ],
 					"source" : [ "obj-15", 0 ]
 				}
 
@@ -6337,7 +6336,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 481.833313, 582.0, 56.5, 582.0 ],
+					"midpoints" : [ 481.833313, 520.0, 56.5, 520.0 ],
 					"source" : [ "obj-19", 0 ]
 				}
 
@@ -6347,7 +6346,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 80.5, 344.0, 56.5, 344.0 ],
+					"midpoints" : [ 164.5, 384.0, 56.5, 384.0 ],
 					"source" : [ "obj-21", 0 ]
 				}
 
@@ -6394,7 +6393,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 78.5, 538.0, 56.5, 538.0 ],
+					"midpoints" : [ 78.5, 487.0, 56.5, 487.0 ],
 					"source" : [ "obj-29", 0 ]
 				}
 
@@ -6404,7 +6403,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 466.5, 387.0, 466.0, 387.0, 466.0, 582.0, 56.5, 582.0 ],
+					"midpoints" : [ 466.5, 387.0, 466.0, 387.0, 466.0, 521.0, 56.5, 521.0 ],
 					"source" : [ "obj-33", 0 ]
 				}
 
@@ -6414,7 +6413,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 80.5, 315.0, 56.5, 315.0 ],
+					"midpoints" : [ 80.5, 316.0, 56.5, 316.0 ],
 					"source" : [ "obj-4", 0 ]
 				}
 
@@ -6433,7 +6432,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 78.5, 502.0, 56.5, 502.0 ],
+					"midpoints" : [ 78.5, 455.0, 56.5, 455.0 ],
 					"source" : [ "obj-58", 0 ]
 				}
 
@@ -6443,7 +6442,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 78.5, 473.0, 56.5, 473.0 ],
+					"midpoints" : [ 78.5, 426.0, 56.5, 426.0 ],
 					"source" : [ "obj-60", 0 ]
 				}
 
@@ -6462,7 +6461,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 78.5, 580.0, 56.5, 580.0 ],
+					"midpoints" : [ 78.5, 521.0, 56.5, 521.0 ],
 					"source" : [ "obj-7", 0 ]
 				}
 

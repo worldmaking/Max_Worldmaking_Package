@@ -55,6 +55,7 @@ public:
 	void * outlet_tracking;
 	void * outlet_node;
 	void * outlet_eye[2];
+	void * outlet_controller[2];
 	void * outlet_tex;
 
 	t_symbol * dest_name;
@@ -73,6 +74,7 @@ public:
 	int reconnect_wait;
 
 	ovrSession session;
+	ovrSessionStatus status;
 	ovrHmdDesc hmd;
 	ovrGraphicsLuid luid;
 	ovrEyeRenderDesc eyeRenderDesc[2];
@@ -93,6 +95,8 @@ public:
 		jit_ob3d_new(this, dest_name);
 		// outlets create in reverse order:
 		outlet_msg = outlet_new(&ob, NULL);
+		outlet_controller[1] = outlet_new(&ob, NULL);
+		outlet_controller[0] = outlet_new(&ob, NULL);
 		outlet_tracking = outlet_new(&ob, NULL);
 		outlet_node = outlet_new(&ob, NULL);
 		outlet_eye[1] = outlet_new(&ob, NULL);
@@ -147,6 +151,10 @@ public:
 		object_post(&ob, "LibOVR runtime version %s", ovr_GetVersionString());
 
 		outlet_anything(outlet_msg, gensym("connected"), 0, NULL);
+
+		// update our session status
+		ovr_GetSessionStatus(session, &status);
+
 
 		configure();
 		return true;
@@ -382,6 +390,49 @@ public:
 
 	void bang() {
 		if (!session) {
+			ovrResult res = ovr_GetSessionStatus(session, &status);
+			if (status.ShouldQuit) {
+				// the HMD display will return to Oculus Home
+				// don't want to quit, but at least notify patcher:
+				outlet_anything(outlet_msg, gensym("quit"), 0, NULL);
+
+				disconnect();
+				return;
+			}
+			if (status.ShouldRecenter) {
+				ovr_RecenterTrackingOrigin(session);
+
+				/*
+				Expose attr to defeat this?
+
+				Some applications may have reason to ignore the request or to implement it 
+				via an internal mechanism other than via ovr_RecenterTrackingOrigin. In such 
+				cases the application can call ovr_ClearShouldRecenterFlag() to cause the 
+				recenter request to be cleared.
+				*/
+			}
+
+			if (!status.HmdPresent) {
+				// TODO: disconnect?
+				return;
+			}
+
+			if (status.DisplayLost) {
+				/*
+				Destroy any TextureSwapChains or mirror textures.
+				Call ovrDestroy.
+				Poll ovrSessionStatus::HmdPresent until true.
+				Call ovrCreate to recreate the session.
+				Recreate any TextureSwapChains or mirror textures.
+				Resume the application.
+				ovrDetect() ??
+				*/
+			}
+
+			// TODO: expose these as gettable attrs?
+			//status.HmdMounted // true if the HMD is currently on the head
+			// status.IsVisible // True if the game or experience has VR focus and is visible in the HMD.
+
 			// TODO: does SDK provide notification of Rift being reconnected?
 
 			/*
@@ -540,7 +591,7 @@ public:
 	// send the current texture to the Oculus driver:
 	void submit() {
 		t_atom a[1];
-		if (!session) return;
+		if (!session || !status.HmdPresent || !status.IsVisible) return;
 
 		void * texob = jit_object_findregistered(intexture);
 		if (!texob) {
@@ -1026,7 +1077,9 @@ void oculusrift_assist(oculusrift *x, void *b, long m, long a, char *s)
 		case 2: sprintf(s, "to right eye camera"); break;
 		case 3: sprintf(s, "to scene node (set texture dim)"); break;
 		case 4: sprintf(s, "tracking state"); break;
-		case 5: sprintf(s, "other messages"); break;
+		case 5: sprintf(s, "left controller"); break;
+		case 6: sprintf(s, "right controller"); break;
+		default: sprintf(s, "other messages"); break;
 		//default: sprintf(s, "I am outlet %ld", a); break;
 		}
 	}
@@ -1154,6 +1207,11 @@ void ext_main(void *r)
 		*/
 	}
 	quittask_install((method)oculusrift_quit, NULL);
+
+	ovr_IdentifyClient("EngineName: Max/MSP/Jitter\n"
+					   "EngineVersion: 7\n"
+					   "EnginePluginName: [oculusrift]\n"
+					   "EngineEditor: true");
 	
 	c = class_new("oculusrift", (method)oculusrift_new, (method)oculusrift_free, (long)sizeof(oculusrift),
 				  0L /* leave NULL!! */, A_GIMME, 0);
