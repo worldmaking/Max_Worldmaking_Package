@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 935.0, 136.0, 880.0, 734.0 ],
+		"rect" : [ 351.0, 85.0, 880.0, 734.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -37,6 +37,20 @@
 		"style" : "",
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
+				"box" : 				{
+					"id" : "obj-21",
+					"linecount" : 2,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 179.625, 492.5, 107.75, 34.0 ],
+					"presentation_rect" : [ 402.25, 495.5, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "hmd & controller tracking"
+				}
+
+			}
+, 			{
 				"box" : 				{
 					"id" : "obj-30",
 					"maxclass" : "comment",
@@ -83,19 +97,6 @@
 					"patching_rect" : [ 692.25, 35.0, 93.0, 89.0 ],
 					"style" : "",
 					"text" : "A bit crashy currently but usually works the second time. Not sure the cause yet."
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-6",
-					"linecount" : 2,
-					"maxclass" : "comment",
-					"numinlets" : 1,
-					"numoutlets" : 0,
-					"patching_rect" : [ 250.75, 495.5, 93.0, 34.0 ],
-					"style" : "",
-					"text" : "^ hmd position & orientation"
 				}
 
 			}
@@ -316,9 +317,9 @@
 									"numinlets" : 1,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 32.5, 95.0, 303.0, 22.0 ],
+									"patching_rect" : [ 32.5, 95.0, 243.0, 22.0 ],
 									"style" : "",
-									"text" : "jit.gl.light vive_world @direction 3 2 -1 @diffuse 1 1 0.5"
+									"text" : "jit.gl.light @direction 3 2 -1 @diffuse 1 1 0.5"
 								}
 
 							}
@@ -329,9 +330,9 @@
 									"numinlets" : 1,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 32.5, 126.0, 309.0, 22.0 ],
+									"patching_rect" : [ 32.5, 126.0, 249.0, 22.0 ],
 									"style" : "",
-									"text" : "jit.gl.light vive_world @direction 3 2 1 @diffuse 1 0.5 0.5"
+									"text" : "jit.gl.light @direction 3 2 1 @diffuse 1 0.5 0.5"
 								}
 
 							}
@@ -342,9 +343,9 @@
 									"numinlets" : 1,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 32.5, 64.0, 220.0, 22.0 ],
+									"patching_rect" : [ 32.5, 64.0, 160.0, 22.0 ],
 									"style" : "",
-									"text" : "jit.gl.light vive_world @direction -1 -2 -3"
+									"text" : "jit.gl.light @direction -1 -2 -3"
 								}
 
 							}
@@ -814,7 +815,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "jit_gl_texture", "" ],
-					"patching_rect" : [ 143.649994, 594.0, 403.0, 22.0 ],
+					"patching_rect" : [ 114.39286, 594.0, 403.0, 22.0 ],
 					"style" : "",
 					"text" : "jit.gl.camera vive_world @viewport 0.5 0 0.5 1 @projection_mode frustum"
 				}
@@ -827,7 +828,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "jit_gl_texture", "" ],
-					"patching_rect" : [ 92.449997, 622.0, 393.0, 22.0 ],
+					"patching_rect" : [ 77.821426, 622.0, 393.0, 22.0 ],
 					"style" : "",
 					"text" : "jit.gl.camera vive_world @viewport 0 0 0.5 1 @projection_mode frustum"
 				}
@@ -1024,9 +1025,9 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 325.25, 462.5, 57.0, 22.0 ],
+					"patching_rect" : [ 325.25, 462.5, 98.0, 22.0 ],
 					"style" : "",
-					"text" : "print info"
+					"text" : "print htcvive-info"
 				}
 
 			}
@@ -1049,8 +1050,8 @@
 					"id" : "obj-1",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
-					"numoutlets" : 6,
-					"outlettype" : [ "jit_gl_texture", "", "", "", "", "" ],
+					"numoutlets" : 8,
+					"outlettype" : [ "jit_gl_texture", "", "", "", "", "", "", "" ],
 					"patching_rect" : [ 41.25, 458.0, 275.0, 31.0 ],
 					"style" : "",
 					"text" : "htcvive vive"
@@ -1124,7 +1125,7 @@
 					"destination" : [ "obj-28", 1 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 204.350006, 536.5, 306.75, 536.5 ],
+					"midpoints" : [ 160.464279, 536.5, 306.75, 536.5 ],
 					"source" : [ "obj-1", 3 ]
 				}
 
@@ -1134,7 +1135,7 @@
 					"destination" : [ "obj-4", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"source" : [ "obj-1", 5 ]
+					"source" : [ "obj-1", 7 ]
 				}
 
 			}

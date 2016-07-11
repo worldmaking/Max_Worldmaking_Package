@@ -302,3 +302,4 @@ source/kinect/kinect.VC.opendb
 source/kinect2/kinect2.VC.opendb
 *.opendb
 source/oculusrift/oculusrift.VC.db
+*.db
