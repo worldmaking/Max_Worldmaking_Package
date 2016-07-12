@@ -4,11 +4,11 @@
 Currently includes:
 
 - **oculusrift** -- supports the Oculus Rift head-mounted display (developer kit and consumer models, currently Windows only)
+- **htcvive** -- supports the HTC Vive head-mounted display (currently Windows only)
 - **ws** -- a simple websocket server external for max, making it trivial to interact with browser-based clients (Windows/OSX)
 
 Work in progress (may have limited functionality/stability issues)
 
-- **htcvive** -- supports the HTC Vive head-mounted display (currently Windows only)
 - **kinect** -- supports the kinect v1 including multiple devices, skeleton, point cloud etc. (windows only)
 - **kinect2** -- supports the kinect v2 (for windows/for xbox versions, windows only)
 
