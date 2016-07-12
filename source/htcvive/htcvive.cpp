@@ -212,7 +212,7 @@ public:
 		mirror = 0;
 	}
 
-	// attempt to connect to the OVR runtime, creating a session:
+	// attempt to connect to the Vive runtime, creating a session:
 	bool connect() {
 		if (mHMD) disconnect();
 
@@ -440,7 +440,7 @@ public:
 					switch (role) {
 					case vr::TrackedControllerRole_LeftHand:
 					case vr::TrackedControllerRole_RightHand: {
-						if (trackedDevicePose.eTrackingResult == vr::TrackingResult_Running_OK) {
+						//if (trackedDevicePose.eTrackingResult == vr::TrackingResult_Running_OK) {
 
 							int hand = role == vr::TrackedControllerRole_RightHand;
 
@@ -450,7 +450,7 @@ public:
 							atom_setfloat(a + 2, p.z);
 							outlet_anything(outlet_controller[hand], _jit_sym_position, 3, a);
 
-							glm::quat q = glm::quat_cast(mHMDPose);
+							glm::quat q = glm::quat_cast(mDevicePose[i]);
 							//q = glm::normalize(q);
 							atom_setfloat(a + 0, q.x);
 							atom_setfloat(a + 1, q.y);
@@ -477,15 +477,15 @@ public:
 							outlet_anything(outlet_controller[hand], ps_trigger, 2, a);
 
 							atom_setlong(a + 0, (cs.ulButtonTouched & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad)) != 0);
-							atom_setfloat(a + 1, cs.rAxis[1].x);
-							atom_setfloat(a + 2, cs.rAxis[1].y);
+							atom_setfloat(a + 1, cs.rAxis[0].x);
+							atom_setfloat(a + 2, cs.rAxis[0].y);
 							outlet_anything(outlet_controller[hand], ps_trackpad, 3, a);
 
 							atom_setlong(a + 0, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu)) != 0);
-							atom_setlong(a + 0, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_Grip)) != 0);
+							atom_setlong(a + 1, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_Grip)) != 0);
 							outlet_anything(outlet_controller[hand], ps_buttons, 2, a);
 
-						}
+						//}
 					}
 						break;
 					default:
@@ -1036,6 +1036,7 @@ void htcvive_jit_gl_texture(htcvive * x, t_symbol * s, long argc, t_atom * argv)
 	}
 }
 
+//TODO: Express Loop in terms of Vive API calls
 // Application Loop:
 //  - Call ovr_GetPredictedDisplayTime() to get the current frame timing information.
 //  - Call ovr_GetTrackingState() and ovr_CalcEyePoses() to obtain the predicted
@@ -1056,7 +1057,7 @@ void htcvive_quit() {
 }
 
 void htcvive_log(int level, const char* message) {
-	post("oculus log %d %s", level, message);
+	post("vive log %d %s", level, message);
 }
 
 void ext_main(void *r)
