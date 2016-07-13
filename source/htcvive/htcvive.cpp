@@ -479,7 +479,11 @@ public:
 							atom_setlong(a + 0, (cs.ulButtonTouched & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad)) != 0);
 							atom_setfloat(a + 1, cs.rAxis[0].x);
 							atom_setfloat(a + 2, cs.rAxis[0].y);
-							outlet_anything(outlet_controller[hand], ps_trackpad, 3, a);
+							atom_setlong(a + 3, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad)) != 0);
+							outlet_anything(outlet_controller[hand], ps_trackpad, 4, a);
+
+							//TODO: The API appears to partition the Touchpad to D-Pad quadrants internally, investigate!
+							//vr::k_EButton_DPad_Down etc.
 
 							atom_setlong(a + 0, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu)) != 0);
 							atom_setlong(a + 1, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_Grip)) != 0);
