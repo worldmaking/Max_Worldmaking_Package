@@ -20,7 +20,6 @@ extern "C" {
 #include <new> // for in-place constructor
 
 #include "al_math.h"
-#include "al_hashspace.h"
 
 // jitter uses xyzw format
 // glm:: uses wxyz format

@@ -5,68 +5,19 @@
 	Might be useful:
 		https://forums.oculus.com/viewtopic.php?f=39&t=91&p=277330&hilit=opengl+0.6#p277330
 
-
 */
 
-
-// a bunch of likely Max includes:
-extern "C" {
-#include "ext.h"
-#include "ext_obex.h"
-#include "ext_dictionary.h"
-#include "ext_dictobj.h"
-#include "ext_systhread.h"
-	
-#include "z_dsp.h"
-#include "jit.common.h"
-#include "jit.vecmath.h"
-
-#include "jit.gl.h"
-}
+#include "al_max.h"
 
 // The OpenVR SDK:
 #include "openvr.h"
 
-#include <new> // for in-place constructor
-
-// how many glm headers do we really need?
-#define GLM_FORCE_RADIANS
-#include "glm.hpp"
-#include "gtc/quaternion.hpp"
-#include "gtc/matrix_access.hpp"
-#include "gtc/matrix_inverse.hpp"
-#include "gtc/matrix_transform.hpp"
-//#include "gtc/noise.hpp"
-//#include "gtc/random.hpp"
-//#include "gtc/type_ptr.hpp"
-
-// unstable extensions
-//#include "glm/gtx/norm.hpp"
-//#include "glm/gtx/std_based_type.hpp"
 
 using glm::vec2;
 using glm::vec3;
 using glm::vec4;
 using glm::quat;
 using glm::mat4;
-//typedef glm::detail::tvec4<glm::detail::uint8> ucvec4;
-
-
-// jitter uses xyzw format
-// glm:: uses wxyz format
-// xyzw -> wxyz
-inline glm::quat quat_from_jitter(glm::quat const & v) {
-	return glm::quat(v.z, v.w, v.x, v.y);
-}
-
-inline glm::quat quat_from_jitter(t_jit_quat const & v) {
-	return glm::quat(v.w, v.x, v.y, v.z);
-}
-
-// wxyz -> xyzw
-inline glm::quat quat_to_jitter(glm::quat const & v) {
-	return glm::quat(v.x, v.y, v.z, v.w);
-}
 
 glm::mat4 mat4_from_openvr(const vr::HmdMatrix34_t &m) {
 	return glm::mat4(
@@ -85,41 +36,6 @@ glm::mat4 mat4_from_openvr(const vr::HmdMatrix44_t &m) {
 		m.m[0][3], m.m[1][3], m.m[2][3], m.m[3][3]
 		);
 }
-
-//	q must be a normalized quaternion
-template<typename T, glm::precision P>
-glm::tvec3<T, P> quat_unrotate(glm::quat const & q, glm::tvec3<T, P> & v) {
-	// return quat_mul(quat_mul(quat_conj(q), vec4(v, 0)), q).xyz;
-	// reduced:
-	glm::tvec4<T, P> p(
-		q.w*v.x - q.y*v.z + q.z*v.y,  // x
-		q.w*v.y - q.z*v.x + q.x*v.z,  // y
-		q.w*v.z - q.x*v.y + q.y*v.x,  // z
-		q.x*v.x + q.y*v.y + q.z*v.z   // w
-		);
-	return glm::tvec3<T, P>(
-		p.w*q.x + p.x*q.w + p.y*q.z - p.z*q.y,  // x
-		p.w*q.y + p.y*q.w + p.z*q.x - p.x*q.z,  // y
-		p.w*q.z + p.z*q.w + p.x*q.y - p.y*q.x   // z
-		);
-}
-
-//	q must be a normalized quaternion
-template<typename T, glm::precision P>
-glm::tvec3<T, P> quat_rotate(glm::quat const & q, glm::tvec3<T, P> & v) {
-	glm::tvec4<T, P> p(
-		q.w*v.x + q.y*v.z - q.z*v.y,	// x
-		q.w*v.y + q.z*v.x - q.x*v.z,	// y
-		q.w*v.z + q.x*v.y - q.y*v.x,	// z
-		-q.x*v.x - q.y*v.y - q.z*v.z	// w
-		);
-	return glm::tvec3<T, P>(
-		p.x*q.w - p.w*q.x + p.z*q.y - p.y*q.z,	// x
-		p.y*q.w - p.w*q.y + p.x*q.z - p.z*q.x,	// y
-		p.z*q.w - p.w*q.z + p.y*q.x - p.x*q.y	// z
-		);
-}
-
 
 static t_class * max_class = 0;
 
@@ -1028,12 +944,6 @@ void htcvive_submit(htcvive * x) {
 	x->submit();
 }
 
-void htcvive_recenter(htcvive * x) {
-	
-}
-
-
-
 void htcvive_jit_gl_texture(htcvive * x, t_symbol * s, long argc, t_atom * argv) {
 	if (argc > 0 && atom_gettype(argv) == A_SYM) {
 		x->jit_gl_texture(atom_getsym(argv));
@@ -1131,8 +1041,6 @@ void ext_main(void *r)
 	class_addmethod(c, (method)htcvive_configure, "configure", 0);
 	class_addmethod(c, (method)htcvive_info, "info", 0);
 
-
-	class_addmethod(c, (method)htcvive_recenter, "recenter", 0);
 
 	class_addmethod(c, (method)htcvive_bang, "bang", 0);
 	class_addmethod(c, (method)htcvive_submit, "submit", 0);

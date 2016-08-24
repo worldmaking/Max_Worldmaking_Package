@@ -1,16 +1,11 @@
 // a bunch of likely Max includes:
-extern "C" {
-#include "ext.h"
-#include "ext_obex.h"
-#include "ext_dictionary.h"
-#include "ext_dictobj.h"
-#include "ext_systhread.h"
+#include "al_max.h"
 
-#include "z_dsp.h"
-
-#include "jit.common.h"
-#include "jit.gl.h"
-}
+using glm::vec2;
+using glm::vec3;
+using glm::vec4;
+using glm::quat;
+using glm::mat4;
 
 // used in ext_main
 // a dummy call just to get jitter initialized, otherwise _jit_sym_* symbols etc. won't be populated
@@ -33,8 +28,6 @@ typedef OLECHAR* WinStr;
 
 #include "kinect.h"
 
-#include <new> // for in-place constructor
-
 // Safe release for interfaces
 template<class Interface>
 inline void SafeRelease(Interface *& pInterfaceToRelease)
@@ -45,80 +38,6 @@ inline void SafeRelease(Interface *& pInterfaceToRelease)
 		pInterfaceToRelease = NULL;
 	}
 }
-
-// how many glm headers do we really need?
-#define GLM_FORCE_RADIANS
-#include "glm/glm.hpp"
-#include "glm/gtc/quaternion.hpp"
-#include "glm/gtc/matrix_access.hpp"
-#include "glm/gtc/matrix_inverse.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/noise.hpp"
-#include "glm/gtc/random.hpp"
-#include "glm/gtc/type_ptr.hpp"
-
-// unstable extensions
-#include "glm/gtx/norm.hpp"
-#include "glm/gtx/std_based_type.hpp"
-
-using glm::vec2;
-using glm::vec3;
-using glm::vec4;
-using glm::quat;
-//typedef glm::detail::tvec4<glm::detail::uint8> ucvec4;
-
-
-// jitter uses xyzw format
-// glm:: uses wxyz format
-// xyzw -> wxyz
-template<typename T, glm::precision P>
-inline glm::detail::tquat<T, P> quat_from_jitter(glm::detail::tquat<T, P> const & v) {
-	return glm::detail::tquat<T, P>(v.z, v.w, v.x, v.y);
-}
-
-// wxyz -> xyzw
-template<typename T, glm::precision P>
-inline glm::detail::tquat<T, P> quat_to_jitter(glm::detail::tquat<T, P> const & v) {
-	return glm::detail::tquat<T, P>(v.x, v.y, v.z, v.w);
-}
-
-
-//	q must be a normalized quaternion
-template<typename T, glm::precision P>
-glm::detail::tvec3<T, P> & quat_rotate(glm::detail::tquat<T, P> const & q, glm::detail::tvec3<T, P> & v) {
-	// qv = vec4(v, 0) // 'pure quaternion' derived from vector
-	// return ((q * qv) * q^-1).xyz
-	// reduced:
-	vec4 p;
-	p.x = q.w*v.x + q.y*v.z - q.z*v.y;	// x
-	p.y = q.w*v.y + q.z*v.x - q.x*v.z;	// y
-	p.z = q.w*v.z + q.x*v.y - q.y*v.x;	// z
-	p.w = -q.x*v.x - q.y*v.y - q.z*v.z;	// w
-
-	v.x = p.x*q.w - p.w*q.x + p.z*q.y - p.y*q.z;	// x
-	v.y = p.y*q.w - p.w*q.y + p.x*q.z - p.z*q.x;	// y
-	v.z = p.z*q.w - p.w*q.z + p.y*q.x - p.x*q.y;	// z
-
-	return v;
-}
-
-// equiv. quat_rotate(quat_conj(q), v):
-// q must be a normalized quaternion
-template<typename T, glm::precision P>
-void quat_unrotate(glm::detail::tquat<T, P> const & q, glm::detail::tvec3<T, P> & v) {
-	// return quat_mul(quat_mul(quat_conj(q), vec4(v, 0)), q).xyz;
-	// reduced:
-	vec4 p;
-	p.x = q.w*v.x + q.y*v.z - q.z*v.y;	// x
-	p.y = q.w*v.y + q.z*v.x - q.x*v.z;	// y
-	p.z = q.w*v.z + q.x*v.y - q.y*v.x;	// z
-	p.w = q.x*v.x + q.y*v.y + q.z*v.z;	// -w
-
-	v.x = p.w*q.x + p.x*q.w + p.y*q.z - p.z*q.y;  // x
-	v.x = p.w*q.y + p.y*q.w + p.z*q.x - p.x*q.z;  // y
-	v.x = p.w*q.z + p.z*q.w + p.x*q.y - p.y*q.x;   // z
-}
-
 
 template <typename celltype>
 struct jitmat {
@@ -392,14 +311,15 @@ public:
 			ARGB * dst = (ARGB *)rgb_mat.back;
 			int cells = nWidth * nHeight;
 
-			//if (align_depth_to_color) {
+			if (1) { //align_depth_to_color) {
 				for (int i = 0; i < cells; ++i) {
 					dst[i].r = src[i].rgbRed;
 					dst[i].g = src[i].rgbGreen;
 					dst[i].b = src[i].rgbBlue;
 				}
-			/*}
+			}
 			else {
+				/*
 				// align color to depth:
 				//std::fill(dst, dst + cells, RGB(0, 0, 0));
 				for (int i = 0; i < cells; ++i) {
@@ -413,8 +333,8 @@ public:
 						dst[i].g = src[idx].g;
 						dst[i].b = src[idx].b;
 					}
-				}
-			}*/
+				}*/
+			}
 
 			new_rgb_data = 1;
 
