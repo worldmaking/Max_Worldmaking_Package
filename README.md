@@ -36,3 +36,7 @@ Creating a virtual reality world requires high-performance computer graphics -- 
 - **Memory:** 8GB+ RAM
 - **USB:** 3x USB 3.0 ports plus 1x USB 2.0 port
 - **OS:** Windows 7 SP1 64 bit or newer (No OSX support at present)
+
+---
+
+Created by Graham Wakefield and the [Alice Lab for Computational Worldmaking](https://worldmaking.github.io) at York University, Toronto.
