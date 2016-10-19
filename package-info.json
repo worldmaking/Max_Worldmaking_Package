@@ -1,16 +1,15 @@
 {
-    "name": "worldmaking",
+    "name": "Worldmaking",
     "type": "package",
-    "author": "Computational Worldmaking Lab",
+    "author": "The Alice Lab for Computational Worldmaking",
 	"description": "Max/MSP/Jitter objects to support computational worldmaking.",
 	"version": "0.0",
     "major_version": "0",
     "minor_version": "0",
     "min_max_version": "700",
-    "website": "https://github.com/worldmaking/Max_Worldmaking_Package",
+    "website": "https://worldmaking.github.io",
     "link_mac32": "None",
-    "link_mac64": "None",
-    "link_win32": "None",
-    "link_win64": "None",
-    "alert_text": "None"
+	"link_mac64": "None",
+	"link_win32": "None",
+	"link_win64": "None",
 }
