@@ -4,12 +4,12 @@
 		"appversion" : 		{
 			"major" : 7,
 			"minor" : 2,
-			"revision" : 1,
+			"revision" : 4,
 			"architecture" : "x86",
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 61.0, 80.0, 877.0, 604.0 ],
+		"rect" : [ 136.0, 243.0, 877.0, 604.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -47,7 +47,7 @@
 						"appversion" : 						{
 							"major" : 7,
 							"minor" : 2,
-							"revision" : 1,
+							"revision" : 4,
 							"architecture" : "x86",
 							"modernui" : 1
 						}
@@ -232,7 +232,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 362.5, 112.5, 101.0, 33.0 ],
-					"presentation_rect" : [ 274.5, 207.5, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "send a big dict (as JSON)"
 				}
@@ -2442,7 +2441,7 @@
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 152.0, 544.0, 185.0, 22.0 ],
 					"style" : "",
-					"text" : "hello 76"
+					"text" : "hello 7"
 				}
 
 			}
