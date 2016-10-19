@@ -8,8 +8,8 @@
     "minor_version": "0",
     "min_max_version": "700",
     "website": "https://worldmaking.github.io",
-    "link_mac32": "None",
-	"link_mac64": "None",
-	"link_win32": "None",
-	"link_win64": "None",
+    "link_mac32": "https://github.com/worldmaking/Max_Worldmaking_Package/archive/v0.0.zip",
+	"link_mac64": "https://github.com/worldmaking/Max_Worldmaking_Package/archive/v0.0.zip",
+	"link_win32": "https://github.com/worldmaking/Max_Worldmaking_Package/archive/v0.0.zip",
+	"link_win64": "https://github.com/worldmaking/Max_Worldmaking_Package/archive/v0.0.zip",
 }
