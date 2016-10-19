@@ -7,11 +7,6 @@ Currently includes:
 - **htcvive** -- supports the HTC Vive head-mounted display (currently Windows only)
 - **ws** -- a simple websocket server external for max, making it trivial to interact with browser-based clients (Windows/OSX)
 
-Work in progress (may have limited functionality/stability issues)
-
-- **kinect** -- supports the kinect v1 including multiple devices, skeleton, point cloud etc. (windows only)
-- **kinect2** -- supports the kinect v2 (for windows/for xbox versions, windows only)
-
 Much more to come!
 
 ---------------
@@ -21,7 +16,6 @@ Much more to come!
 Download the package and place into your Max Packages folder. (On Windows, ```My Documents/Max 7/Packages```, on Mac, ```~/Documents/Max 7/Packages```), then restart Max.
 
 Take a look at patchers in the ```help``` and ```examples``` folders to get to know the package.
-
 
 ### Dependencies
 
@@ -42,10 +36,3 @@ Creating a virtual reality world requires high-performance computer graphics -- 
 - **Memory:** 8GB+ RAM
 - **USB:** 3x USB 3.0 ports plus 1x USB 2.0 port
 - **OS:** Windows 7 SP1 64 bit or newer (No OSX support at present)
-
----------------
-
-## Development
-
-See the ```/source``` folder. You may need to ```git submodules init && git submodules update``` to get all dependencies.
-
