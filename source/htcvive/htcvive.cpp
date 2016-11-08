@@ -9,6 +9,115 @@
 
 #include "al_max.h"
 
+struct jittex {
+	void * tex;
+	t_symbol * sym;
+	t_atom_long dim[2];
+
+	jittex(t_atom_long w = 640, t_atom_long h = 480) {
+		tex = 0;
+		sym = _jit_sym_nothing;
+		dim[0] = w;
+		dim[1] = h;
+	}
+
+	~jittex() {
+		dest_closing();
+	}
+
+	void resize(t_atom_long w, t_atom_long h) {
+		if (dim[0] != w && dim[1] != h) {
+			dim[0] = w;
+			dim[1] = h;
+			if (tex) {
+				if (jit_attr_setlong_array(tex, _jit_sym_dim, 2, dim)) object_error(nullptr, "failed to set mirror dim");
+			}
+		}
+
+		
+	}
+
+	bool dest_changed(t_symbol * context) {
+		if (tex) dest_closing();
+
+		// create a jit.gl.texture to copy mirror to
+		tex = jit_object_new(gensym("jit_gl_texture"), context);
+		if (!tex) return false;
+		// set texture attributes.
+		sym = jit_attr_getsym(tex, gensym("name"));
+		if (jit_attr_setlong_array(tex, _jit_sym_dim, 2, dim)) object_error(nullptr, "failed to set mirror dim");
+		if (jit_attr_setlong(tex, gensym("rectangle"), 1)) object_error(nullptr, "failed to set mirror rectangle mode");
+		//jit_attr_setsym(tex, gensym("defaultimage"), gensym("black"));
+		//jit_attr_setlong(outtexture, gensym("flip"), 0);
+		return true;
+	}
+
+	bool dest_closing() {
+		if (tex) {
+			jit_object_free(tex);
+			tex = 0;
+		}
+		return true;
+	}
+
+	long glid() {
+		return jit_attr_getlong(tex, gensym("glid"));
+	}
+
+	bool bind(void * ob3d) {
+		t_jit_gl_drawinfo drawInfo;
+		if (jit_gl_drawinfo_setup(ob3d, &drawInfo)) return false;
+		jit_gl_bindtexture(&drawInfo, sym, 0);
+		return true;
+	}
+	bool unbind(void * ob3d) {
+		t_jit_gl_drawinfo drawInfo;
+		if (jit_gl_drawinfo_setup(ob3d, &drawInfo)) return false;
+		jit_gl_unbindtexture(&drawInfo, sym, 0);
+		return true;
+	}
+};
+
+template <typename celltype>
+struct jitmat {
+
+	t_object * mat;
+	t_symbol * sym;
+	t_atom name[1];
+	int w, h;
+
+	celltype * back;
+
+	jitmat() {
+		mat = 0;
+		back = 0;
+		sym = 0;
+	}
+
+	~jitmat() {
+		//if (mat) object_release(mat);
+	}
+
+	void init(int planecount, t_symbol * type, int width, int height) {
+		w = width;
+		h = height;
+		t_jit_matrix_info info;
+		jit_matrix_info_default(&info);
+		info.planecount = planecount;
+		info.type = type;
+		info.dimcount = 2;
+		info.dim[0] = w;
+		info.dim[1] = h;
+		info.flags |= JIT_MATRIX_DATA_PACK_TIGHT;
+		mat = (t_object *)jit_object_new(_jit_sym_jit_matrix, &info);
+		jit_object_method(mat, _jit_sym_clear);
+		sym = jit_symbol_unique();
+		jit_object_method(mat, _jit_sym_getdata, &back);
+		mat = (t_object *)jit_object_method(mat, _jit_sym_register, sym);
+		atom_setsym(name, sym);
+	}
+};
+
 // The OpenVR SDK:
 #include "openvr.h"
 
@@ -58,6 +167,7 @@ public:
 	t_object ob; // must be first!
 	void * ob3d;
 	void * outlet_msg;
+	void * outlet_video;
 	void * outlet_tracking;
 	void * outlet_node;
 	void * outlet_eye[2];
@@ -76,6 +186,7 @@ public:
 	// attrs:
 	float near_clip, far_clip;
 	int mirror;
+	int use_camera;
 
 	// OpenGL
 	GLuint fbo, fbomirror;
@@ -94,6 +205,15 @@ public:
 	glm::mat4 m_mat4projectionEye[2];
 
 	vr::IVRRenderModels * mRenderModels;
+	vr::IVRTrackedCamera * mCamera;
+	vr::TrackedCameraHandle_t	m_hTrackedCamera;
+	uint32_t	m_nCameraFrameWidth;
+	uint32_t	m_nCameraFrameHeight;
+	uint32_t	m_nCameraFrameBufferSize;
+	uint32_t	m_nLastFrameSequence;
+	uint8_t		* m_pCameraFrameBuffer;
+	vr::EVRTrackedCameraFrameType frametype;
+	jittex camtex;
 
 	htcvive(t_symbol * dest_name) : dest_name(dest_name) {
 
@@ -102,6 +222,7 @@ public:
 		jit_ob3d_new(this, dest_name);
 		// outlets create in reverse order:
 		outlet_msg = outlet_new(&ob, NULL);
+		outlet_video = outlet_new(&ob, "jit_gl_texture");
 		outlet_controller[1] = outlet_new(&ob, NULL);
 		outlet_controller[0] = outlet_new(&ob, NULL);
 		outlet_tracking = outlet_new(&ob, NULL);
@@ -112,6 +233,11 @@ public:
 
 		mHMD = 0;
 		mHMDPose = glm::mat4(1.f);
+
+		mCamera = 0;
+		m_hTrackedCamera = INVALID_TRACKED_CAMERA_HANDLE;
+		m_nLastFrameSequence = 0;
+		frametype = vr::VRTrackedCameraFrameType_Undistorted;
 
 		fbo = 0;
 		fbomirror = 0;
@@ -126,6 +252,7 @@ public:
 		near_clip = 0.15f;
 		far_clip = 100.f;
 		mirror = 0;
+		use_camera = 0;
 	}
 
 	// attempt to connect to the Vive runtime, creating a session:
@@ -149,6 +276,22 @@ public:
 		if (!mRenderModels) {
 			object_error(&ob, "Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
 		}
+		
+		mCamera = vr::VRTrackedCamera(); // (vr::IVRTrackedCamera *)vr::VR_GetGenericInterface(vr::IVRTrackedCamera_Version, &eError);
+		if (!mCamera) {
+			object_post(&ob, "failed to acquire camera -- is it enabled in the SteamVR settings?");
+		} else {
+			vr::EVRTrackedCameraError camError;
+			bool bHasCamera = false;
+
+			camError = mCamera->HasCamera(vr::k_unTrackedDeviceIndex_Hmd, &bHasCamera);
+			if (camError != vr::VRTrackedCameraError_None || !bHasCamera) {
+				object_post(&ob, "No Tracked Camera Available! (%s)\n", mCamera->GetCameraErrorNameFromEnum(camError));
+				mCamera = 0;
+			}
+			
+			if (use_camera) video_start();
+		}
 
 		configure();
 
@@ -156,8 +299,113 @@ public:
 		return true;
 	}
 
+	void video_restart() {
+		video_stop();
+		video_start();
+	}
+
+	void video_start() {
+		uint32_t nCameraFrameBufferSize = 0;
+		vr::EVRTrackedCameraError err;
+		if (mCamera) {
+			if (mCamera->GetCameraFrameSize(vr::k_unTrackedDeviceIndex_Hmd, frametype, &m_nCameraFrameWidth, &m_nCameraFrameHeight, &nCameraFrameBufferSize) != vr::VRTrackedCameraError_None)
+			{
+				object_error(&ob, "GetCameraFrameBounds() Failed!\n");
+				mCamera = 0;
+			}
+		}
+
+		uint32_t planes = nCameraFrameBufferSize / (m_nCameraFrameWidth * m_nCameraFrameHeight);
+		//object_post(&ob, "video %i x %i, %i-plane", m_nCameraFrameWidth, m_nCameraFrameHeight, planes);
+
+		if (mCamera && nCameraFrameBufferSize) {
+
+
+			camtex.resize(m_nCameraFrameWidth, m_nCameraFrameHeight);
+
+			if (nCameraFrameBufferSize != m_nCameraFrameBufferSize) {
+				delete[] m_pCameraFrameBuffer;
+				m_nCameraFrameBufferSize = nCameraFrameBufferSize;
+				m_pCameraFrameBuffer = new uint8_t[m_nCameraFrameBufferSize];
+				memset(m_pCameraFrameBuffer, 0, m_nCameraFrameBufferSize);
+			}
+
+			err = mCamera->AcquireVideoStreamingService(vr::k_unTrackedDeviceIndex_Hmd, &m_hTrackedCamera);
+			if (m_hTrackedCamera == INVALID_TRACKED_CAMERA_HANDLE)
+			{
+				object_error(&ob, "AcquireVideoStreamingService() Failed! %s", mCamera->GetCameraErrorNameFromEnum(err));
+				return;
+			}
+
+			/*
+
+			// doesn't seem to be giving good numbers yet...
+
+			t_atom a[4];
+			vr::HmdVector2_t focalLength, center;
+			err = mCamera->GetCameraIntrinisics(m_hTrackedCamera, frametype, &focalLength, &center);
+			vr::HmdMatrix44_t projection;
+			err = mCamera->GetCameraProjection(m_hTrackedCamera, frametype, near_clip, far_clip, &projection);
+			atom_setfloat(&a[0], (double)focalLength.v[0]);
+			atom_setfloat(&a[1], (double)focalLength.v[1]);
+			atom_setfloat(&a[2], (double)center.v[0]);
+			atom_setfloat(&a[3], (double)center.v[1]);
+			outlet_anything(outlet_msg, gensym("video_focal_center"), 4, a);
+
+			t_atom b[16];
+			// convert matrix?
+			glm::mat4 proj = mat4_from_openvr(projection);
+			// so, what do we really want to do with this information?
+			float * fp = glm::value_ptr(proj);
+			for (int i = 0; i < 16; i++) atom_setfloat(&b[i], (double)fp[i]);
+			outlet_anything(outlet_msg, gensym("video_projection"), 16, b);
+			*/
+		}
+	}
+
+	void video_step() {
+		if (!mCamera || !m_hTrackedCamera) return;
+		// get the frame header only
+		vr::CameraVideoStreamFrameHeader_t frameHeader;
+		vr::EVRTrackedCameraError nCameraError = mCamera->GetVideoStreamFrameBuffer(m_hTrackedCamera, frametype, nullptr, 0, &frameHeader, sizeof(frameHeader));
+		if (nCameraError != vr::VRTrackedCameraError_None) { object_post(&ob, "no video %s", mCamera->GetCameraErrorNameFromEnum(nCameraError)); return; }
+
+		// only continue if this is a new frame
+		if (frameHeader.nFrameSequence == m_nLastFrameSequence) return;
+		m_nLastFrameSequence = frameHeader.nFrameSequence;
+
+		// copy frame
+		nCameraError = mCamera->GetVideoStreamFrameBuffer(m_hTrackedCamera, frametype, m_pCameraFrameBuffer, m_nCameraFrameBufferSize, &frameHeader, sizeof(frameHeader));
+		if (nCameraError != vr::VRTrackedCameraError_None) return;
+
+		// would be nice to copy this as a texture on the GPU but apparently this isn't supported yet (the API exists, but returns error NotSupportedForThisDevice)
+		// so instead here's uploading to a jit.gl.texture from our CPU copy:
+		if (camtex.tex) {
+			// update texture:
+			glPushAttrib(GL_ENABLE_BIT | GL_TEXTURE_BIT);
+			glEnable(GL_TEXTURE_RECTANGLE_ARB);
+			glActiveTextureARB(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_RECTANGLE_ARB, camtex.glid());
+			glTexSubImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, 0, 0, camtex.dim[0], camtex.dim[1], GL_RGBA, GL_UNSIGNED_BYTE, m_pCameraFrameBuffer);
+			glPopAttrib();
+
+			// and output:
+			t_atom a[1];
+			atom_setsym(&a[0], camtex.sym);
+			outlet_anything(outlet_video, ps_jit_gl_texture, 1, a);
+		}
+	}
+
+	void video_stop() {
+		if (mCamera && m_hTrackedCamera) {
+			mCamera->ReleaseVideoStreamingService(m_hTrackedCamera);
+			m_hTrackedCamera = INVALID_TRACKED_CAMERA_HANDLE;
+		}
+	}
+
 	void disconnect() {
 		if (mHMD) {
+			video_stop();
 			vr::VR_Shutdown();
 			mHMD = 0;
 		}
@@ -326,6 +574,7 @@ public:
 		// check each device:
 		for (int i = 0; i < vr::k_unMaxTrackedDeviceCount; i++) {
 			const vr::TrackedDevicePose_t& trackedDevicePose = pRenderPoseArray[i];
+
 			if (trackedDevicePose.bPoseIsValid && trackedDevicePose.bDeviceIsConnected && trackedDevicePose.bPoseIsValid) {
 				mDevicePose[i] = mat4_from_openvr(trackedDevicePose.mDeviceToAbsoluteTracking);
 				
@@ -437,6 +686,9 @@ public:
 			atom_setfloat(a + 3, q.w);
 			outlet_anything(outlet_eye[i], _jit_sym_quat, 4, a);
 		}
+
+		// video:
+		video_step();
 	}
 
 	// receive a texture
@@ -523,17 +775,17 @@ public:
 
 				// move to VA for rendering
 				GLfloat tex_coords[] = {
-					texdim[0], texdim[1],
-					0.0, texdim[1],
+					(GLfloat)texdim[0], (GLfloat)texdim[1],
+					0.0, (GLfloat)texdim[1],
 					0.0, 0.,
-					texdim[0], 0.
+					(GLfloat)texdim[0], 0.
 				};
 
 				GLfloat verts[] = {
-					texdim_w, texdim_h,
-					0.0, texdim_h,
+					(GLfloat)texdim_w, (GLfloat)texdim_h,
+					0.0, (GLfloat)texdim_h,
 					0.0, 0.0,
-					texdim_w, 0.0
+					(GLfloat)texdim_w, 0.0
 				};
 
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -712,10 +964,10 @@ public:
 				};
 
 				GLfloat verts[] = {
-					width, height,
-					0.0, height,
+					(GLfloat)width, (GLfloat)height,
+					0.0, (GLfloat)height,
 					0.0, 0.0,
-					width, 0.0
+					(GLfloat)width, 0.0
 				};
 
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -767,12 +1019,11 @@ public:
 	}
 
 	t_jit_err dest_changed() {
+		configure();
 		object_post(&ob, "dest_changed %d %d", texdim_w, texdim_h);
 
 		t_symbol *context = jit_attr_getsym(this, gensym("drawto"));
 
-		glGenFramebuffersEXT(1, &fbo);
-		glGenFramebuffersEXT(1, &fbomirror);
 
 		// create a jit.gl.texture to copy mirror to
 		outtexture = jit_object_new(gensym("jit_gl_texture"), context);
@@ -796,10 +1047,16 @@ public:
 			object_error(&ob, "failed to create Jitter mirror texture");
 		}
 
-		
+
+		if (!camtex.dest_changed(context)) object_error(&ob, "failed to create camera texture");
+		// need to do this if you plan using the texture as an FBO target:
+		if (!camtex.bind(this))  object_error(&ob, "failed to bind camera texture");
+		if (!camtex.unbind(this))  object_error(&ob, "failed to unbind camera texture");
+
 		// make a framebuffer:
 
-
+		glGenFramebuffersEXT(1, &fbo);
+		glGenFramebuffersEXT(1, &fbomirror);
 		glGenFramebuffersEXT(1, &inFBO);
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, inFBO);
 
@@ -831,6 +1088,8 @@ public:
 	t_jit_err dest_closing() {
 		//object_post(&ob, "dest_closing");
 		//disconnect();
+
+		camtex.dest_closing();
 
 		if (fbo) {
 			glDeleteFramebuffersEXT(1, &fbo);
@@ -962,21 +1221,21 @@ t_max_err htcvive_far_clip_set(htcvive *x, t_object *attr, long argc, t_atom *ar
 	return 0;
 }
 
-//TODO: Express Loop in terms of Vive API calls
-// Application Loop:
-//  - Call ovr_GetPredictedDisplayTime() to get the current frame timing information.
-//  - Call ovr_GetTrackingState() and ovr_CalcEyePoses() to obtain the predicted
-//    rendering pose for each eye based on timing.
-//  - Increment ovrTextureSet::CurrentIndex for each layer you will be rendering to 
-//    in the next step.
-//  - Render the scene content into ovrTextureSet::CurrentIndex for each eye and layer
-//    you plan to update this frame. 
-//  - Call ovr_SubmitFrame() to render the distorted layers to the back buffer
-//    and present them on the HMD. If ovr_SubmitFrame returns ovrSuccess_NotVisible,
-//    there is no need to render the scene for the next loop iteration. Instead,
-//    just call ovr_SubmitFrame again until it returns ovrSuccess. ovrTextureSet::CurrentIndex 
-//    for each layer should refer to the texure you want to display.
-//
+t_max_err htcvive_use_camera_set(htcvive *x, t_object *attr, long argc, t_atom *argv) {
+	x->use_camera = atom_getlong(argv);
+	if (x->use_camera > 0) {
+		switch (x->use_camera) {
+		case 1: x->frametype = vr::VRTrackedCameraFrameType_Undistorted; break;
+		case 2: x->frametype = vr::VRTrackedCameraFrameType_Distorted; break;
+		default: x->frametype = vr::VRTrackedCameraFrameType_MaximumUndistorted; break;
+		}
+		x->video_restart();
+	}
+	else {
+		x->video_stop();
+	}
+	return 0;
+}
 
 void htcvive_quit() {
 	
@@ -1062,8 +1321,14 @@ void ext_main(void *r)
 	CLASS_ATTR_ACCESSORS(c, "near_clip", NULL, htcvive_near_clip_set);
 	CLASS_ATTR_ACCESSORS(c, "far_clip", NULL, htcvive_far_clip_set);
 
-	CLASS_ATTR_LONG(c, "mirror", 0, htcvive, mirror);
-	CLASS_ATTR_STYLE_LABEL(c, "mirror", 0, "onoff", "mirror HMD display in main window");
+
+	CLASS_ATTR_LONG(c, "use_camera", 0, htcvive, use_camera);
+	CLASS_ATTR_LABEL(c, "use_camera", 0, "Use the camera on the HMD");
+	CLASS_ATTR_ENUMINDEX4(c, "use_camera", 0, "no video", "distorted", "undistorted", "undistorted_maximized");
+	CLASS_ATTR_ACCESSORS(c, "use_camera", NULL, htcvive_use_camera_set);
+
+//	CLASS_ATTR_LONG(c, "mirror", 0, htcvive, mirror);
+//	CLASS_ATTR_STYLE_LABEL(c, "mirror", 0, "onoff", "mirror HMD display in main window");
 	
 	class_register(CLASS_BOX, c);
 	max_class = c;

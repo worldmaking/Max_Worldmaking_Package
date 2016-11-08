@@ -1,0 +1,17 @@
+git tips:
+
+tag a commit to an issue: include #number. Can also say "fix #number" etc. to close the issue.
+
+merging specific files from devel to master:
+
+git checkout master
+git checkout devel externals/htcvive.mxe externals/htcvive.mxe64
+git commit -m 'merged files'
+
+
+merging everything except a folder:
+
+git checkout master
+git merge --no-commit --no-ff devel
+git reset -- source
+git commit
