@@ -950,6 +950,18 @@ void htcvive_jit_gl_texture(htcvive * x, t_symbol * s, long argc, t_atom * argv)
 	}
 }
 
+t_max_err htcvive_near_clip_set(htcvive *x, t_object *attr, long argc, t_atom *argv) {
+	x->near_clip = atom_getfloat(argv);
+	x->configure();
+	return 0;
+}
+
+t_max_err htcvive_far_clip_set(htcvive *x, t_object *attr, long argc, t_atom *argv) {
+	x->far_clip = atom_getfloat(argv);
+	x->configure();
+	return 0;
+}
+
 //TODO: Express Loop in terms of Vive API calls
 // Application Loop:
 //  - Call ovr_GetPredictedDisplayTime() to get the current frame timing information.
@@ -1047,6 +1059,8 @@ void ext_main(void *r)
 
 	CLASS_ATTR_FLOAT(c, "near_clip", 0, htcvive, near_clip);
 	CLASS_ATTR_FLOAT(c, "far_clip", 0, htcvive, far_clip);
+	CLASS_ATTR_ACCESSORS(c, "near_clip", NULL, htcvive_near_clip_set);
+	CLASS_ATTR_ACCESSORS(c, "far_clip", NULL, htcvive_far_clip_set);
 
 	CLASS_ATTR_LONG(c, "mirror", 0, htcvive, mirror);
 	CLASS_ATTR_STYLE_LABEL(c, "mirror", 0, "onoff", "mirror HMD display in main window");
