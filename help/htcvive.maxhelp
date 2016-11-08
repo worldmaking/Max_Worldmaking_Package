@@ -3,13 +3,13 @@
 		"fileversion" : 1,
 		"appversion" : 		{
 			"major" : 7,
-			"minor" : 2,
-			"revision" : 3,
+			"minor" : 3,
+			"revision" : 1,
 			"architecture" : "x86",
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 370.0, 138.0, 872.0, 732.0 ],
+		"rect" : [ 1001.0, 286.0, 877.0, 748.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -37,6 +37,207 @@
 		"style" : "",
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
+				"box" : 				{
+					"id" : "obj-10",
+					"maxclass" : "number",
+					"numinlets" : 1,
+					"numoutlets" : 2,
+					"outlettype" : [ "", "bang" ],
+					"parameter_enable" : 0,
+					"patching_rect" : [ 232.0, 266.0, 50.0, 22.0 ],
+					"style" : ""
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-20",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patcher" : 					{
+						"fileversion" : 1,
+						"appversion" : 						{
+							"major" : 7,
+							"minor" : 3,
+							"revision" : 1,
+							"architecture" : "x86",
+							"modernui" : 1
+						}
+,
+						"rect" : [ 86.0, 519.0, 616.0, 261.0 ],
+						"bglocked" : 0,
+						"openinpresentation" : 0,
+						"default_fontsize" : 12.0,
+						"default_fontface" : 0,
+						"default_fontname" : "Arial",
+						"gridonopen" : 1,
+						"gridsize" : [ 15.0, 15.0 ],
+						"gridsnaponopen" : 1,
+						"objectsnaponopen" : 1,
+						"statusbarvisible" : 2,
+						"toolbarvisible" : 1,
+						"lefttoolbarpinned" : 0,
+						"toptoolbarpinned" : 0,
+						"righttoolbarpinned" : 0,
+						"bottomtoolbarpinned" : 0,
+						"toolbars_unpinned_last_save" : 0,
+						"tallnewobj" : 0,
+						"boxanimatetime" : 200,
+						"enablehscroll" : 1,
+						"enablevscroll" : 1,
+						"devicewidth" : 0.0,
+						"description" : "",
+						"digest" : "",
+						"tags" : "",
+						"style" : "",
+						"subpatcher_template" : "",
+						"boxes" : [ 							{
+								"box" : 								{
+									"id" : "obj-8",
+									"maxclass" : "newobj",
+									"numinlets" : 1,
+									"numoutlets" : 2,
+									"outlettype" : [ "jit_matrix", "" ],
+									"patching_rect" : [ 21.0, 213.0, 215.0, 22.0 ],
+									"style" : "",
+									"text" : "jit.gl.videoplane vive_world @enable 0"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-11",
+									"maxclass" : "message",
+									"numinlets" : 2,
+									"numoutlets" : 1,
+									"outlettype" : [ "" ],
+									"patching_rect" : [ 37.0, 173.0, 57.0, 22.0 ],
+									"style" : "",
+									"text" : "enable 1"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-9",
+									"maxclass" : "newobj",
+									"numinlets" : 1,
+									"numoutlets" : 2,
+									"outlettype" : [ "", "bang" ],
+									"patching_rect" : [ 21.0, 145.0, 30.0, 22.0 ],
+									"style" : "",
+									"text" : "t l b"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-7",
+									"linecount" : 4,
+									"maxclass" : "comment",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 340.0, 15.0, 255.0, 62.0 ],
+									"style" : "",
+									"text" : "The htcvive object gives you the camera data as a texture, to keep things on the GPU for speed. bringing it back to the CPU (as a matrix) can affect framerate."
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"comment" : "",
+									"id" : "obj-5",
+									"maxclass" : "inlet",
+									"numinlets" : 0,
+									"numoutlets" : 1,
+									"outlettype" : [ "jit_gl_texture" ],
+									"patching_rect" : [ 21.0, 89.0, 30.0, 30.0 ],
+									"style" : ""
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-4",
+									"linecount" : 4,
+									"maxclass" : "comment",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 183.0, 15.0, 150.0, 62.0 ],
+									"style" : "",
+									"text" : "The camera will only work if it is also enabled in the SteamVR settings (under the Camera tab)"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-2",
+									"linecount" : 4,
+									"maxclass" : "comment",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 21.0, 15.0, 155.0, 62.0 ],
+									"style" : "",
+									"text" : "The Vive has a camera mounted on the front, which you can enable with @use_camera 1"
+								}
+
+							}
+ ],
+						"lines" : [ 							{
+								"patchline" : 								{
+									"destination" : [ "obj-8", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"source" : [ "obj-11", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-9", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"source" : [ "obj-5", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-11", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"source" : [ "obj-9", 1 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-8", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"source" : [ "obj-9", 0 ]
+								}
+
+							}
+ ]
+					}
+,
+					"patching_rect" : [ 297.25, 503.0, 109.0, 22.0 ],
+					"saved_object_attributes" : 					{
+						"description" : "",
+						"digest" : "",
+						"globalpatchername" : "",
+						"style" : "",
+						"tags" : ""
+					}
+,
+					"style" : "",
+					"text" : "p the-hmd-camera"
+				}
+
+			}
+, 			{
 				"box" : 				{
 					"id" : "obj-46",
 					"maxclass" : "comment",
@@ -72,8 +273,8 @@
 						"fileversion" : 1,
 						"appversion" : 						{
 							"major" : 7,
-							"minor" : 2,
-							"revision" : 3,
+							"minor" : 3,
+							"revision" : 1,
 							"architecture" : "x86",
 							"modernui" : 1
 						}
@@ -184,8 +385,8 @@
 										"fileversion" : 1,
 										"appversion" : 										{
 											"major" : 7,
-											"minor" : 2,
-											"revision" : 3,
+											"minor" : 3,
+											"revision" : 1,
 											"architecture" : "x86",
 											"modernui" : 1
 										}
@@ -399,13 +600,13 @@
 						"fileversion" : 1,
 						"appversion" : 						{
 							"major" : 7,
-							"minor" : 2,
-							"revision" : 3,
+							"minor" : 3,
+							"revision" : 1,
 							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
-						"rect" : [ 1174.0, 180.0, 616.0, 326.0 ],
+						"rect" : [ 724.0, 503.0, 616.0, 326.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -468,8 +669,8 @@
 										"fileversion" : 1,
 										"appversion" : 										{
 											"major" : 7,
-											"minor" : 2,
-											"revision" : 3,
+											"minor" : 3,
+											"revision" : 1,
 											"architecture" : "x86",
 											"modernui" : 1
 										}
@@ -929,13 +1130,13 @@
 						"fileversion" : 1,
 						"appversion" : 						{
 							"major" : 7,
-							"minor" : 2,
-							"revision" : 3,
+							"minor" : 3,
+							"revision" : 1,
 							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
-						"rect" : [ 315.0, 195.0, 1346.0, 670.0 ],
+						"rect" : [ 869.0, 135.0, 1346.0, 670.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -2699,7 +2900,7 @@
 									"numinlets" : 0,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 39.0, 233.0, 30.0, 30.0 ],
+									"patching_rect" : [ 40.0, 233.0, 30.0, 30.0 ],
 									"style" : ""
 								}
 
@@ -2712,7 +2913,7 @@
 									"numinlets" : 0,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 39.0, 446.0, 30.0, 30.0 ],
+									"patching_rect" : [ 41.0, 446.0, 30.0, 30.0 ],
 									"style" : ""
 								}
 
@@ -2725,7 +2926,7 @@
 									"numinlets" : 0,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 39.0, 8.0, 30.0, 30.0 ],
+									"patching_rect" : [ 40.0, 8.0, 30.0, 30.0 ],
 									"style" : ""
 								}
 
@@ -3465,7 +3666,7 @@
  ]
 					}
 ,
-					"patching_rect" : [ 187.535721, 503.0, 90.0, 22.0 ],
+					"patching_rect" : [ 187.535721, 503.0, 92.14286, 22.0 ],
 					"saved_object_attributes" : 					{
 						"description" : "",
 						"digest" : "",
@@ -3476,19 +3677,6 @@
 ,
 					"style" : "",
 					"text" : "p tracking-data"
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-21",
-					"linecount" : 2,
-					"maxclass" : "comment",
-					"numinlets" : 1,
-					"numoutlets" : 0,
-					"patching_rect" : [ 289.625, 497.0, 107.75, 34.0 ],
-					"style" : "",
-					"text" : "hmd & controller tracking"
 				}
 
 			}
@@ -3526,19 +3714,6 @@
 					"patching_rect" : [ 188.25, 543.0, 128.0, 22.0 ],
 					"style" : "",
 					"text" : "dim 3024 1680"
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-20",
-					"maxclass" : "message",
-					"numinlets" : 2,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 100.25, 387.0, 60.0, 22.0 ],
-					"style" : "",
-					"text" : "configure"
 				}
 
 			}
@@ -3592,8 +3767,8 @@
 						"fileversion" : 1,
 						"appversion" : 						{
 							"major" : 7,
-							"minor" : 2,
-							"revision" : 3,
+							"minor" : 3,
+							"revision" : 1,
 							"architecture" : "x86",
 							"modernui" : 1
 						}
@@ -3802,8 +3977,8 @@
 										"fileversion" : 1,
 										"appversion" : 										{
 											"major" : 7,
-											"minor" : 2,
-											"revision" : 3,
+											"minor" : 3,
+											"revision" : 1,
 											"architecture" : "x86",
 											"modernui" : 1
 										}
@@ -4232,7 +4407,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 531.25, 596.0, 81.0, 48.0 ],
+					"patching_rect" : [ 473.5, 621.0, 81.0, 48.0 ],
 					"style" : "",
 					"text" : "the left & right scene cameras"
 				}
@@ -4417,7 +4592,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 284.0, 387.0, 68.0, 22.0 ],
+					"patching_rect" : [ 127.75, 394.0, 68.0, 22.0 ],
 					"style" : "",
 					"text" : "disconnect"
 				}
@@ -4429,7 +4604,7 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 325.25, 462.5, 98.0, 22.0 ],
+					"patching_rect" : [ 359.5, 465.0, 98.0, 22.0 ],
 					"style" : "",
 					"text" : "print htcvive-info"
 				}
@@ -4442,7 +4617,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 207.0, 387.0, 53.0, 22.0 ],
+					"patching_rect" : [ 66.0, 394.0, 53.0, 22.0 ],
 					"style" : "",
 					"text" : "connect"
 				}
@@ -4454,9 +4629,9 @@
 					"id" : "obj-1",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
-					"numoutlets" : 8,
-					"outlettype" : [ "jit_gl_texture", "", "", "", "", "", "", "" ],
-					"patching_rect" : [ 41.25, 458.0, 275.0, 31.0 ],
+					"numoutlets" : 9,
+					"outlettype" : [ "jit_gl_texture", "", "", "", "", "", "", "jit_gl_texture", "" ],
+					"patching_rect" : [ 41.25, 449.0, 311.571442, 31.0 ],
 					"style" : "",
 					"text" : "htcvive vive"
 				}
@@ -4470,7 +4645,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 65.25, 303.0, 150.0, 22.0 ],
+					"patching_rect" : [ 66.0, 354.0, 150.0, 22.0 ],
 					"style" : ""
 				}
 
@@ -4483,7 +4658,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 222.25, 303.0, 150.0, 22.0 ],
+					"patching_rect" : [ 223.0, 354.0, 150.0, 22.0 ],
 					"style" : ""
 				}
 
@@ -4503,19 +4678,29 @@
 			}
 , 			{
 				"box" : 				{
-					"attr" : "mirror",
-					"id" : "obj-26",
+					"attr" : "use_camera",
+					"id" : "obj-45",
 					"maxclass" : "attrui",
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 65.25, 354.0, 150.0, 22.0 ],
+					"patching_rect" : [ 66.0, 311.0, 217.0, 22.0 ],
 					"style" : ""
 				}
 
 			}
  ],
 		"lines" : [ 			{
+				"patchline" : 				{
+					"destination" : [ "obj-20", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"midpoints" : [ 306.75, 492.0, 306.75, 492.0 ],
+					"source" : [ "obj-1", 7 ]
+				}
+
+			}
+, 			{
 				"patchline" : 				{
 					"destination" : [ "obj-27", 0 ],
 					"disabled" : 0,
@@ -4529,7 +4714,7 @@
 					"destination" : [ "obj-28", 1 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 160.464279, 536.5, 306.75, 536.5 ],
+					"midpoints" : [ 160.464294, 536.5, 306.75, 536.5 ],
 					"source" : [ "obj-1", 3 ]
 				}
 
@@ -4539,7 +4724,7 @@
 					"destination" : [ "obj-4", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"source" : [ "obj-1", 7 ]
+					"source" : [ "obj-1", 8 ]
 				}
 
 			}
@@ -4563,7 +4748,7 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-81", 1 ],
+					"destination" : [ "obj-81", 2 ],
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-1", 6 ]
@@ -4572,7 +4757,7 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-81", 2 ],
+					"destination" : [ "obj-81", 1 ],
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-1", 5 ]
@@ -4585,6 +4770,15 @@
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-1", 4 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-45", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-10", 0 ]
 				}
 
 			}
@@ -4620,7 +4814,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 74.75, 335.0, 50.75, 335.0 ],
+					"midpoints" : [ 75.5, 386.0, 50.75, 386.0 ],
 					"source" : [ "obj-12", 0 ]
 				}
 
@@ -4630,17 +4824,8 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 448.5, 441.0, 50.75, 441.0 ],
+					"midpoints" : [ 448.5, 444.0, 50.75, 444.0 ],
 					"source" : [ "obj-15", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-20", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
-					"source" : [ "obj-16", 0 ]
 				}
 
 			}
@@ -4677,17 +4862,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 109.75, 433.0, 50.75, 433.0 ],
-					"source" : [ "obj-20", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-1", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
-					"midpoints" : [ 231.75, 334.0, 50.75, 334.0 ],
+					"midpoints" : [ 232.5, 385.0, 50.75, 385.0 ],
 					"source" : [ "obj-23", 0 ]
 				}
 
@@ -4706,17 +4881,7 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 74.75, 416.5, 50.75, 416.5 ],
-					"source" : [ "obj-26", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-1", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
-					"midpoints" : [ 216.5, 433.0, 50.75, 433.0 ],
+					"midpoints" : [ 75.5, 433.0, 50.75, 433.0 ],
 					"source" : [ "obj-3", 0 ]
 				}
 
@@ -4764,7 +4929,17 @@
 					"destination" : [ "obj-1", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"midpoints" : [ 293.5, 433.0, 50.75, 433.0 ],
+					"midpoints" : [ 75.5, 347.0, 50.75, 347.0 ],
+					"source" : [ "obj-45", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-1", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"midpoints" : [ 137.25, 433.0, 50.75, 433.0 ],
 					"source" : [ "obj-5", 0 ]
 				}
 
