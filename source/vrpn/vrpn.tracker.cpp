@@ -55,7 +55,7 @@ public:
 		snprintf(name_str, 4095, "%s@%s:%d", name->s_name, host->s_name, (int)port);
 		
 		tkr = new vrpn_Tracker_Remote(name_str);
-		tkr->register_change_handler((void *)this, &tracker_handler);
+		tkr->register_change_handler((void *)this, (vrpn_TRACKERWORKSPACECHANGEHANDLER)&tracker_handler);
 		
 		object_post(&ob, "created vrpn tracker %s", name_str);
 
