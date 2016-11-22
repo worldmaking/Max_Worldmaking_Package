@@ -162,6 +162,9 @@ static t_symbol * ps_buttons;
 static t_symbol * ps_velocity;
 static t_symbol * ps_angular_velocity;
 
+static t_symbol * ps_tracked_position;
+static t_symbol * ps_tracked_quat;
+
 class htcvive {
 public:
 
@@ -609,7 +612,7 @@ public:
 						atom_setfloat(a + 0, p.x);
 						atom_setfloat(a + 1, p.y);
 						atom_setfloat(a + 2, p.z);
-						outlet_anything(outlet_tracking, _jit_sym_position, 3, a);
+						outlet_anything(outlet_tracking, ps_tracked_position, 3, a);
 
 						glm::quat q = glm::quat_cast(mHMDPose);
 						//q = glm::normalize(q);
@@ -617,7 +620,7 @@ public:
 						atom_setfloat(a + 1, q.y);
 						atom_setfloat(a + 2, q.z);
 						atom_setfloat(a + 3, q.w);
-						outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
+						outlet_anything(outlet_tracking, ps_tracked_quat, 4, a);
 					}
 				} break;
 				case vr::TrackedDeviceClass_Controller: {
@@ -632,14 +635,32 @@ public:
 							mHandControllerDeviceIndex[hand] = i;
 
 							if (trackedDevicePose.bPoseIsValid) {
-								glm::vec3 p = glm::vec3(mDevicePose[i][3]); // the translation component
+
+								mat4& tracked_pose = mDevicePose[i];
+								glm::mat4 world_pose = modelview_mat * tracked_pose;
+
+								// output the raw tracking data:
+								glm::vec3 p = glm::vec3(tracked_pose[3]); // the translation component
+								atom_setfloat(a + 0, p.x);
+								atom_setfloat(a + 1, p.y);
+								atom_setfloat(a + 2, p.z);
+								outlet_anything(outlet_controller[hand], ps_tracked_position, 3, a);
+
+								glm::quat q = glm::quat_cast(tracked_pose);
+								//q = glm::normalize(q);
+								atom_setfloat(a + 0, q.x);
+								atom_setfloat(a + 1, q.y);
+								atom_setfloat(a + 2, q.z);
+								atom_setfloat(a + 3, q.w);
+								outlet_anything(outlet_controller[hand], ps_tracked_quat, 4, a);
+
+								p = glm::vec3(world_pose[3]); // the translation component
 								atom_setfloat(a + 0, p.x);
 								atom_setfloat(a + 1, p.y);
 								atom_setfloat(a + 2, p.z);
 								outlet_anything(outlet_controller[hand], _jit_sym_position, 3, a);
 
-								glm::quat q = glm::quat_cast(mDevicePose[i]);
-								//q = glm::normalize(q);
+								q = glm::quat_cast(world_pose);
 								atom_setfloat(a + 0, q.x);
 								atom_setfloat(a + 1, q.y);
 								atom_setfloat(a + 2, q.z);
@@ -692,7 +713,6 @@ public:
 
 		// now update cameras:
 		for (int i = 0; i < 2; i++) {
-			// left:
 			glm::mat4 modelvieweye_mat = modelview_mat * mHMDPose * m_mat4viewEye[i]; 
 
 			// modelview
@@ -1294,6 +1314,9 @@ void ext_main(void *r)
 	ps_buttons = gensym("buttons");
 	ps_velocity = gensym("velocity");
 	ps_angular_velocity = gensym("angular_velocity");
+
+	ps_tracked_position = gensym("tracked_position");
+	ps_tracked_quat = gensym("tracked_quat");
 
 	// init
 	
