@@ -164,6 +164,7 @@ static t_symbol * ps_angular_velocity;
 
 class htcvive {
 public:
+
 	t_object ob; // must be first!
 	void * ob3d;
 	void * outlet_msg;
@@ -215,6 +216,8 @@ public:
 	vr::EVRTrackedCameraFrameType frametype;
 	jittex camtex;
 
+	int mHandControllerDeviceIndex[2];
+
 	htcvive(t_symbol * dest_name) : dest_name(dest_name) {
 
 
@@ -233,6 +236,9 @@ public:
 
 		mHMD = 0;
 		mHMDPose = glm::mat4(1.f);
+		mHandControllerDeviceIndex[0] = -1;
+		mHandControllerDeviceIndex[1] = -1;
+
 
 		mCamera = 0;
 		m_hTrackedCamera = INVALID_TRACKED_CAMERA_HANDLE;
@@ -298,6 +304,76 @@ public:
 		outlet_anything(outlet_msg, gensym("connected"), 0, NULL);
 		return true;
 	}
+
+	void disconnect() {
+		if (mHMD) {
+			video_stop();
+			vr::VR_Shutdown();
+			mHMD = 0;
+		}
+		
+	}
+
+	// usually called after session is created, and when important attributes are changed
+	// invokes info() to send configuration results 
+	void configure() {
+		t_atom a[6];
+		if (!mHMD) return;
+
+		t_symbol * display_name = GetTrackedDeviceString(mHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_TrackingSystemName_String);
+		t_symbol * driver_name = GetTrackedDeviceString(mHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_SerialNumber_String);
+		object_post(&ob, "display %s driver %s", display_name->s_name, driver_name->s_name);
+
+		mHMD->GetRecommendedRenderTargetSize(&texdim_w, &texdim_h);
+		// we will send as side-by-side:
+		texdim_w *= 2;
+
+		// setup cameras:
+		for (int i = 0; i < 2; i++) {
+
+			vr::HmdMatrix34_t matEyeRight = mHMD->GetEyeToHeadTransform((vr::Hmd_Eye)i);
+			glm::mat4 matrixObj(
+				matEyeRight.m[0][0], matEyeRight.m[1][0], matEyeRight.m[2][0], 0.0,
+				matEyeRight.m[0][1], matEyeRight.m[1][1], matEyeRight.m[2][1], 0.0,
+				matEyeRight.m[0][2], matEyeRight.m[1][2], matEyeRight.m[2][2], 0.0,
+				matEyeRight.m[0][3], matEyeRight.m[1][3], matEyeRight.m[2][3], 1.0f
+				);
+
+			m_mat4viewEye[i] = matrixObj;
+			float l, r, t, b;
+			mHMD->GetProjectionRaw((vr::Hmd_Eye)i, &l, &r, &t, &b);
+			atom_setfloat(a + 0, l * near_clip);
+			atom_setfloat(a + 1, r * near_clip);
+			atom_setfloat(a + 2, -b * near_clip);
+			atom_setfloat(a + 3, -t * near_clip);
+			atom_setfloat(a + 4, near_clip);
+			atom_setfloat(a + 5, far_clip);
+			outlet_anything(outlet_eye[i], ps_frustum, 6, a);
+		}
+
+		info();
+	}
+
+	void info() {
+		t_atom a[2];
+		// send texture dim (determined via configure()) to the scene jit.gl.node:
+		atom_setlong(a + 0, texdim_w);
+		atom_setlong(a + 1, texdim_h);
+		outlet_anything(outlet_node, _jit_sym_dim, 2, a);
+	}
+
+	~htcvive() {
+		// free GL resources created by this external
+		dest_closing();
+		// disconnect from session
+		disconnect();
+		// remove from jit.gl* hierarchy
+		jit_ob3d_free(this);
+		// actually delete object
+		max_jit_object_free(this);
+	}
+
+
 
 	void video_restart() {
 		video_stop();
@@ -403,72 +479,12 @@ public:
 		}
 	}
 
-	void disconnect() {
-		if (mHMD) {
-			video_stop();
-			vr::VR_Shutdown();
-			mHMD = 0;
-		}
-		
-	}
-
-	// usually called after session is created, and when important attributes are changed
-	// invokes info() to send configuration results 
-	void configure() {
-		t_atom a[6];
+	void vibrate(unsigned int hand = 0, float ms = 1) {
 		if (!mHMD) return;
-
-		t_symbol * display_name = GetTrackedDeviceString(mHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_TrackingSystemName_String);
-		t_symbol * driver_name = GetTrackedDeviceString(mHMD, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_SerialNumber_String);
-		object_post(&ob, "display %s driver %s", display_name->s_name, driver_name->s_name);
-
-		mHMD->GetRecommendedRenderTargetSize(&texdim_w, &texdim_h);
-		// we will send as side-by-side:
-		texdim_w *= 2;
-
-		// setup cameras:
-		for (int i = 0; i < 2; i++) {
-
-			vr::HmdMatrix34_t matEyeRight = mHMD->GetEyeToHeadTransform((vr::Hmd_Eye)i);
-			glm::mat4 matrixObj(
-				matEyeRight.m[0][0], matEyeRight.m[1][0], matEyeRight.m[2][0], 0.0,
-				matEyeRight.m[0][1], matEyeRight.m[1][1], matEyeRight.m[2][1], 0.0,
-				matEyeRight.m[0][2], matEyeRight.m[1][2], matEyeRight.m[2][2], 0.0,
-				matEyeRight.m[0][3], matEyeRight.m[1][3], matEyeRight.m[2][3], 1.0f
-				);
-
-			m_mat4viewEye[i] = matrixObj;
-			float l, r, t, b;
-			mHMD->GetProjectionRaw((vr::Hmd_Eye)i, &l, &r, &t, &b);
-			atom_setfloat(a + 0, l * near_clip);
-			atom_setfloat(a + 1, r * near_clip);
-			atom_setfloat(a + 2, -b * near_clip);
-			atom_setfloat(a + 3, -t * near_clip);
-			atom_setfloat(a + 4, near_clip);
-			atom_setfloat(a + 5, far_clip);
-			outlet_anything(outlet_eye[i], ps_frustum, 6, a);
+		int index = mHandControllerDeviceIndex[hand % 2];
+		if (index >= 0 && ms > 0.f && ms <= 5.f) {
+			mHMD->TriggerHapticPulse(index, 0, ms * 1000);
 		}
-
-		info();
-	}
-
-	void info() {
-		t_atom a[2];
-		// send texture dim (determined via configure()) to the scene jit.gl.node:
-		atom_setlong(a + 0, texdim_w);
-		atom_setlong(a + 1, texdim_h);
-		outlet_anything(outlet_node, _jit_sym_dim, 2, a);
-	}
-
-	~htcvive() {
-		// free GL resources created by this external
-		dest_closing();
-		// disconnect from session
-		disconnect();
-		// remove from jit.gl* hierarchy
-		jit_ob3d_free(this);
-		// actually delete object
-		max_jit_object_free(this);
 	}
 
 	// TODO: complete this method
@@ -575,29 +591,34 @@ public:
 		for (int i = 0; i < vr::k_unMaxTrackedDeviceCount; i++) {
 			const vr::TrackedDevicePose_t& trackedDevicePose = pRenderPoseArray[i];
 
-			if (trackedDevicePose.bPoseIsValid && trackedDevicePose.bDeviceIsConnected && trackedDevicePose.bPoseIsValid) {
-				mDevicePose[i] = mat4_from_openvr(trackedDevicePose.mDeviceToAbsoluteTracking);
-				
-				switch (mHMD->GetTrackedDeviceClass(i)) {
-				case vr::TrackedDeviceClass_HMD: {
+			if (trackedDevicePose.bDeviceIsConnected) {
+				if (trackedDevicePose.bPoseIsValid) {
 					// this is the view matrix relative to the 'chaperone' space origin
 					// (the center of the floor space in the real world)
-					mHMDPose = mDevicePose[i];
-					
-					// probably want to output this for navigation etc. use
-					glm::vec3 p = glm::vec3(mHMDPose[3]); // the translation component
-					atom_setfloat(a + 0, p.x);
-					atom_setfloat(a + 1, p.y);
-					atom_setfloat(a + 2, p.z);
-					outlet_anything(outlet_tracking, _jit_sym_position, 3, a);
+					// do we need to transform this by the scene?
+					mDevicePose[i] = mat4_from_openvr(trackedDevicePose.mDeviceToAbsoluteTracking);
+				}
 
-					glm::quat q = glm::quat_cast(mHMDPose);
-					//q = glm::normalize(q);
-					atom_setfloat(a + 0, q.x);
-					atom_setfloat(a + 1, q.y);
-					atom_setfloat(a + 2, q.z);
-					atom_setfloat(a + 3, q.w);
-					outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
+				switch (mHMD->GetTrackedDeviceClass(i)) {
+				case vr::TrackedDeviceClass_HMD: {
+					if (trackedDevicePose.bPoseIsValid) {
+						mHMDPose = mDevicePose[i];
+
+						// probably want to output this for navigation etc. use
+						glm::vec3 p = glm::vec3(mHMDPose[3]); // the translation component
+						atom_setfloat(a + 0, p.x);
+						atom_setfloat(a + 1, p.y);
+						atom_setfloat(a + 2, p.z);
+						outlet_anything(outlet_tracking, _jit_sym_position, 3, a);
+
+						glm::quat q = glm::quat_cast(mHMDPose);
+						//q = glm::normalize(q);
+						atom_setfloat(a + 0, q.x);
+						atom_setfloat(a + 1, q.y);
+						atom_setfloat(a + 2, q.z);
+						atom_setfloat(a + 3, q.w);
+						outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
+					}
 				} break;
 				case vr::TrackedDeviceClass_Controller: {
 					// check role to see if these are hands
@@ -607,33 +628,35 @@ public:
 					case vr::TrackedControllerRole_RightHand: {
 						//if (trackedDevicePose.eTrackingResult == vr::TrackingResult_Running_OK) {
 
-							int hand = role == vr::TrackedControllerRole_RightHand;
+							int hand = (role == vr::TrackedControllerRole_RightHand);
+							mHandControllerDeviceIndex[hand] = i;
 
-							glm::vec3 p = glm::vec3(mDevicePose[i][3]); // the translation component
-							atom_setfloat(a + 0, p.x);
-							atom_setfloat(a + 1, p.y);
-							atom_setfloat(a + 2, p.z);
-							outlet_anything(outlet_controller[hand], _jit_sym_position, 3, a);
+							if (trackedDevicePose.bPoseIsValid) {
+								glm::vec3 p = glm::vec3(mDevicePose[i][3]); // the translation component
+								atom_setfloat(a + 0, p.x);
+								atom_setfloat(a + 1, p.y);
+								atom_setfloat(a + 2, p.z);
+								outlet_anything(outlet_controller[hand], _jit_sym_position, 3, a);
 
-							glm::quat q = glm::quat_cast(mDevicePose[i]);
-							//q = glm::normalize(q);
-							atom_setfloat(a + 0, q.x);
-							atom_setfloat(a + 1, q.y);
-							atom_setfloat(a + 2, q.z);
-							atom_setfloat(a + 3, q.w);
-							outlet_anything(outlet_controller[hand], _jit_sym_quat, 4, a);
+								glm::quat q = glm::quat_cast(mDevicePose[i]);
+								//q = glm::normalize(q);
+								atom_setfloat(a + 0, q.x);
+								atom_setfloat(a + 1, q.y);
+								atom_setfloat(a + 2, q.z);
+								atom_setfloat(a + 3, q.w);
+								outlet_anything(outlet_controller[hand], _jit_sym_quat, 4, a);
 
-							atom_setfloat(a + 0, trackedDevicePose.vVelocity.v[0]);
-							atom_setfloat(a + 1, trackedDevicePose.vVelocity.v[1]);
-							atom_setfloat(a + 2, trackedDevicePose.vVelocity.v[2]);
-							outlet_anything(outlet_controller[hand], ps_velocity, 3, a);
+								atom_setfloat(a + 0, trackedDevicePose.vVelocity.v[0]);
+								atom_setfloat(a + 1, trackedDevicePose.vVelocity.v[1]);
+								atom_setfloat(a + 2, trackedDevicePose.vVelocity.v[2]);
+								outlet_anything(outlet_controller[hand], ps_velocity, 3, a);
 
-							atom_setfloat(a + 0, trackedDevicePose.vAngularVelocity.v[0]);
-							atom_setfloat(a + 1, trackedDevicePose.vAngularVelocity.v[1]);
-							atom_setfloat(a + 2, trackedDevicePose.vAngularVelocity.v[2]);
-							outlet_anything(outlet_controller[hand], ps_angular_velocity, 3, a);
-							
-							// TODO: should this be outside the if()?
+								atom_setfloat(a + 0, trackedDevicePose.vAngularVelocity.v[0]);
+								atom_setfloat(a + 1, trackedDevicePose.vAngularVelocity.v[1]);
+								atom_setfloat(a + 2, trackedDevicePose.vAngularVelocity.v[2]);
+								outlet_anything(outlet_controller[hand], ps_angular_velocity, 3, a);
+							}
+
 							vr::VRControllerState_t cs;
 							mHMD->GetControllerState(i, &cs);
 
@@ -1174,6 +1197,7 @@ void htcvive_assist(htcvive *x, void *b, long m, long a, char *s)
 		case 4: sprintf(s, "tracking state"); break;
 		case 5: sprintf(s, "left controller"); break;
 		case 6: sprintf(s, "right controller"); break;
+		case 7: sprintf(s, "hmd camera image (if enabled)"); break;
 		default: sprintf(s, "other messages"); break;
 		}
 	}
@@ -1201,6 +1225,13 @@ void htcvive_bang(htcvive * x) {
 
 void htcvive_submit(htcvive * x) {
 	x->submit();
+}
+
+void htcvive_vibrate(htcvive * x, t_symbol * s, long argc, t_atom * argv) {
+
+	t_atom_long hand = argc > 0 ? atom_getlong(argv + 0) : 0;
+	float ms = argc > 1 ? atom_getfloat(argv + 1) : 1.f;
+	x->vibrate(hand, ms);
 }
 
 void htcvive_jit_gl_texture(htcvive * x, t_symbol * s, long argc, t_atom * argv) {
@@ -1312,6 +1343,8 @@ void ext_main(void *r)
 	class_addmethod(c, (method)htcvive_configure, "configure", 0);
 	class_addmethod(c, (method)htcvive_info, "info", 0);
 
+
+	class_addmethod(c, (method)htcvive_vibrate, "vibrate", A_GIMME, 0);
 
 	class_addmethod(c, (method)htcvive_bang, "bang", 0);
 	class_addmethod(c, (method)htcvive_submit, "submit", 0);
