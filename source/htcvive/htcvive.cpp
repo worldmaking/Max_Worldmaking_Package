@@ -482,6 +482,17 @@ public:
 		}
 	}
 
+	void get_battery_status(unsigned int hand = 0) {
+		if (!mHMD) return;
+		int index = mHandControllerDeviceIndex[hand % 2];
+		if (index >= 0) {
+			t_atom a[2];
+			atom_setlong(a + 0, hand);
+			atom_setfloat(a + 1, mHMD->GetFloatTrackedDeviceProperty(index, vr::Prop_DeviceBatteryPercentage_Float));
+			outlet_anything(outlet_msg, gensym("battery"), 2, a);
+		}
+	}
+
 	void vibrate(unsigned int hand = 0, float ms = 1) {
 		if (!mHMD) return;
 		int index = mHandControllerDeviceIndex[hand % 2];
@@ -1254,6 +1265,12 @@ void htcvive_vibrate(htcvive * x, t_symbol * s, long argc, t_atom * argv) {
 	x->vibrate(hand, ms);
 }
 
+void htcvive_battery(htcvive * x, t_symbol * s, long argc, t_atom * argv) {
+
+	t_atom_long hand = argc > 0 ? atom_getlong(argv + 0) : 0;
+	x->get_battery_status(hand);
+}
+
 void htcvive_jit_gl_texture(htcvive * x, t_symbol * s, long argc, t_atom * argv) {
 	if (argc > 0 && atom_gettype(argv) == A_SYM) {
 		x->jit_gl_texture(atom_getsym(argv));
@@ -1368,6 +1385,7 @@ void ext_main(void *r)
 
 
 	class_addmethod(c, (method)htcvive_vibrate, "vibrate", A_GIMME, 0);
+	class_addmethod(c, (method)htcvive_battery, "battery", A_GIMME, 0);
 
 	class_addmethod(c, (method)htcvive_bang, "bang", 0);
 	class_addmethod(c, (method)htcvive_submit, "submit", 0);

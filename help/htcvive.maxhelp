@@ -38,6 +38,72 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-43",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 473.5, 537.0, 106.0, 20.0 ],
+					"style" : "",
+					"text" : "battery state (0-1)"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"format" : 6,
+					"id" : "obj-38",
+					"maxclass" : "flonum",
+					"numinlets" : 1,
+					"numoutlets" : 2,
+					"outlettype" : [ "", "bang" ],
+					"parameter_enable" : 0,
+					"patching_rect" : [ 525.5, 513.0, 50.0, 22.0 ],
+					"style" : ""
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"format" : 6,
+					"id" : "obj-36",
+					"maxclass" : "flonum",
+					"numinlets" : 1,
+					"numoutlets" : 2,
+					"outlettype" : [ "", "bang" ],
+					"parameter_enable" : 0,
+					"patching_rect" : [ 473.5, 513.0, 50.0, 22.0 ],
+					"style" : ""
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-22",
+					"maxclass" : "newobj",
+					"numinlets" : 3,
+					"numoutlets" : 3,
+					"outlettype" : [ "", "", "" ],
+					"patching_rect" : [ 473.5, 487.0, 58.0, 22.0 ],
+					"style" : "",
+					"text" : "route 0 1"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-21",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 2,
+					"outlettype" : [ "", "" ],
+					"patching_rect" : [ 473.5, 458.0, 78.0, 22.0 ],
+					"style" : "",
+					"text" : "route battery"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-49",
 					"maxclass" : "message",
 					"numinlets" : 2,
@@ -156,7 +222,6 @@
 													"numinlets" : 1,
 													"numoutlets" : 0,
 													"patching_rect" : [ 384.0, 36.0, 147.0, 75.0 ],
-													"presentation_rect" : [ 342.0, 37.0, 0.0, 0.0 ],
 													"style" : "",
 													"text" : "in this example, you navigate in the direction the controller is pointing, at a speed depending on the trigger squeeze."
 												}
@@ -170,7 +235,6 @@
 													"numinlets" : 1,
 													"numoutlets" : 0,
 													"patching_rect" : [ 184.0, 325.0, 266.0, 34.0 ],
-													"presentation_rect" : [ 192.0, 353.0, 0.0, 0.0 ],
 													"style" : "",
 													"text" : "apply as motion to the navigation jit.anim.node. disabled easing to reduce nausea."
 												}
@@ -184,7 +248,6 @@
 													"numinlets" : 1,
 													"numoutlets" : 0,
 													"patching_rect" : [ 277.0, 233.0, 172.0, 34.0 ],
-													"presentation_rect" : [ 277.0, 304.0, 0.0, 0.0 ],
 													"style" : "",
 													"text" : "scale by trigger squeeze, and negate for a forward vector"
 												}
@@ -3110,7 +3173,7 @@
 							"modernui" : 1
 						}
 ,
-						"rect" : [ 922.0, 383.0, 406.0, 317.0 ],
+						"rect" : [ 922.0, 383.0, 528.0, 317.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -3138,6 +3201,45 @@
 						"style" : "",
 						"subpatcher_template" : "",
 						"boxes" : [ 							{
+								"box" : 								{
+									"id" : "obj-7",
+									"maxclass" : "message",
+									"numinlets" : 2,
+									"numoutlets" : 1,
+									"outlettype" : [ "" ],
+									"patching_rect" : [ 403.0, 146.0, 57.0, 22.0 ],
+									"style" : "",
+									"text" : "battery 1"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-4",
+									"maxclass" : "message",
+									"numinlets" : 2,
+									"numoutlets" : 1,
+									"outlettype" : [ "" ],
+									"patching_rect" : [ 337.0, 146.0, 57.0, 22.0 ],
+									"style" : "",
+									"text" : "battery 0"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-3",
+									"linecount" : 2,
+									"maxclass" : "comment",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 339.0, 51.0, 150.0, 34.0 ],
+									"style" : "",
+									"text" : "report battery status for each wand:"
+								}
+
+							}
+, 							{
 								"box" : 								{
 									"id" : "obj-51",
 									"maxclass" : "newobj",
@@ -3516,7 +3618,7 @@
 									"maxclass" : "comment",
 									"numinlets" : 1,
 									"numoutlets" : 0,
-									"patching_rect" : [ 23.0, 24.0, 270.0, 48.0 ],
+									"patching_rect" : [ 25.0, 37.0, 270.0, 48.0 ],
 									"style" : "",
 									"text" : "vibrate <hand> <intensity>, \nwhere <hand> is 0 for left, 1 for right, \nand <intensity> ranges from about 0. to 3.7"
 								}
@@ -3540,6 +3642,7 @@
 									"destination" : [ "obj-1", 0 ],
 									"disabled" : 0,
 									"hidden" : 0,
+									"midpoints" : [ 34.5, 171.0, 34.5, 171.0 ],
 									"source" : [ "obj-33", 0 ]
 								}
 
@@ -3549,7 +3652,18 @@
 									"destination" : [ "obj-1", 0 ],
 									"disabled" : 0,
 									"hidden" : 0,
+									"midpoints" : [ 120.5, 192.0, 34.5, 192.0 ],
 									"source" : [ "obj-34", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-1", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"midpoints" : [ 346.5, 192.0, 34.5, 192.0 ],
+									"source" : [ "obj-4", 0 ]
 								}
 
 							}
@@ -3567,14 +3681,25 @@
 									"destination" : [ "obj-1", 0 ],
 									"disabled" : 0,
 									"hidden" : 0,
+									"midpoints" : [ 215.5, 192.0, 34.5, 192.0 ],
 									"source" : [ "obj-51", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-1", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"midpoints" : [ 412.5, 192.0, 34.5, 192.0 ],
+									"source" : [ "obj-7", 0 ]
 								}
 
 							}
  ]
 					}
 ,
-					"patching_rect" : [ 232.0, 394.0, 116.0, 22.0 ],
+					"patching_rect" : [ 232.0, 394.0, 90.0, 22.0 ],
 					"saved_object_attributes" : 					{
 						"description" : "",
 						"digest" : "",
@@ -3584,7 +3709,7 @@
 					}
 ,
 					"style" : "",
-					"text" : "p vibrate-controllers"
+					"text" : "p to-controllers"
 				}
 
 			}
@@ -5596,7 +5721,7 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 359.5, 465.0, 98.0, 22.0 ],
+					"patching_rect" : [ 561.0, 458.0, 98.0, 22.0 ],
 					"style" : "",
 					"text" : "print htcvive-info"
 				}
@@ -5707,6 +5832,15 @@
 			}
 , 			{
 				"patchline" : 				{
+					"destination" : [ "obj-21", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-1", 8 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
 					"destination" : [ "obj-27", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
@@ -5748,15 +5882,6 @@
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-1", 4 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-4", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
-					"source" : [ "obj-1", 8 ]
 				}
 
 			}
@@ -5859,6 +5984,42 @@
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-2", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-22", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-21", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-4", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-21", 1 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-36", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-22", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-38", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-22", 1 ]
 				}
 
 			}
