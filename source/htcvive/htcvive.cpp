@@ -617,6 +617,7 @@ public:
 				case vr::TrackedDeviceClass_HMD: {
 					if (trackedDevicePose.bPoseIsValid) {
 						mHMDPose = mDevicePose[i];
+						glm::mat4 world_pose = modelview_mat * mHMDPose;
 
 						// probably want to output this for navigation etc. use
 						glm::vec3 p = glm::vec3(mHMDPose[3]); // the translation component
@@ -632,6 +633,19 @@ public:
 						atom_setfloat(a + 2, q.z);
 						atom_setfloat(a + 3, q.w);
 						outlet_anything(outlet_tracking, ps_tracked_quat, 4, a);
+
+						p = glm::vec3(world_pose[3]); // the translation component
+						atom_setfloat(a + 0, p.x);
+						atom_setfloat(a + 1, p.y);
+						atom_setfloat(a + 2, p.z);
+						outlet_anything(outlet_tracking, _jit_sym_position, 3, a);
+
+						q = glm::quat_cast(world_pose);
+						atom_setfloat(a + 0, q.x);
+						atom_setfloat(a + 1, q.y);
+						atom_setfloat(a + 2, q.z);
+						atom_setfloat(a + 3, q.w);
+						outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
 					}
 				} break;
 				case vr::TrackedDeviceClass_Controller: {
