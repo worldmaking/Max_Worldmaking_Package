@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 537.0, 97.0, 1017.0, 702.0 ],
+		"rect" : [ 864.0, 92.0, 976.0, 675.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -37,6 +37,18 @@
 		"style" : "",
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
+				"box" : 				{
+					"comment" : "",
+					"id" : "obj-2",
+					"maxclass" : "outlet",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 69.583336, 212.0, 24.0, 24.0 ],
+					"style" : ""
+				}
+
+			}
+, 			{
 				"box" : 				{
 					"id" : "obj-38",
 					"maxclass" : "toggle",
@@ -96,7 +108,7 @@
 					"maxclass" : "inlet",
 					"numinlets" : 0,
 					"numoutlets" : 1,
-					"outlettype" : [ "int" ],
+					"outlettype" : [ "" ],
 					"patching_rect" : [ 50.25, 10.0, 30.0, 30.0 ],
 					"style" : ""
 				}
@@ -382,7 +394,7 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 6.25, 231.0, 108.0, 22.0 ],
+					"patching_rect" : [ 1.25, 246.0, 108.0, 22.0 ],
 					"style" : "",
 					"text" : "s /vr/render/bang"
 				}
@@ -487,7 +499,7 @@
 											"modernui" : 1
 										}
 ,
-										"rect" : [ 88.0, 143.0, 1761.0, 766.0 ],
+										"rect" : [ 83.0, 420.0, 1761.0, 535.0 ],
 										"bglocked" : 0,
 										"openinpresentation" : 0,
 										"default_fontsize" : 12.0,
@@ -4129,7 +4141,7 @@
 							"modernui" : 1
 						}
 ,
-						"rect" : [ 1121.0, 459.0, 616.0, 326.0 ],
+						"rect" : [ 162.0, 655.0, 616.0, 326.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -4164,7 +4176,7 @@
 									"numinlets" : 0,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 145.5, 22.0, 161.0, 22.0 ],
+									"patching_rect" : [ 145.5, 20.0, 161.0, 22.0 ],
 									"style" : "",
 									"text" : "r /vr/desktop-display/stereo"
 								}
@@ -4672,7 +4684,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 623.0, 270.0, 376.0, 20.0 ],
+					"patching_rect" : [ 594.0, 274.0, 376.0, 20.0 ],
 					"style" : "",
 					"text" : "FSAA might make edges look softer, but also may impact frame rate"
 				}
@@ -4699,8 +4711,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 188.25, 516.0, 108.0, 22.0 ],
-					"style" : "",
-					"text" : "dim 3024 1680"
+					"style" : ""
 				}
 
 			}
@@ -4965,7 +4976,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 611.5, 246.0, 150.0, 22.0 ],
+					"patching_rect" : [ 582.5, 250.0, 150.0, 22.0 ],
 					"style" : ""
 				}
 
@@ -5072,6 +5083,15 @@
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-11", 2 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-2", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-11", 1 ]
 				}
 
 			}
@@ -5332,6 +5352,12 @@
 
 			}
  ],
+		"dependency_cache" : [ 			{
+				"name" : "htcvive.mxe",
+				"type" : "iLaF"
+			}
+ ],
+		"autosave" : 0,
 		"styles" : [ 			{
 				"name" : "Jamoma_highlighted_orange",
 				"default" : 				{
