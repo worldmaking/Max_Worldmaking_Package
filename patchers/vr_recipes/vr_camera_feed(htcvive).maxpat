@@ -4,8 +4,8 @@
 		"appversion" : 		{
 			"major" : 7,
 			"minor" : 3,
-			"revision" : 1,
-			"architecture" : "x86",
+			"revision" : 2,
+			"architecture" : "x64",
 			"modernui" : 1
 		}
 ,
@@ -89,6 +89,7 @@
 			}
 , 			{
 				"box" : 				{
+					"dontreplace" : 1,
 					"id" : "obj-3",
 					"maxclass" : "message",
 					"numinlets" : 2,
@@ -96,7 +97,7 @@
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 150.0, 154.0, 209.0, 22.0 ],
 					"style" : "",
-					"text" : "jit_gl_texture u051000875"
+					"text" : "jit_gl_texture u516001454"
 				}
 
 			}
@@ -161,7 +162,7 @@
 					"outlettype" : [ "jit_matrix", "" ],
 					"patching_rect" : [ 129.0, 210.0, 215.0, 22.0 ],
 					"style" : "",
-					"text" : "jit.gl.videoplane vive_world @enable 1"
+					"text" : "jit.gl.videoplane vr_world @enable 1"
 				}
 
 			}
