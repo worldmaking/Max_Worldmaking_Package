@@ -41,6 +41,15 @@ static t_symbol * ps_frustum;
 static t_symbol * ps_warning;
 static t_symbol * ps_glid;
 static t_symbol * ps_jit_gl_texture;
+static t_symbol * ps_tracked_position;
+static t_symbol * ps_tracked_quat;
+static t_symbol * ps_velocity;
+static t_symbol * ps_angular_velocity;
+
+static t_symbol * ps_trigger;
+static t_symbol * ps_hand_trigger;
+static t_symbol * ps_thumbstick;
+static t_symbol * ps_buttons;
 
 // TODO: this is a really annoying hack. The Oculus driver doesn't seem to like being reconnected too quickly 
 // -- it says it reconnects, but the display remains blank or noisy.
@@ -518,10 +527,12 @@ public:
 		// Get both eye poses simultaneously, with IPD offset already included.
 		double displayMidpointSeconds = ovr_GetPredictedDisplayTime(session, frameIndex);
 		ovrTrackingState ts = ovr_GetTrackingState(session, displayMidpointSeconds, ovrTrue);
+		ovrPosef         handPoses[2];
+		ovrInputState    inputState;
 		if (ts.StatusFlags & (ovrStatus_OrientationTracked | ovrStatus_PositionTracked)) {
 			// get current head pose
 			const ovrPosef& pose = ts.HeadPose.ThePose;
-			
+
 			// use the tracking state to update the layers (part of how timewarp works)
 			ovr_CalcEyePoses(pose, hmdToEyeViewOffset, layer.RenderPose);
 
@@ -563,20 +574,114 @@ public:
 				outlet_anything(outlet_eye[eye], ps_frustum, 6, a);
 			}
 
-			// it may be useful to have the pose information in Max for other purposes:
-			ovrVector3f p = pose.Position;
-			ovrQuatf q = pose.Orientation;
+			// Headset tracking data:
+			{
+				ovrVector3f p = pose.Position;
+				ovrQuatf q = pose.Orientation;
+				t_jit_quat q1;
+				jit_quat_mult(&q1, (t_jit_quat *)&q, &quat);
 
-			atom_setfloat(a + 0, p.x);
-			atom_setfloat(a + 1, p.y);
-			atom_setfloat(a + 2, p.z);
-			outlet_anything(outlet_tracking, _jit_sym_position, 3, a);
+				atom_setfloat(a + 0, p.x);
+				atom_setfloat(a + 1, p.y);
+				atom_setfloat(a + 2, p.z);
+				outlet_anything(outlet_tracking, ps_tracked_position, 3, a);
 
-			atom_setfloat(a + 0, q.x);
-			atom_setfloat(a + 1, q.y);
-			atom_setfloat(a + 2, q.z);
-			atom_setfloat(a + 3, q.w);
-			outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
+				atom_setfloat(a + 0, q.x);
+				atom_setfloat(a + 1, q.y);
+				atom_setfloat(a + 2, q.z);
+				atom_setfloat(a + 3, q.w);
+				outlet_anything(outlet_tracking, ps_tracked_quat, 4, a);
+
+				atom_setfloat(a + 0, p.x + pos[0]);
+				atom_setfloat(a + 1, p.y + pos[1]);
+				atom_setfloat(a + 2, p.z + pos[2]);
+				outlet_anything(outlet_tracking, _jit_sym_position, 3, a);
+
+				atom_setfloat(a + 0, q1.x);
+				atom_setfloat(a + 1, q1.y);
+				atom_setfloat(a + 2, q1.z);
+				atom_setfloat(a + 3, q1.w);
+				outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
+			}
+
+			// Grab hand poses useful for rendering hand or controller representation
+			handPoses[ovrHand_Left] = ts.HandPoses[ovrHand_Left].ThePose;
+			handPoses[ovrHand_Right] = ts.HandPoses[ovrHand_Right].ThePose;
+
+			if (OVR_SUCCESS(ovr_GetInputState(session, ovrControllerType_Touch, &inputState)))
+			{
+				for (int i = 0; i < 2; i++) {
+					// it may be useful to have the pose information in Max for other purposes:
+					ovrVector3f p = handPoses[i].Position;
+					ovrQuatf q = handPoses[i].Orientation;
+
+					ovrVector3f vel = ts.HandPoses[i].LinearVelocity;
+					ovrVector3f angvel = ts.HandPoses[i].AngularVelocity;
+
+					t_jit_quat q1;
+					jit_quat_mult(&q1, (t_jit_quat *)&q, &quat);
+
+					atom_setfloat(a + 0, p.x);
+					atom_setfloat(a + 1, p.y);
+					atom_setfloat(a + 2, p.z);
+					outlet_anything(outlet_controller[i], ps_tracked_position, 3, a);
+
+					atom_setfloat(a + 0, q.x);
+					atom_setfloat(a + 1, q.y);
+					atom_setfloat(a + 2, q.z);
+					atom_setfloat(a + 3, q.w);
+					outlet_anything(outlet_controller[i], ps_tracked_quat, 4, a);
+
+					atom_setfloat(a + 0, p.x + pos[0]);
+					atom_setfloat(a + 1, p.y + pos[1]);
+					atom_setfloat(a + 2, p.z + pos[2]);
+					outlet_anything(outlet_controller[i], _jit_sym_position, 3, a);
+
+					atom_setfloat(a + 0, q1.x);
+					atom_setfloat(a + 1, q1.y);
+					atom_setfloat(a + 2, q1.z);
+					atom_setfloat(a + 3, q1.w);
+					outlet_anything(outlet_controller[i], _jit_sym_quat, 4, a);
+
+					atom_setfloat(a + 0, vel.x);
+					atom_setfloat(a + 1, vel.y);
+					atom_setfloat(a + 2, vel.z);
+					outlet_anything(outlet_controller[i], ps_velocity, 3, a);
+
+					atom_setfloat(a + 0, angvel.x);
+					atom_setfloat(a + 1, angvel.y);
+					atom_setfloat(a + 2, angvel.z);
+					outlet_anything(outlet_controller[i], ps_angular_velocity, 3, a);
+
+					atom_setlong(a + 0, inputState.IndexTrigger[i] > 0.25);
+					atom_setfloat(a + 1, inputState.IndexTrigger[i]);
+					outlet_anything(outlet_controller[i], ps_trigger, 2, a);
+
+					atom_setlong(a + 0, inputState.HandTrigger[i] > 0.25);
+					atom_setfloat(a + 1, inputState.HandTrigger[i]);
+					outlet_anything(outlet_controller[i], ps_hand_trigger, 2, a);
+
+					atom_setlong(a + 0, inputState.Touches & (i ? ovrButton_RThumb : ovrButton_LThumb));
+					atom_setfloat(a + 1, inputState.Thumbstick[i].x);
+					atom_setfloat(a + 2, inputState.Thumbstick[i].y);
+					atom_setlong(a + 3, inputState.Buttons & (i ? ovrButton_RThumb : ovrButton_LThumb));
+					outlet_anything(outlet_controller[i], ps_thumbstick, 4, a);
+
+					atom_setlong(a + 0, inputState.Buttons & (i ? ovrButton_A : ovrButton_X));
+					atom_setlong(a + 1, inputState.Buttons & (i ? ovrButton_B : ovrButton_Y));
+					outlet_anything(outlet_controller[i], ps_buttons, 2, a);
+				}
+				
+				if (inputState.Buttons & ovrButton_A)
+				{
+					// Handle A button being pressed
+					post("A pressed");
+				}
+				if (inputState.HandTrigger[ovrHand_Left] > 0.5f)
+				{
+					// Handle hand grip...
+				}
+			}
 		}
 		
 	}
@@ -1180,6 +1285,16 @@ void ext_main(void *r)
 	ps_warning = gensym("warning");
 	ps_glid = gensym("glid");
 	ps_jit_gl_texture = gensym("jit_gl_texture");
+
+	ps_velocity = gensym("velocity");
+	ps_angular_velocity = gensym("angular_velocity");
+	ps_tracked_position = gensym("tracked_position");
+	ps_tracked_quat = gensym("tracked_quat");
+
+	ps_trigger = gensym("trigger");
+	ps_hand_trigger = gensym("hand_trigger");
+	ps_buttons = gensym("buttons");
+	ps_thumbstick = gensym("thumbstick");
 
 	// init OVR SDK
 	result = ovr_Initialize(NULL);
