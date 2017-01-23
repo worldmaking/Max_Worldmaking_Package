@@ -646,6 +646,16 @@ public:
 						atom_setfloat(a + 2, q.z);
 						atom_setfloat(a + 3, q.w);
 						outlet_anything(outlet_tracking, _jit_sym_quat, 4, a);
+
+						atom_setfloat(a + 0, trackedDevicePose.vVelocity.v[0]);
+						atom_setfloat(a + 1, trackedDevicePose.vVelocity.v[1]);
+						atom_setfloat(a + 2, trackedDevicePose.vVelocity.v[2]);
+						outlet_anything(outlet_tracking, ps_velocity, 3, a);
+
+						atom_setfloat(a + 0, trackedDevicePose.vAngularVelocity.v[0]);
+						atom_setfloat(a + 1, trackedDevicePose.vAngularVelocity.v[1]);
+						atom_setfloat(a + 2, trackedDevicePose.vAngularVelocity.v[2]);
+						outlet_anything(outlet_tracking, ps_angular_velocity, 3, a);
 					}
 				} break;
 				case vr::TrackedDeviceClass_Controller: {
