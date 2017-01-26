@@ -12,8 +12,12 @@
 
 #include "al_max.h"
 
+extern "C" {
 
-void al_cv_findchessboard_main();
-void al_cv_calibratecamera_main();
+	C74_EXPORT void al_cv_findchessboard_main();
+	C74_EXPORT void al_cv_calibratecamera_main();
+	C74_EXPORT void al_cv_solvepnp_main();
+
+}
 
 #endif

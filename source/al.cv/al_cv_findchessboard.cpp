@@ -85,6 +85,7 @@ public:
 	void jit_matrix(t_symbol * name) {
 		t_jit_matrix_info in_info;
 		char * in_bp;
+		t_atom a[1];
 
 		void * in_mat = jit_object_findregistered(name);
 
@@ -139,8 +140,11 @@ public:
 		// restore matrix lock state:
 		jit_object_method(in_mat, _jit_sym_lock, in_savelock);
 
+		atom_setlong(a, found);
+		outlet_anything(outlet_msg, gensym("found"), 1, a);
+
 		if (!found) {
-			object_warn(&ob, "chessboard not found");
+			//object_warn(&ob, "chessboard not found");
 			return;
 		}
 
@@ -148,7 +152,7 @@ public:
 			object_warn(&ob, "chessboard size mismatch");
 			return;
 		}
-
+		
 
 		// refine:
 		cv::cornerSubPix(src, corners, cv::Size(11, 11), cv::Size(-1, -1), cv::TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 30, 0.1));
@@ -212,7 +216,7 @@ void *findchessboard_new(t_symbol *s, long argc, t_atom *argv)
 	t_findchessboard *x = NULL;
 	if (x = (t_findchessboard *)object_alloc(maxclass)) {
 
-		x->outlet_msg = outlet_new(x, 0);
+		x->outlet_msg = outlet_new(x, "found");
 		x->outlet_corners = outlet_new(x, "jit_matrix");
 
 		// initialize in-place:

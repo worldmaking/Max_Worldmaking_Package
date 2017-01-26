@@ -11,4 +11,5 @@ void ext_main(void *r)
 
 	al_cv_findchessboard_main();
 	al_cv_calibratecamera_main();
+	al_cv_solvepnp_main();
 }

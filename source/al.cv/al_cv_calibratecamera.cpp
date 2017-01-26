@@ -10,11 +10,7 @@ public:
 
 	// outlets:
 	void * outlet_msg;
-	//void * outlet_tvec;
-	//void * outlet_rvec;
-	void * outlet_tangential;
-	void * outlet_radial;
-	void * outlet_intrinsic;
+	void * outlet_calibration;
 
 	// attributes
 	int image_size[2];
@@ -63,11 +59,7 @@ public:
 
 		// add a general purpose outlet (rightmost)
 		outlet_msg = outlet_new(this, 0);
-		//outlet_tvec = listout(this);
-		//outlet_rvec = listout(this);
-		outlet_tangential = listout(this);
-		outlet_radial = listout(this);
-		outlet_intrinsic = listout(this);
+		outlet_calibration = outlet_new(this, 0);
 
 		// add a proxy inlet:
 		proxy = proxy_new(this, 1, &proxy_inlet_num);
@@ -200,51 +192,9 @@ public:
 		atom_setfloat(a, reprojection_error);
 		outlet_anything(outlet_msg, gensym("reprojection_error"), 1, a);
 
-		/*
-		cv::Mat& tvec = tvecs[tvecs.size() - 1];
-		if (invert_extrinsics) {
-			atom_setfloat(a, -tvec.at<double>(0));
-			atom_setfloat(a + 1, -tvec.at<double>(1));
-			atom_setfloat(a + 2, -tvec.at<double>(2));
-		}
-		else {
-			atom_setfloat(a, tvec.at<double>(0));
-			atom_setfloat(a + 1, tvec.at<double>(1));
-			atom_setfloat(a + 2, tvec.at<double>(2));
-		}
-		outlet_list(outlet_tvec, 0, 3, a);
 
-		cv::Mat& rvec = rvecs[rvecs.size() - 1];
-		// http://docs.opencv.org/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#void Rodrigues(InputArray src, OutputArray dst, OutputArray jacobian)
-		if (rodrigues) {
-			atom_setfloat(a, rvec.at<double>(0));
-			atom_setfloat(a + 1, rvec.at<double>(1));
-			atom_setfloat(a + 2, rvec.at<double>(2));
-			outlet_list(outlet_rvec, 0, 3, a);
-		}
-		else {
-			cv::Mat dst(3, 3, CV_64F, rotation);
-
-			if (invert_extrinsics) {
-				cv::Mat tmp(3, 3, CV_64F);
-				cv::Rodrigues(rvec, tmp);
-				dst = tmp.inv();
-			}
-			else {
-				cv::Rodrigues(rvec, dst);
-			}
-			atom_setdouble_array(9, a, 9, rotation);
-			outlet_list(outlet_rvec, 0, 9, a);
-		}*/
-
-		atom_setfloat(a, distortion[2]);
-		atom_setfloat(a + 1, distortion[3]);
-		outlet_list(outlet_tangential, 0, 2, a);
-
-		atom_setfloat(a, distortion[0]);
-		atom_setfloat(a + 1, distortion[1]);
-		atom_setfloat(a + 2, distortion[4]);
-		outlet_list(outlet_radial, 0, 3, a);
+		for (int i=0; i<5; i++) atom_setfloat(a + i, distortion[i]);
+		outlet_anything(outlet_calibration, gensym("distortion"), 5, a);
 
 		//atom_setdouble_array(9, a, 9, intrinsic);
 		for (int i = 0, y = 0; y<3; y++) {
@@ -252,7 +202,7 @@ public:
 				atom_setfloat(a + i, cvIntrinsic.at<double>(y, x));
 			}
 		}
-		outlet_list(outlet_intrinsic, 0, 9, a);
+		outlet_anything(outlet_calibration, gensym("intrinsic"), 9, a);
 	}
 
 	void image_points(t_symbol * name, void * in_mat) {
