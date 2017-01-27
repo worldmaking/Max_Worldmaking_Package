@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 120.0, 148.0, 868.0, 729.0 ],
+		"rect" : [ 120.0, 148.0, 682.0, 729.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -38,12 +38,79 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-27",
+					"linecount" : 3,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 419.0, 28.0, 224.0, 48.0 ],
+					"presentation_rect" : [ 366.0, 58.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "Using OpenCV to locate a chessboard image (of predefined size) within an image. Useful for camera calibration."
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"fontface" : 2,
+					"fontsize" : 24.0,
+					"id" : "obj-15",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 37.0, 13.0, 289.0, 34.0 ],
+					"style" : "",
+					"text" : "al.findchessboard"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-12",
+					"maxclass" : "toggle",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "int" ],
+					"parameter_enable" : 0,
+					"patching_rect" : [ 356.0, 418.521484, 24.0, 24.0 ],
+					"style" : ""
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-8",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 2,
+					"outlettype" : [ "", "" ],
+					"patching_rect" : [ 356.0, 391.0, 71.0, 22.0 ],
+					"style" : "",
+					"text" : "route found"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-5",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 401.5, 350.0, 82.0, 22.0 ],
+					"style" : "",
+					"text" : "found 1"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-22",
 					"linecount" : 4,
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 369.0, 618.0, 224.0, 62.0 ],
+					"patching_rect" : [ 366.0, 653.0, 224.0, 62.0 ],
 					"style" : "",
 					"text" : "output is 2-plane matrix whose dimensions match the chessboard size. values are (sub-)pixel indices of the chessboard inner corners."
 				}
@@ -55,7 +122,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 177.0, 177.0, 224.0, 20.0 ],
+					"patching_rect" : [ 177.0, 188.0, 224.0, 20.0 ],
 					"style" : "",
 					"text" : "source should be 4-plane char matrix"
 				}
@@ -80,7 +147,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 290.0, 209.0, 226.0, 34.0 ],
+					"patching_rect" : [ 290.0, 222.0, 226.0, 34.0 ],
 					"style" : "",
 					"text" : "size of chessboard pattern to match (no. of inner corners, not no. of squares!)"
 				}
@@ -95,22 +162,8 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 137.0, 209.0, 151.0, 20.0 ],
+					"patching_rect" : [ 137.0, 222.0, 151.0, 20.0 ],
 					"style" : ""
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"fontsize" : 10.0,
-					"id" : "obj-9",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 388.0, 404.521484, 52.0, 20.0 ],
-					"style" : "",
-					"text" : "loadbang"
 				}
 
 			}
@@ -122,7 +175,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "jit_matrix", "" ],
-					"patching_rect" : [ 37.0, 177.0, 138.0, 20.0 ],
+					"patching_rect" : [ 37.0, 188.0, 138.0, 20.0 ],
 					"style" : "",
 					"text" : "jit.matrix chessboard_source"
 				}
@@ -180,9 +233,9 @@
 									"numinlets" : 2,
 									"numoutlets" : 1,
 									"outlettype" : [ "bang" ],
-									"patching_rect" : [ 50.0, 100.0, 71.0, 22.0 ],
+									"patching_rect" : [ 50.0, 93.0, 71.0, 22.0 ],
 									"style" : "",
-									"text" : "qmetro 500"
+									"text" : "qmetro 100"
 								}
 
 							}
@@ -1056,7 +1109,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
-					"patching_rect" : [ 37.0, 451.5, 320.0, 240.0 ]
+					"patching_rect" : [ 37.0, 474.5, 320.0, 240.0 ]
 				}
 
 			}
@@ -1151,7 +1204,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 388.0, 428.5, 109.0, 20.0 ],
+					"patching_rect" : [ 381.0, 463.5, 109.0, 20.0 ],
 					"style" : "",
 					"text" : "colwidth 100, plane -1"
 				}
@@ -1169,7 +1222,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 4,
 					"outlettype" : [ "list", "", "", "" ],
-					"patching_rect" : [ 369.0, 455.0, 281.0, 150.0 ],
+					"patching_rect" : [ 362.0, 490.0, 281.0, 150.0 ],
 					"rows" : 6
 				}
 
@@ -1181,7 +1234,7 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 2,
-					"outlettype" : [ "jit_matrix", "" ],
+					"outlettype" : [ "jit_matrix", "found" ],
 					"patching_rect" : [ 109.0, 350.0, 266.0, 31.0 ],
 					"style" : "",
 					"text" : "al.findchessboard @size 9 6"
@@ -1250,6 +1303,7 @@
 					"destination" : [ "obj-2", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
+					"midpoints" : [ 118.5, 453.0, 371.5, 453.0 ],
 					"source" : [ "obj-1", 0 ]
 				}
 
@@ -1260,6 +1314,24 @@
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-1", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-5", 1 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-1", 1 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-8", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-1", 1 ]
 				}
 
 			}
@@ -1436,10 +1508,10 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-7", 0 ],
+					"destination" : [ "obj-12", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"source" : [ "obj-9", 0 ]
+					"source" : [ "obj-8", 0 ]
 				}
 
 			}

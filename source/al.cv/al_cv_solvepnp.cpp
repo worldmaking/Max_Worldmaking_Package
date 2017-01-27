@@ -41,10 +41,9 @@ public:
 
 	// outlets:
 	void * outlet_msg;
-	void * outlet_rvec;
-	void * outlet_tvec;
 
 	void * outlet_camera;
+	void * outlet_object;
 	//void * outlet_tangential;
 	//void * outlet_radial;
 	//void * outlet_intrinsic;
@@ -85,9 +84,8 @@ public:
 
 		// add a general purpose outlet (rightmost)
 		outlet_msg = outlet_new(this, 0);
-		outlet_rvec = listout(this);
-		outlet_tvec = listout(this);
 		outlet_camera = outlet_new(this, 0);
+		outlet_object = outlet_new(this, 0);
 
 		// add a proxy inlet:
 		proxy = proxy_new(this, 1, &proxy_inlet_num);
@@ -125,8 +123,6 @@ public:
 			return;
 		}
 
-
-		
 		bool result;
 		if (ransac) {
 			
@@ -141,53 +137,15 @@ public:
 			return;
 		}
 
+		// now convert rvec and tvec from OpenCV to OpenGL conventions
 
-		/*
-		cv::Mat& tvec = tvecs[tvecs.size() - 1];
-		if (invert_extrinsics) {
-		atom_setfloat(a, -tvec.at<double>(0));
-		atom_setfloat(a + 1, -tvec.at<double>(1));
-		atom_setfloat(a + 2, -tvec.at<double>(2));
-		}
-		else {
-		atom_setfloat(a, tvec.at<double>(0));
-		atom_setfloat(a + 1, tvec.at<double>(1));
-		atom_setfloat(a + 2, tvec.at<double>(2));
-		}
-		outlet_list(outlet_tvec, 0, 3, a);
-
-		cv::Mat& rvec = rvecs[rvecs.size() - 1];
-		// http://docs.opencv.org/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#void Rodrigues(InputArray src, OutputArray dst, OutputArray jacobian)
-		if (rodrigues) {
-		atom_setfloat(a, rvec.at<double>(0));
-		atom_setfloat(a + 1, rvec.at<double>(1));
-		atom_setfloat(a + 2, rvec.at<double>(2));
-		outlet_list(outlet_rvec, 0, 3, a);
-		}
-		else {
-		cv::Mat dst(3, 3, CV_64F, rotation);
-
-		if (invert_extrinsics) {
-		cv::Mat tmp(3, 3, CV_64F);
-		cv::Rodrigues(rvec, tmp);
-		dst = tmp.inv();
-		}
-		else {
-		cv::Rodrigues(rvec, dst);
-		}
-		atom_setdouble_array(9, a, 9, rotation);
-		outlet_list(outlet_rvec, 0, 9, a);
-		}*/
-
-		// axis flip from OpenCV to glm:
+		// position: axis flip from OpenCV to glm:
 		glm::vec3 pos(tvec.at<double>(0), -tvec.at<double>(1), -tvec.at<double>(2));
 
-		// convert the Rodrigues vector rvec into a 3x3 rotation matrix
+		// rotation: first convert the Rodrigues vector rvec into a 3x3 rotation matrix
 		cv::Mat rmat(3, 3, CV_32F);
 		cv::Rodrigues(rvec, rmat);
-
-		// transpose because opencv uses row-major and glm is column-major
-		// and axis flip from opencv to glm
+		// then transpose (because opencv uses row-major and glm is column-major) and axis flip from opencv to glm
 		rotation = glm::mat3(
 			rmat.at<double>(0, 0),
 			-rmat.at<double>(1, 0),
@@ -200,19 +158,36 @@ public:
 			-rmat.at<double>(2, 2)
 		);
 		glm::quat q = glm::normalize(glm::quat_cast(rotation));
-		// hack because of the different cv/glm coordinate systems
+		// then hack because of the different cv/glm coordinate systems
 		// (TODO: figure out how to fix that when instancing the rotation matrix above)
 		q = glm::quat(-q.x, q.w, q.z, -q.y);
 
+		// pos and q are the pose of the object in camera space:
+		atom_setfloat(a + 0, q.x);
+		atom_setfloat(a + 1, q.y);
+		atom_setfloat(a + 2, q.z);
+		atom_setfloat(a + 3, q.w);
+		outlet_anything(outlet_object, _jit_sym_quat, 4, a);
+		atom_setfloat(a, pos.x);
+		atom_setfloat(a + 1, pos.y);
+		atom_setfloat(a + 2, pos.z);
+		outlet_anything(outlet_object, _jit_sym_position, 3, a);
 
-		// output the quaternion (in Jitter XYZW format)
+
+		// invert quat:
+		q = glm::inverse(q);
 		atom_setfloat(a + 0, q.x);
 		atom_setfloat(a + 1, q.y);
 		atom_setfloat(a + 2, q.z);
 		atom_setfloat(a + 3, q.w);
 		outlet_anything(outlet_camera, _jit_sym_quat, 4, a);
 
-		// output the position
+		// invert position:
+		pos = -pos;
+		// and rotate by quat:
+		pos = quat_rotate(q, pos);
+
+		// now also compute the camera pose in object-space
 		atom_setfloat(a, pos.x);
 		atom_setfloat(a + 1, pos.y);
 		atom_setfloat(a + 2, pos.z);
@@ -364,19 +339,10 @@ void solvepnp_assist(t_solvepnp *x, void *b, long m, long a, char *s) {
 	else {	// outlet
 		switch (a) {
 		case 0:
-			sprintf(s, "camera intrinsic matrix (list)");
+			sprintf(s, "position, quat of object in camera space");
 			break;
 		case 1:
-			sprintf(s, "camera radial lens distortion coefficients k1, k2, k3 (list)");
-			break;
-		case 2:
-			sprintf(s, "camera tangential lens distortion coefficients p1, p2 (list)");
-			break;
-		case 3:
-			sprintf(s, "camera extrinsic rotation (list)");
-			break;
-		case 4:
-			sprintf(s, "camera extrinsic translation x,y,z (list)");
+			sprintf(s, "position, quat of camera in object space");
 			break;
 		default:
 			sprintf(s, "general messages");

@@ -1,0 +1,3 @@
+max oblist "worldmaking" al.findchessboard;
+max oblist "worldmaking" al.calibratecamera;
+max oblist "worldmaking" al.solvepnp;
