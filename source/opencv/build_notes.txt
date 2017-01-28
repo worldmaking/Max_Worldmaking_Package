@@ -1,0 +1,39 @@
+build notes
+
+see https://putuyuwono.wordpress.com/2015/04/23/building-and-installing-opencv-3-0-on-windows-7-64-bit
+
+Set source to E:\opencv-3.2\source\opencv
+Set build to E:\opencv-3.2\build
+
+File > Delete Cache
+
+Configure:
+	Visual Studio 2015 x64
+	Default native compilers
+
+Set OPENCV_EXTRA_MODULES_PATH = E:/opencv-3.2/source/opencv_contrib/modules
+
+Configure again.
+
+//Enable BUILD_OPENCV_CONTRIB_WORLD
+//Enable BUILD_OPENCV_WORLD
+
+Configure again.
+
+
+
+Set any other options to try, e.g.:
+
+
+	BUILD_SHARED_LIBS=0
+	Disable: Build_docs, build tests
+	//Enable: WITH_OPENGL
+
+Configure again.
+
+Generate.
+
+Open E:\opencv-3.2\build\Opencv.sln
+
+Switch to Release x64
+Build target CMakeTargets:INSTALL

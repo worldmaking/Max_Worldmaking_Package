@@ -1,6 +1,9 @@
 #ifndef al_max_h
 #define al_max_h
 
+// see https://cycling74.com/forums/topic/error-126-loading-external/#.WIvJXhsrKHs
+#define MAXAPI_USE_MSCRT
+
 // a bunch of likely Max includes:
 extern "C" {
 #include "ext.h"

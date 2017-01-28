@@ -5,7 +5,7 @@
 			"major" : 7,
 			"minor" : 3,
 			"revision" : 1,
-			"architecture" : "x64",
+			"architecture" : "x86",
 			"modernui" : 1
 		}
 ,
@@ -44,7 +44,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 476.5, 438.0, 144.0, 75.0 ],
-					"presentation_rect" : [ 476.5, 436.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "to calibrate (and to use solvePnP) we need to know the object-space corresponding points for each chessboard point."
 				}
@@ -113,7 +112,7 @@
 							"major" : 7,
 							"minor" : 3,
 							"revision" : 1,
-							"architecture" : "x64",
+							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
@@ -197,7 +196,7 @@
 											"major" : 7,
 											"minor" : 3,
 											"revision" : 1,
-											"architecture" : "x64",
+											"architecture" : "x86",
 											"modernui" : 1
 										}
 ,
@@ -708,7 +707,7 @@
 											"major" : 7,
 											"minor" : 3,
 											"revision" : 1,
-											"architecture" : "x64",
+											"architecture" : "x86",
 											"modernui" : 1
 										}
 ,
@@ -1387,7 +1386,7 @@
 							"major" : 7,
 							"minor" : 3,
 							"revision" : 1,
-							"architecture" : "x64",
+							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
@@ -1470,7 +1469,7 @@
 											"major" : 7,
 											"minor" : 3,
 											"revision" : 1,
-											"architecture" : "x64",
+											"architecture" : "x86",
 											"modernui" : 1
 										}
 ,
@@ -1799,7 +1798,7 @@
 							"major" : 7,
 							"minor" : 3,
 							"revision" : 1,
-							"architecture" : "x64",
+							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
@@ -1893,7 +1892,7 @@
 											"major" : 7,
 											"minor" : 3,
 											"revision" : 1,
-											"architecture" : "x64",
+											"architecture" : "x86",
 											"modernui" : 1
 										}
 ,
@@ -2480,7 +2479,7 @@
 							"major" : 7,
 							"minor" : 3,
 							"revision" : 1,
-							"architecture" : "x64",
+							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
@@ -2538,7 +2537,7 @@
 											"major" : 7,
 											"minor" : 3,
 											"revision" : 1,
-											"architecture" : "x64",
+											"architecture" : "x86",
 											"modernui" : 1
 										}
 ,
@@ -3784,7 +3783,7 @@
 													"destination" : [ "obj-50", 0 ],
 													"disabled" : 0,
 													"hidden" : 0,
-													"midpoints" : [ 736.000006, 251.0, 336.5, 251.0 ],
+													"midpoints" : [ 736.0, 251.0, 336.5, 251.0 ],
 													"source" : [ "obj-9", 4 ]
 												}
 
@@ -4459,7 +4458,7 @@
 							"major" : 7,
 							"minor" : 3,
 							"revision" : 1,
-							"architecture" : "x64",
+							"architecture" : "x86",
 							"modernui" : 1
 						}
 ,
@@ -4594,7 +4593,7 @@
 											"major" : 7,
 											"minor" : 3,
 											"revision" : 1,
-											"architecture" : "x64",
+											"architecture" : "x86",
 											"modernui" : 1
 										}
 ,
@@ -5609,16 +5608,16 @@
 			}
  ],
 		"dependency_cache" : [ 			{
-				"name" : "al.cv.mxe64",
-				"type" : "mx64"
+				"name" : "al.cv.mxe",
+				"type" : "iLaF"
 			}
 , 			{
-				"name" : "al.cv.mxe64",
-				"type" : "mx64"
+				"name" : "al.cv.mxe",
+				"type" : "iLaF"
 			}
 , 			{
-				"name" : "al.cv.mxe64",
-				"type" : "mx64"
+				"name" : "al.cv.mxe",
+				"type" : "iLaF"
 			}
  ],
 		"autosave" : 0
