@@ -25,6 +25,7 @@ public:
 		
 		code_string = string_new("#include <stddef.h> \n #include <stdarg.h> \n extern \"C\" void object_post(void *x, char *s, ...); \n extern \"C\" int test(int i) { object_post(0, \"input: %i\", i); return -i; }");
 
+
 	}
 	
 	~Compile() {
@@ -166,35 +167,39 @@ void ext_main(void *r)
 {
 	t_class *c;
 	
-	{
+	common_symbols_init();
+
+	if (system_header_path == 0) {
 		// want to know the containing path
 		char filename[MAX_FILENAME_CHARS];
 		char folderpath[MAX_FILENAME_CHARS];
 		char systempath[MAX_FILENAME_CHARS];
 		short outvol;
 		t_fourcc outtype;
-		t_fourcc filetypelist[3]; // iLaX, xdll, mx64
-		// find self as external:
-		strncpy_zero(filename, "compile", MAX_FILENAME_CHARS);
-		filetypelist[0] = FOUR_CHAR_CODE('iLaX');
-		filetypelist[1] = FOUR_CHAR_CODE('xdll');
-		filetypelist[2] = FOUR_CHAR_CODE('mx64');
-		short result = locatefile_extended(filename,&outvol,&outtype,filetypelist,3);
+#ifdef WIN_VERSION
+		strncpy_zero(filename, "compile.mxe", MAX_FILENAME_CHARS);
+#else
+		strncpy_zero(filename, "compile.mxo", MAX_FILENAME_CHARS);
+#endif
+
+		//t_fourcc filetypelist[3];
+		//filetypelist[0] = FOUR_CHAR_CODE('iLaX');
+		//filetypelist[1] = FOUR_CHAR_CODE('iLaF');
+		//filetypelist[2] = FOUR_CHAR_CODE('mx64');
+		//short result = locatefile_extended(filename, &outvol, &outtype, filetypelist, 3);
+
+		short result = locatefile_extended(filename, &outvol, &outtype, NULL, 0);
 		if (result == 0
 			&& path_toabsolutesystempath(outvol, "../include", folderpath) == 0
 			&& path_nameconform(folderpath, systempath, PATH_STYLE_SLASH, PATH_TYPE_BOOT) == 0) {
-			
-			post("find %i %s\n", (int)result, systempath);
-			
+
 			system_header_path = gensym(systempath);
-		} else {
+		}
+		else {
 			object_error(0, "failed to locate system headers");
 			return;
 		}
 	}
-
-	
-	common_symbols_init();
 	
 	c = class_new("compile", (method)compile_new, (method)compile_free, (long)sizeof(Compile),
 				  0L /* leave NULL!! */, A_GIMME, 0);
