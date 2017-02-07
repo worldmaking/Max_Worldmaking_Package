@@ -38,6 +38,19 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-9",
+					"linecount" : 6,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 296.0, 275.0, 246.0, 89.0 ],
+					"style" : "",
+					"text" : "Working:\n- C/C++ sources, defines, include paths, pushing symbols\n\nNot working:\n- C++ standard lib, linking external dlls"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-2",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
@@ -174,8 +187,8 @@
 			}
  ],
 		"dependency_cache" : [ 			{
-				"name" : "compile.mxo",
-				"type" : "iLaX"
+				"name" : "compile.mxe",
+				"type" : "iLaF"
 			}
  ],
 		"autosave" : 0
