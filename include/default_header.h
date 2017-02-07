@@ -9,6 +9,8 @@
 extern "C" {
 
 	void object_post(void *, char *, ...);
+	void object_warn(void *, char *, ...);
+	void object_error(void *, char *, ...);
 
 }
 

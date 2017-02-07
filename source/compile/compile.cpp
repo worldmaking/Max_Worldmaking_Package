@@ -67,6 +67,7 @@ public:
 			object_method(clang, gensym("define"), gensym("__STDC_CONSTANT_MACROS"));
 #ifdef WIN_VERSION
 			object_method(clang, gensym("define"), gensym("WIN_VERSION"));
+			object_method(clang, gensym("define"), gensym("_MSC_VER"));
 #endif
 #ifdef MAC_VERSION
 			object_method(clang, gensym("define"), gensym("MAC_VERSION"));
@@ -199,6 +200,8 @@ void ext_main(void *r)
 			&& path_nameconform(folderpath, systempath, PATH_STYLE_SLASH, PATH_TYPE_BOOT) == 0) {
 
 			system_header_path = gensym(systempath);
+
+			post("%s", system_header_path->s_name);
 		}
 		else {
 			object_error(0, "failed to locate system headers");
