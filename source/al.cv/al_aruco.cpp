@@ -27,7 +27,7 @@ public:
 	double intrinsic[9];
 	double distortion[5];
 	float markersize;
-
+	t_atom_long sought_id;
 
 	int			size[2];
 	int			fast_check, adaptive_thresh, normalize_image, filter_quads;
@@ -52,11 +52,12 @@ public:
 
 		outlet_msg = outlet_new(&ob, 0);
 		outlet_img = outlet_new(&ob, "jit_matrix");
-		outlet_corners = listout(&ob);
+		outlet_corners = outlet_new(&ob, 0);
 
 		// TODO: support other dictionaries
 		dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_ARUCO_ORIGINAL);
 		markersize = 0.05;
+		sought_id = -1;
 
 		fast_check = 1;
 		adaptive_thresh = 1;
@@ -221,57 +222,101 @@ public:
 			std::vector< cv::Vec3d > rvecs, tvecs;
 			cv::aruco::estimatePoseSingleMarkers(markerCorners, markersize, cvIntrinsic, cvDistortion, rvecs, tvecs);
 
+			std::vector<glm::vec3> points;
+
 			// draw axis for each marker
 			for (int i = 0; i < rvecs.size(); i++) {
+				int id = markerIds[i];
+
+				if (sought_id < 0 || id == sought_id) {
 
 
-				// ok so let's try outputting these poses.
-				cv::Vec3d& rvec = rvecs[i];
-				cv::Vec3d& tvec = tvecs[i];
-
-				// position: axis flip from OpenCV to glm:
-				glm::vec3 pos(tvec[0], -tvec[1], -tvec[2]);
-
-				// rotation: first convert the Rodrigues vector rvec into a 3x3 rotation matrix
-				cv::Mat rmat(3, 3, CV_32F);
-				cv::Rodrigues(rvec, rmat);
-				// then transpose (because opencv uses row-major and glm is column-major) and axis flip from opencv to glm
-				glm::mat3 rotation(
-					rmat.at<double>(0, 0),
-					-rmat.at<double>(1, 0),
-					-rmat.at<double>(2, 0),
-					rmat.at<double>(0, 1),
-					-rmat.at<double>(1, 1),
-					-rmat.at<double>(2, 1),
-					rmat.at<double>(0, 2),
-					-rmat.at<double>(1, 2),
-					-rmat.at<double>(2, 2)
-				);
-				glm::quat q = glm::normalize(glm::quat_cast(rotation));
-				
-				atom_setlong(a, i);
-				outlet_anything(outlet_msg, _jit_sym_cell, 1, a);
 
 
-				atom_setlong(a, markerIds[i]);
-				outlet_anything(outlet_msg, _sym_name, 1, a);
+					// ok so let's try outputting these poses.
+					cv::Vec3d& rvec = rvecs[i];
+					cv::Vec3d& tvec = tvecs[i];
 
-				// pos and q are the pose of the object in camera space:
-				atom_setfloat(a + 0, q.x);
-				atom_setfloat(a + 1, q.y);
-				atom_setfloat(a + 2, q.z);
-				atom_setfloat(a + 3, q.w);
-				outlet_anything(outlet_corners, _jit_sym_quat, 4, a);
+					// position: axis flip from OpenCV to glm:
+					glm::vec3 pos(tvec[0], -tvec[1], -tvec[2]);
 
-				atom_setfloat(a, pos.x);
-				atom_setfloat(a + 1, pos.y);
-				atom_setfloat(a + 2, pos.z);
-				outlet_anything(outlet_corners, _jit_sym_position, 3, a);
+					// rotation: first convert the Rodrigues vector rvec into a 3x3 rotation matrix
+					cv::Mat rmat(3, 3, CV_32F);
+					cv::Rodrigues(rvec, rmat);
+					// then transpose (because opencv uses row-major and glm is column-major) and axis flip from opencv to glm
+					glm::mat3 rotation(
+						rmat.at<double>(0, 0),
+						-rmat.at<double>(1, 0),
+						-rmat.at<double>(2, 0),
+						rmat.at<double>(0, 1),
+						-rmat.at<double>(1, 1),
+						-rmat.at<double>(2, 1),
+						rmat.at<double>(0, 2),
+						-rmat.at<double>(1, 2),
+						-rmat.at<double>(2, 2)
+					);
+					glm::quat q = glm::normalize(glm::quat_cast(rotation));
 
-				// TODO: add inverse for equivalent camera pose, as in solvePnP
+					atom_setlong(a, i);
+					outlet_anything(outlet_msg, _jit_sym_cell, 1, a);
+
+
+					atom_setlong(a, id);
+					outlet_anything(outlet_msg, _sym_name, 1, a);
+
+					// pos and q are the pose of the object in camera space:
+					atom_setfloat(a + 0, q.x);
+					atom_setfloat(a + 1, q.y);
+					atom_setfloat(a + 2, q.z);
+					atom_setfloat(a + 3, q.w);
+					outlet_anything(outlet_corners, _jit_sym_quat, 4, a);
+
+					atom_setfloat(a, pos.x);
+					atom_setfloat(a + 1, pos.y);
+					atom_setfloat(a + 2, pos.z);
+					outlet_anything(outlet_corners, _jit_sym_position, 3, a);
+
+					// TODO: add inverse for equivalent camera pose, as in solvePnP
+
+					points.push_back(pos);
+				}
 			}
 
+			if (points.size() > 2) {
+				cv::Mat_<double> cldm(points.size(), 3);
+				for (unsigned int i = 0; i < points.size(); i++) {
+					cldm.row(i)(0) = points[i].x;
+					cldm.row(i)(1) = points[i].y;
+					cldm.row(i)(2) = points[i].z;
+				}
 
+				
+				cv::Mat_<double> mean;
+				cv::PCA pca(cldm, mean, CV_PCA_DATA_AS_ROW);
+
+				if (pca.eigenvalues.rows > 2) {
+
+					post("evs %i %i", pca.eigenvalues.rows, pca.eigenvalues.cols);
+
+					double p_to_plane_thresh = pca.eigenvalues.at<double>(2);
+					int num_inliers = 0;
+					cv::Vec3d nrm = pca.eigenvectors.row(2);
+					nrm = nrm / norm(nrm);
+					cv::Vec3d x0 = pca.mean;
+
+					for (int i = 0; i < points.size(); i++) {
+
+						cv::Vec3d p(points[i].x, points[i].y, points[i].z);
+
+						cv::Vec3d w = p - x0;
+						double D = fabs(nrm.dot(w));
+						if (D < p_to_plane_thresh) num_inliers++;
+					}
+
+					post("inliers: %i", num_inliers);
+					
+				}
+			}
 
 		}
 		catch (std::exception &ex) {
@@ -373,6 +418,7 @@ void al_cv_aruco_main() {
 	CLASS_ATTR_DOUBLE_ARRAY(maxclass, "intrinsic", 0, t_aruco, intrinsic, 9);
 
 	CLASS_ATTR_FLOAT(maxclass, "markersize", 0, t_aruco, markersize);
+	CLASS_ATTR_LONG(maxclass, "sought_id", 0, t_aruco, sought_id);
 
 	class_register(CLASS_BOX, maxclass);
 }
