@@ -1,7 +1,10 @@
 #include "al_max.h"
 
+#define MULTILINE(...) #__VA_ARGS__
+
 static t_class * max_class = 0;
 
+t_symbol * system_header_path = 0;
 
 
 class Compile {
@@ -9,7 +12,7 @@ public:
 	
 	typedef int (*testfun_t)(int);
 	
-	t_object ob; // max objExamplet, must be first!
+	t_object ob;
 	
 	void * outlet_result;
 	
@@ -20,16 +23,20 @@ public:
 	Compile() {
 		outlet_result = outlet_new(&ob, 0);
 		
-		code_string = string_new("#include <stddef.h> \n object_post(0, __VA_ARGS__) \n extern \"C\" int test(int i) { return -i; }");
-
+		code_string = string_new("#include <stddef.h> \n #include <stdarg.h> \n extern \"C\" void object_post(void *x, char *s, ...); \n extern \"C\" int test(int i) { object_post(0, \"input: %i\", i); return -i; }");
 
 	}
 	
 	~Compile() {
 		
-		if (code_string) object_free(code_string);
-		if (clang) object_release(clang);
-
+		if (code_string) {
+			object_free(code_string);
+			code_string = NULL;
+		}
+		if (clang) {
+			object_release(clang);
+			clang = NULL;
+		}
 	}
 	
 	void test(t_atom_long i) {
@@ -37,15 +44,20 @@ public:
 		clang = (t_object *)object_new(CLASS_NOBOX, gensym("clang"), gensym("ctest"));
 
 
-		if (clang != NULL) {
+		if (code_string != NULL && clang != NULL) {
+			
+			post("compile %s", code_string->s_text);
+			
 			// set C or C++
 			object_attr_setlong(clang, gensym("cpp"), 1);
+			
 
 			// add include paths:
 			//		object_method(clang, gensym("include"), gensym("path/to/include"));
-			//		object_method(clang, gensym("system_include"), gensym("path/to/include")); // for <includes>
 			
-
+			// add path to the Clang standard headers:
+			object_method(clang, gensym("system_include"), system_header_path);
+			
 			// define macros:
 #ifdef WIN_VERSION
 			object_method(clang, gensym("define"), gensym("WIN_VERSION"));
@@ -153,6 +165,34 @@ void compile_assist(Compile *x, void *b, long m, long a, char *s)
 void ext_main(void *r)
 {
 	t_class *c;
+	
+	{
+		// want to know the containing path
+		char filename[MAX_FILENAME_CHARS];
+		char folderpath[MAX_FILENAME_CHARS];
+		char systempath[MAX_FILENAME_CHARS];
+		short outvol;
+		t_fourcc outtype;
+		t_fourcc filetypelist[3]; // iLaX, xdll, mx64
+		// find self as external:
+		strncpy_zero(filename, "compile", MAX_FILENAME_CHARS);
+		filetypelist[0] = FOUR_CHAR_CODE('iLaX');
+		filetypelist[1] = FOUR_CHAR_CODE('xdll');
+		filetypelist[2] = FOUR_CHAR_CODE('mx64');
+		short result = locatefile_extended(filename,&outvol,&outtype,filetypelist,3);
+		if (result == 0
+			&& path_toabsolutesystempath(outvol, "../include", folderpath) == 0
+			&& path_nameconform(folderpath, systempath, PATH_STYLE_SLASH, PATH_TYPE_BOOT) == 0) {
+			
+			post("find %i %s\n", (int)result, systempath);
+			
+			system_header_path = gensym(systempath);
+		} else {
+			object_error(0, "failed to locate system headers");
+			return;
+		}
+	}
+
 	
 	common_symbols_init();
 	
