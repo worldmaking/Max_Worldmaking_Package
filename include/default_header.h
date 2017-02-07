@@ -4,8 +4,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <float.h>
-#include <stdint.h>
-#include <limits.h>
+//#include <stdint.h>
 
 extern "C" {
 

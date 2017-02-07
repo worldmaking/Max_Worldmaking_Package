@@ -181,13 +181,10 @@ void ext_main(void *r)
 		char systempath[MAX_FILENAME_CHARS];
 		short outvol;
 		t_fourcc outtype;
-		char * include_path;
 #ifdef WIN_VERSION
 		strncpy_zero(filename, "compile.mxe", MAX_FILENAME_CHARS);
-		include_path = "../include_win";
 #else
 		strncpy_zero(filename, "compile.mxo", MAX_FILENAME_CHARS);
-		include_path = "../include";
 #endif
 
 		//t_fourcc filetypelist[3];
@@ -198,7 +195,7 @@ void ext_main(void *r)
 
 		short result = locatefile_extended(filename, &outvol, &outtype, NULL, 0);
 		if (result == 0
-			&& path_toabsolutesystempath(outvol, include_path, folderpath) == 0
+			&& path_toabsolutesystempath(outvol, "../include", folderpath) == 0
 			&& path_nameconform(folderpath, systempath, PATH_STYLE_SLASH, PATH_TYPE_BOOT) == 0) {
 
 			system_header_path = gensym(systempath);
