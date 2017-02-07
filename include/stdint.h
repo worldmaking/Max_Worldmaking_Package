@@ -28,10 +28,10 @@
 /* If we're hosted, fall back to the system's stdint.h, which might have
  * additional definitions.
  */
-#if __STDC_HOSTED__ && \
-    defined(__has_include_next) && __has_include_next(<stdint.h>)
-# include_next <stdint.h>
-#else
+//#if __STDC_HOSTED__ && \
+//    defined(__has_include_next) && __has_include_next(<stdint.h>)
+//# include_next <stdint.h>
+//#else
 
 /* C99 7.18.1.1 Exact-width integer types.
  * C99 7.18.1.2 Minimum-width integer types.
@@ -650,5 +650,5 @@ typedef __UINTMAX_TYPE__ uintmax_t;
 #define INTMAX_C(v)   __INTN_C(__INTMAX_WIDTH__, v)
 #define UINTMAX_C(v) __UINTN_C(__INTMAX_WIDTH__, v)
 
-#endif /* __STDC_HOSTED__ */
+//#endif /* __STDC_HOSTED__ */
 #endif /* __CLANG_STDINT_H */
