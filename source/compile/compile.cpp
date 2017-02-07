@@ -6,6 +6,12 @@ static t_class * max_class = 0;
 
 t_symbol * system_header_path = 0;
 
+const char * standard_header = ""
+"#include <stddef.h> \n"
+"#include <stdarg.h> \n"
+"extern \"C\" void object_post(void *x, char *s, ...); \n"
+"";
+
 
 class Compile {
 public:
@@ -23,7 +29,8 @@ public:
 	Compile() {
 		outlet_result = outlet_new(&ob, 0);
 		
-		code_string = string_new("#include <stddef.h> \n #include <stdarg.h> \n extern \"C\" void object_post(void *x, char *s, ...); \n extern \"C\" int test(int i) { object_post(0, \"input: %i\", i); return -i; }");
+		code_string = string_new(standard_header);
+		string_append(code_string, "extern \"C\" int test(int i) { object_post(0, \"input: %i\", i); return -i; } \n");
 
 
 	}
@@ -47,7 +54,7 @@ public:
 
 		if (code_string != NULL && clang != NULL) {
 			
-			post("compile %s", code_string->s_text);
+			//post("compile %s", code_string->s_text);
 			
 			// set C or C++
 			object_attr_setlong(clang, gensym("cpp"), 1);
