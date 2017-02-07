@@ -6,11 +6,7 @@ static t_class * max_class = 0;
 
 t_symbol * system_header_path = 0;
 
-const char * standard_header = ""
-"#include <stddef.h> \n"
-"#include <stdarg.h> \n"
-"extern \"C\" void object_post(void *x, char *s, ...); \n"
-"";
+const char * standard_header = "#include <default_header.h> \n";
 
 
 class Compile {
@@ -54,7 +50,7 @@ public:
 
 		if (code_string != NULL && clang != NULL) {
 			
-			//post("compile %s", code_string->s_text);
+			post("compile %s", code_string->s_text);
 			
 			// set C or C++
 			object_attr_setlong(clang, gensym("cpp"), 1);
@@ -67,6 +63,8 @@ public:
 			object_method(clang, gensym("system_include"), system_header_path);
 			
 			// define macros:
+			object_method(clang, gensym("define"), gensym("__STDC_LIMIT_MACROS"));
+			object_method(clang, gensym("define"), gensym("__STDC_CONSTANT_MACROS"));
 #ifdef WIN_VERSION
 			object_method(clang, gensym("define"), gensym("WIN_VERSION"));
 #endif
@@ -183,10 +181,13 @@ void ext_main(void *r)
 		char systempath[MAX_FILENAME_CHARS];
 		short outvol;
 		t_fourcc outtype;
+		char * include_path;
 #ifdef WIN_VERSION
 		strncpy_zero(filename, "compile.mxe", MAX_FILENAME_CHARS);
+		include_path = "../include_win";
 #else
 		strncpy_zero(filename, "compile.mxo", MAX_FILENAME_CHARS);
+		include_path = "../include";
 #endif
 
 		//t_fourcc filetypelist[3];
@@ -197,7 +198,7 @@ void ext_main(void *r)
 
 		short result = locatefile_extended(filename, &outvol, &outtype, NULL, 0);
 		if (result == 0
-			&& path_toabsolutesystempath(outvol, "../include", folderpath) == 0
+			&& path_toabsolutesystempath(outvol, include_path, folderpath) == 0
 			&& path_nameconform(folderpath, systempath, PATH_STYLE_SLASH, PATH_TYPE_BOOT) == 0) {
 
 			system_header_path = gensym(systempath);
