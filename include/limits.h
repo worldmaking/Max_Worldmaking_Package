@@ -33,10 +33,10 @@
 
 /* System headers include a number of constants from POSIX in <limits.h>.
    Include it if we're hosted. */
-#if __STDC_HOSTED__ && \
-    defined(__has_include_next) && __has_include_next(<limits.h>)
-#include_next <limits.h>
-#endif
+//#if __STDC_HOSTED__ && \
+ //   defined(__has_include_next) && __has_include_next(<limits.h>)
+//#include_next <limits.h>
+//#endif
 
 /* Many system headers try to "help us out" by defining these.  No really, we
    know how big each datatype is. */

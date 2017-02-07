@@ -63,8 +63,8 @@ public:
 			object_method(clang, gensym("system_include"), system_header_path);
 			
 			// define macros:
-			object_method(clang, gensym("define"), gensym("__STDC_LIMIT_MACROS"));
-			object_method(clang, gensym("define"), gensym("__STDC_CONSTANT_MACROS"));
+			//object_method(clang, gensym("define"), gensym("__STDC_LIMIT_MACROS"));
+			//object_method(clang, gensym("define"), gensym("__STDC_CONSTANT_MACROS"));
 #ifdef WIN_VERSION
 			object_method(clang, gensym("define"), gensym("WIN_VERSION"));
 			object_method(clang, gensym("define"), gensym("_MSC_VER"));

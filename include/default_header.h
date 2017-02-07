@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <float.h>
 #include <stdint.h>
+#include <limits.h>
 
 extern "C" {
 
