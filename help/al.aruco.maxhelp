@@ -38,12 +38,24 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-21",
+					"maxclass" : "newobj",
+					"numinlets" : 3,
+					"numoutlets" : 3,
+					"outlettype" : [ "", "", "" ],
+					"patching_rect" : [ 33.5, 490.0, 135.0, 22.0 ],
+					"style" : "",
+					"text" : "routepass position quat"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-18",
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 651.5, 139.0, 161.0, 20.0 ],
-					"presentation_rect" : [ 665.5, 139.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "A source image to look for"
 				}
@@ -57,7 +69,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 300.5, 433.0, 295.0, 34.0 ],
-					"presentation_rect" : [ 214.5, 388.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "Normally this requires camera calibration. Defaults match the default  jit.gl.camera / jit.world combo."
 				}
@@ -842,7 +853,7 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 3,
-					"outlettype" : [ "list", "jit_matrix", "" ],
+					"outlettype" : [ "", "jit_matrix", "" ],
 					"patching_rect" : [ 33.5, 444.0, 161.5, 31.0 ],
 					"style" : "",
 					"text" : "al.aruco"
@@ -1398,10 +1409,10 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-27", 0 ],
+					"destination" : [ "obj-21", 0 ],
 					"disabled" : 0,
 					"hidden" : 0,
-					"source" : [ "obj-1", 0 ]
+					"source" : [ "obj-1", 2 ]
 				}
 
 			}
@@ -1483,6 +1494,24 @@
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-20", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-27", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-21", 1 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-27", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-21", 0 ]
 				}
 
 			}
