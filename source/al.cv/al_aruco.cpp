@@ -269,20 +269,51 @@ public:
 					atom_setfloat(a + 1, q.y);
 					atom_setfloat(a + 2, q.z);
 					atom_setfloat(a + 3, q.w);
-					outlet_anything(outlet_corners, _jit_sym_quat, 4, a);
+					outlet_anything(outlet_msg, _jit_sym_quat, 4, a);
 
 					atom_setfloat(a, pos.x);
 					atom_setfloat(a + 1, pos.y);
 					atom_setfloat(a + 2, pos.z);
-					outlet_anything(outlet_corners, _jit_sym_position, 3, a);
+					outlet_anything(outlet_msg, _jit_sym_position, 3, a);
 
 					// TODO: add inverse for equivalent camera pose, as in solvePnP
 
-					points.push_back(pos);
+
+					// add this to the points:
+
+					// actually, since we have estimated the pose, we can add corner points:
+					glm::vec3 vx = quat_ux(q) * (markersize * 0.5f);
+					glm::vec3 vy = quat_uy(q) * (markersize * 0.5f);
+
+					points.push_back(pos + vx + vy);
+					points.push_back(pos - vx + vy);
+					points.push_back(pos + vx - vy);
+					points.push_back(pos - vx - vy);
 				}
 			}
 
 			if (points.size() > 2) {
+
+
+				// dump out all the points:
+
+				for (int i = 0; i < points.size(); i++) {
+					atom_setfloat(a + 0, points[i].x);
+					atom_setfloat(a + 1, points[i].y);
+					atom_setfloat(a + 2, points[i].z);
+					outlet_anything(outlet_corners, _jit_sym_position, 3, a);
+				}
+
+
+
+
+
+
+
+
+
+
+
 				cv::Mat_<double> cldm(points.size(), 3);
 				for (unsigned int i = 0; i < points.size(); i++) {
 					cldm.row(i)(0) = points[i].x;
@@ -296,7 +327,7 @@ public:
 
 				if (pca.eigenvalues.rows > 2) {
 
-					post("evs %i %i", pca.eigenvalues.rows, pca.eigenvalues.cols);
+					//post("evs %i %i", pca.eigenvalues.rows, pca.eigenvalues.cols);
 
 					double p_to_plane_thresh = pca.eigenvalues.at<double>(2);
 					int num_inliers = 0;
@@ -313,7 +344,7 @@ public:
 						if (D < p_to_plane_thresh) num_inliers++;
 					}
 
-					post("inliers: %i", num_inliers);
+					//post("inliers: %i", num_inliers);
 					
 				}
 			}
