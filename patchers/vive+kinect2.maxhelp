@@ -5229,7 +5229,7 @@
 							"modernui" : 1
 						}
 ,
-						"rect" : [ 636.0, 270.0, 844.0, 670.0 ],
+						"rect" : [ -973.0, 214.0, 844.0, 670.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
 						"default_fontsize" : 12.0,
@@ -5309,9 +5309,9 @@
 									"numinlets" : 1,
 									"numoutlets" : 2,
 									"outlettype" : [ "jit_gl_texture", "" ],
-									"patching_rect" : [ 84.785713, 372.0, 173.0, 22.0 ],
+									"patching_rect" : [ 84.785713, 372.0, 137.0, 22.0 ],
 									"style" : "",
-									"text" : "jit.gl.texture vive_world @flip 0"
+									"text" : "jit.gl.texture vive @flip 0"
 								}
 
 							}
