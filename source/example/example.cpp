@@ -1,16 +1,4 @@
-// a bunch of likely Max includes:
-extern "C" {
-#include "ext.h"
-#include "ext_obex.h"
-#include "ext_dictionary.h"
-#include "ext_dictobj.h"
-#include "ext_systhread.h"
-	
-#include "z_dsp.h"
-	
-#include "jit.common.h"
-#include "jit.gl.h"
-}
+#include "al_max.h"
 
 #include <new> // for in-place constructor
 

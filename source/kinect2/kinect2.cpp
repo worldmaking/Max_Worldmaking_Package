@@ -58,10 +58,44 @@ struct jitmat {
 
 	~jitmat() {
 		//if (mat) object_release(mat);
+		//if (back) delete[] back;
 	}
 
 	void init(int planecount, t_symbol * type, int width, int height) {
 		w = width;
+		h = height;
+		dim = vec2(w, h);
+
+		t_jit_matrix_info info;
+		jit_matrix_info_default(&info);
+		mat = (t_object *)jit_object_new(_jit_sym_jit_matrix, &info);
+		if (!mat) {
+			post("failed to allocate matrix");
+			return;
+		}
+
+		jit_object_method(mat, _jit_sym_getinfo, &info);
+
+		info.planecount = planecount;
+		info.type = type; 
+		info.dimcount = 2;
+		info.dim[0] = w;
+		info.dim[1] = h;
+		info.dimstride[0] = sizeof(celltype);
+		info.dimstride[1] = info.dimstride[0] * dim[0];
+		info.size = info.dimstride[1] * info.dim[1];
+		info.flags = JIT_MATRIX_DATA_REFERENCE | JIT_MATRIX_DATA_PACK_TIGHT;// | JIT_MATRIX_DATA_FLAGS_USE;
+		jit_object_method(mat, gensym("freedata"));
+		jit_object_method(mat, _jit_sym_setinfo_ex, &info);  //?
+
+		back = (celltype *)malloc(w * h * sizeof(celltype)); // new celltype[planecount * w * h];
+		jit_object_method(mat, _jit_sym_data, back);
+
+		sym = jit_symbol_unique();
+		mat = (t_object *)jit_object_method(mat, _jit_sym_register, sym);
+		atom_setsym(name, sym);
+		
+		/*w = width;
 		h = height;
 		t_jit_matrix_info info;
 		jit_matrix_info_default(&info);
@@ -79,7 +113,7 @@ struct jitmat {
 		mat = (t_object *)jit_object_method(mat, _jit_sym_register, sym);
 		atom_setsym(name, sym);
 
-		dim = vec2(w, h);
+		dim = vec2(w, h);*/
 	}
 
 	celltype read_clamp(int x, int y) {
@@ -135,31 +169,39 @@ public:
 	t_object ob; // max objkinectt, must be first!
 	// outlets:
 	void *		outlet_cloud;
+	void *		outlet_uv;
 	void *		outlet_rgb;
 	void *		outlet_depth;
+	void *		outlet_mesh;
 	void *		outlet_player;
 	void *		outlet_skeleton;
 	void *		outlet_msg;
 
 
-	jitmat<char> player_mat;
+	jitmat<ARGB> rgb_mat;
+	jitmat<uint32_t> depth_mat;
 	jitmat<vec3> cloud_mat;
+	jitmat<vec2> uv_mat; // texture coordinates to get RGB for each cloud coordinate
+	jitmat<uint32_t> index_mat; // indices for stitched matrix
+
 	jitmat<vec2> rectify_mat, tmp_mat;
 	jitmat<vec3> skel_mat;
-	jitmat<uint32_t> depth_mat;
-	jitmat<ARGB> rgb_mat;
+	jitmat<char> player_mat;
 	int hasColorMap;
 	int capturing;
-	int new_depth_data, new_rgb_data;
+	int new_depth_data, new_rgb_data, new_cloud_data, new_uv_data, new_indices_data;
 	t_systhread capture_thread;
 	t_systhread_mutex depth_mutex;
 	IKinectSensor * device;
-	// Color reader
-	IColorFrameReader*      m_pColorFrameReader;
-	RGBQUAD * rgb_buffer;
+
+	// multi reader
+	IMultiSourceFrameReader* m_reader;   // Kinect data source
+	ICoordinateMapper* m_mapper;         // Converts between depth, color, and 3d coordinates
+	RGBQUAD * m_rgb_buffer;
 
 	// attrs
-	int unique, usecolor, align_depth_to_color, uselock;
+	int stitch;
+	int unique, usecolor, usedepth, align_depth_to_color, uselock;
 	int player, skeleton, seated, near_mode, audio, high_quality_color;
 	int skeleton_smoothing;
 	int device_count;
@@ -176,20 +218,35 @@ public:
 		outlet_msg = outlet_new(&ob, 0);
 		outlet_skeleton = outlet_new(&ob, 0);
 		outlet_player = outlet_new(&ob, "jit_matrix");
-		outlet_rgb = outlet_new(&ob, "jit_matrix");
+		outlet_mesh = outlet_new(&ob, NULL);
 		outlet_depth = outlet_new(&ob, "jit_matrix");
+		outlet_rgb = outlet_new(&ob, "jit_matrix");
+		outlet_uv = outlet_new(&ob, "jit_matrix");
 		outlet_cloud = outlet_new(&ob, "jit_matrix");
 
 		depth_mat.init(1, _jit_sym_long, cDepthWidth, cDepthHeight);
+		cloud_mat.init(3, _jit_sym_float32, cDepthWidth, cDepthHeight);
+		uv_mat.init(2, _jit_sym_float32, cDepthWidth, cDepthHeight);
 		rgb_mat.init(4, _jit_sym_char, cColorWidth, cColorHeight);
 
-		device = 0;
+		index_mat.init(1, _jit_sym_long, (cDepthWidth * cDepthHeight) * 6, 1);
+
 		usecolor = 1;
+		usedepth = 1;
 		unique = 1;
+		stitch = 1;
+
+
+		device = 0;
+		new_depth_data = new_rgb_data = new_cloud_data = new_uv_data = new_indices_data = 0;
+		m_reader = nullptr;
+		m_mapper = nullptr;
+		m_rgb_buffer = new RGBQUAD[cColorWidth * cColorHeight];
 	}
 
 	~kinect2() {
 		close();
+		if (m_rgb_buffer) delete[] m_rgb_buffer;
 	}
 
 	void open(t_symbol *s, long argc, t_atom * argv) {
@@ -208,6 +265,7 @@ public:
 			error("Kinect for Windows could not initialize.");
 			return;
 		}
+		device->get_CoordinateMapper(&m_mapper);
 
 		hasColorMap = 0;
 		long priority = 10; // maybe increase?
@@ -230,128 +288,162 @@ public:
 	void run() {
 		if (!device) return;
 
-		// Initialize the Kinect and get the color reader
-		IColorFrameSource* pColorFrameSource = NULL;
-
 		HRESULT hr = device->Open();
-
-		post("device opened");
-
-		if (SUCCEEDED(hr))
-		{
-			hr = device->get_ColorFrameSource(&pColorFrameSource);
+		if (!SUCCEEDED(hr)) {
+			object_error(&ob, "failed to open device");
+			return;
 		}
 
-		if (SUCCEEDED(hr))
-		{
-			hr = pColorFrameSource->OpenReader(&m_pColorFrameReader);
-		}
+		device->OpenMultiSourceFrameReader(
+			FrameSourceTypes::FrameSourceTypes_Depth | FrameSourceTypes::FrameSourceTypes_Color,
+			&m_reader);
+		
 		capturing = 1;
-		post("starting processing");
 		while (capturing) {
-
-			if (usecolor) processColor();
-			//processDepth();
-			//if (skeleton) pollSkeleton();
+			getKinectData();
 		}
-		post("finished processing");
-
-		SafeRelease(pColorFrameSource);
+		SafeRelease(m_reader);
 	}
 
-	void processColor() {
-		if (!device) return;
-		if (!m_pColorFrameReader) return;
-		
-		IColorFrame* pColorFrame = NULL;
-		HRESULT hr = m_pColorFrameReader->AcquireLatestFrame(&pColorFrame);
-		if (SUCCEEDED(hr)) {
-			INT64 nTime = 0;
-			IFrameDescription* pFrameDescription = NULL;
-			int nWidth = 0;
-			int nHeight = 0;
-			ColorImageFormat imageFormat = ColorImageFormat_None;
-			UINT nBufferSize = 0;
-			RGBQUAD *src = NULL;
+	void getKinectData() {
+		IMultiSourceFrame* frame = nullptr;
+		IDepthFrame* depthframe = nullptr;
+		IDepthFrameReference* depthframeref = nullptr;
+		IColorFrame* colorframe = nullptr;
+		IColorFrameReference* colorframeref = nullptr;
+		HRESULT hr = m_reader->AcquireLatestFrame(&frame);
+		if (FAILED(hr)) return;
 
-			hr = pColorFrame->get_RelativeTime(&nTime);
+		if (usecolor && SUCCEEDED(frame->get_ColorFrameReference(&colorframeref)) && SUCCEEDED(colorframeref->AcquireFrame(&colorframe))) {
+			static const int nCells = cColorWidth * cColorHeight;
+			RGBQUAD *src = m_rgb_buffer;
+			HRESULT hr = colorframe->CopyConvertedFrameDataToArray(nCells * sizeof(RGBQUAD), reinterpret_cast<BYTE*>(src), ColorImageFormat_Bgra);
 			if (SUCCEEDED(hr)) {
-				hr = pColorFrame->get_FrameDescription(&pFrameDescription);
-			}
-			if (SUCCEEDED(hr)) {
-				hr = pFrameDescription->get_Width(&nWidth);
-			}
-			if (SUCCEEDED(hr)) {
-				hr = pFrameDescription->get_Height(&nHeight);
-			}
-			if (SUCCEEDED(hr)) {
-				hr = pColorFrame->get_RawColorImageFormat(&imageFormat);
-			}
-
-			if (imageFormat != ColorImageFormat_Bgra)
-			{
-				if (!rgb_buffer) {
-					rgb_buffer = new RGBQUAD[nWidth * nHeight];
-				}
-
-				//post("image format %d", imageFormat);
-				//error("not brga");
-				nBufferSize = nWidth * nHeight * sizeof(RGBQUAD);
-				hr = pColorFrame->CopyConvertedFrameDataToArray(nBufferSize, reinterpret_cast<BYTE*>(rgb_buffer), ColorImageFormat_Rgba);
-				if (FAILED(hr)) {
-					error("failed to convert image");
-					return;
-				}
-
-				src = rgb_buffer;
-			}
-
-
-			hr = pColorFrame->AccessRawUnderlyingBuffer(&nBufferSize, reinterpret_cast<BYTE**>(&src));
-			ARGB * dst = (ARGB *)rgb_mat.back;
-			int cells = nWidth * nHeight;
-
-			if (1) { //align_depth_to_color) {
-				for (int i = 0; i < cells; ++i) {
+				ARGB * dst = (ARGB *)rgb_mat.back;
+				for (int i = 0; i < nCells; ++i) {
 					dst[i].r = src[i].rgbRed;
 					dst[i].g = src[i].rgbGreen;
 					dst[i].b = src[i].rgbBlue;
+					dst[i].a = 1.f;
 				}
+				new_rgb_data = 1;
 			}
-			else {
-				/*
-				// align color to depth:
-				//std::fill(dst, dst + cells, RGB(0, 0, 0));
-				for (int i = 0; i < cells; ++i) {
-					int c = colorCoordinates[i * 2];
-					int r = colorCoordinates[i * 2 + 1];
-					if (c >= 0 && c < KINECT_DEPTH_WIDTH
-						&& r >= 0 && r < KINECT_DEPTH_HEIGHT) {
-						// valid location: depth value:
-						int idx = r*KINECT_DEPTH_WIDTH + c;
-						dst[i].r = src[idx].r;
-						dst[i].g = src[idx].g;
-						dst[i].b = src[idx].b;
-					}
-				}*/
-			}
-
-			new_rgb_data = 1;
-
 		}
 
+		if (usedepth && SUCCEEDED(frame->get_DepthFrameReference(&depthframeref)) && SUCCEEDED(depthframeref->AcquireFrame(&depthframe))) {
+
+			INT64 relativeTime = 0;
+			depthframe->get_RelativeTime(&relativeTime);
+
+			/*
+			if (SUCCEEDED(frame->get_FrameDescription(&frameDescription))) {
+				frameDescription->get_HorizontalFieldOfView(&this->horizontalFieldOfView));
+				frameDescription->get_VerticalFieldOfView(&this->verticalFieldOfView));
+				frameDescription->get_DiagonalFieldOfView(&this->diagonalFieldOfView));
+			}
+			*/
+
+			UINT capacity;
+			UINT16 * src;
+			hr = depthframe->AccessUnderlyingBuffer(&capacity, &src);
+			if (SUCCEEDED(hr)) {
+				uint32_t * dst = (uint32_t *)depth_mat.back;
+				for (UINT i = 0; i < capacity; i++) dst[i] = src[i];
+				new_depth_data = 1; 
+
+				hr = m_mapper->MapDepthFrameToCameraSpace(
+					cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
+					cDepthWidth*cDepthHeight, (CameraSpacePoint *)cloud_mat.back); // Output CameraSpacePoint array and size
+				if (SUCCEEDED(hr)) {
+					new_cloud_data = 1;
+				
+					if (usecolor) {
+						// TODO dim or dim-1? add 0.5 for center of pixel?
+						vec2 uvscale = vec2(1.f / cColorWidth, 1.f / cColorHeight);
+						// iterate the points to get UVs
+						for (UINT i = 0, y = 0; y < cDepthHeight; y++) {
+							for (UINT x = 0; x < cDepthWidth; x++, i++) {
+								DepthSpacePoint dp = { (float)x, (float)y };
+								vec2 uvpt;
+								m_mapper->MapDepthPointToColorSpace(dp, src[i], (ColorSpacePoint *)(&uvpt));
+								uv_mat.back[i] = uvpt * uvscale;
+							}
+						}
+						new_uv_data = 1;
+					}
+
+					if (stitch > 0) {
+						int steps = MIN(stitch, cDepthHeight/2);
+						float facesMaxLength = steps * 0.1f;
+						vec3 * vertices = cloud_mat.back;
+						uint32_t * indices = index_mat.back;
+						int count = 0;
+						// maybe this couldbe faster?
+						for (int j = 0; j < cDepthHeight - steps; j += steps) {
+							for (int i = 0; i < cDepthWidth - steps; i += steps) {
+								auto topLeft = cDepthWidth * j + i;
+								auto topRight = topLeft + steps;
+								auto bottomLeft = topLeft + cDepthWidth * steps;
+								auto bottomRight = bottomLeft + steps;
+
+								const vec3 & vTL = vertices[topLeft];
+								const vec3 & vTR = vertices[topRight];
+								const vec3 & vBL = vertices[bottomLeft];
+								const vec3 & vBR = vertices[bottomRight];
+
+								//upper left triangle
+								if (vTL.z > 0 && vTR.z > 0 && vBL.z > 0
+									&& abs(vTL.z - vTR.z) < facesMaxLength
+									&& abs(vTL.z - vBL.z) < facesMaxLength) {
+									*indices++ = topLeft;
+									*indices++ = bottomLeft;
+									*indices++ = topRight;
+									count += 3;
+								}
+
+								//bottom right triangle
+								if (vBR.z > 0 && vTR.z > 0 && vBL.z > 0
+									&& abs(vBR.z - vTR.z) < facesMaxLength
+									&& abs(vBR.z - vBL.z) < facesMaxLength) {
+									*indices++ = topRight;
+									*indices++ = bottomRight;
+									*indices++ = bottomLeft;
+									count += 3;
+								}
+							}
+						}
+
+						// somehow update matrix
+						if (count >= 6) {
+							// pretend that the output matrix has changed size (even though the underlying pointer is the same)
+							t_jit_matrix_info index_info;
+							jit_object_method(index_mat.mat, _jit_sym_getinfo, &index_info);
+							index_info.dim[0] = count;
+							index_info.dimstride[1] = index_info.dimstride[0] * count;
+							jit_object_method(index_mat.mat, _jit_sym_setinfo_ex, &index_info);
+
+							new_indices_data = 1;
+						}
+					}
+				}
+			}
+		}
 		
+		SafeRelease(colorframe);
+		SafeRelease(depthframe);
+		SafeRelease(colorframeref);
+		SafeRelease(depthframeref);
 	}
 
 	void close() {
-		// done with color frame reader
-		SafeRelease(m_pColorFrameReader);
-		// close the Kinect Sensor
-		if (device)
-		{
+		if (capturing) {
+			capturing = 0;
+			unsigned int retval;
+			systhread_join(capture_thread, &retval);
+		}
+		if (device) {
 			device->Close();
 			SafeRelease(device);
-			device = 0;
 		}
 	}
 
@@ -361,15 +453,31 @@ public:
 			outlet_anything(outlet_rgb, _jit_sym_jit_matrix, 1, rgb_mat.name);
 			new_rgb_data = 0;
 		}
-		if (new_depth_data || unique == 0) {
-			//if (skeleton) outputSkeleton();
-			if (player) outlet_anything(outlet_player, _jit_sym_jit_matrix, 1, player_mat.name);
-			if (uselock) systhread_mutex_lock(depth_mutex);
-			//outlet_anything(outlet_depth, _jit_sym_jit_matrix, 1, depth_mat.name);
-			//outlet_anything(outlet_cloud, _jit_sym_jit_matrix, 1, cloud_mat.name);
-			if (uselock) systhread_mutex_unlock(depth_mutex);
-			new_depth_data = 0;
+
+		//if (skeleton) outputSkeleton();
+		//if (player) outlet_anything(outlet_player, _jit_sym_jit_matrix, 1, player_mat.name);
+		if (usedepth) {
+			if (new_depth_data || unique == 0) {
+				//if (uselock) systhread_mutex_lock(depth_mutex);
+				outlet_anything(outlet_depth, _jit_sym_jit_matrix, 1, depth_mat.name);
+				//if (uselock) systhread_mutex_unlock(depth_mutex);
+				new_depth_data = 0;
+			}
+			if (new_uv_data || unique == 0) {
+				outlet_anything(outlet_uv, _jit_sym_jit_matrix, 1, uv_mat.name);
+				new_uv_data = 0;
+			}
+			if (new_indices_data || unique == 0) {
+				outlet_anything(outlet_mesh, _jit_sym_jit_matrix, 1, index_mat.name);
+				new_indices_data = 0;
+			}
+			if (new_cloud_data || unique == 0) {
+				outlet_anything(outlet_cloud, _jit_sym_jit_matrix, 1, cloud_mat.name);
+				new_cloud_data = 0;
+			}
+
 		}
+
 	}
 };
 
@@ -419,6 +527,11 @@ void ext_main(void *r)
 	class_addmethod(c, (method)kinect_open, "open", A_GIMME, 0);
 	class_addmethod(c, (method)kinect_bang, "bang", 0);
 	class_addmethod(c, (method)kinect_close, "close", 0);
+
+	CLASS_ATTR_LONG(c, "usedepth", 0, kinect2, usedepth);
+	CLASS_ATTR_LONG(c, "usecolor", 0, kinect2, usecolor);
+
+	CLASS_ATTR_LONG(c, "stitch", 0, kinect2, stitch);
 
 	class_register(CLASS_BOX, c);
 	max_class = c;
