@@ -121,7 +121,6 @@ struct jitmat {
 // The OpenVR SDK:
 #include "openvr.h"
 
-
 using glm::vec2;
 using glm::vec3;
 using glm::vec4;
@@ -714,7 +713,8 @@ public:
 							}
 
 							vr::VRControllerState_t cs;
-							mHMD->GetControllerState(i, &cs);
+							//OpenVR SDK 1.0.4 adds a 3rd arg for size
+							mHMD->GetControllerState(i, &cs, sizeof(cs));
 
 							atom_setlong(a + 0, (cs.ulButtonTouched & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Trigger)) != 0);
 							atom_setfloat(a + 1, cs.rAxis[1].x);
@@ -901,7 +901,8 @@ public:
 
 		
 		vr::EVRCompositorError err;
-		vr::Texture_t vrTexture = { (void*)inFBOtex, vr::API_OpenGL, vr::ColorSpace_Gamma }; 
+		//GraphicsAPIConvention enum was renamed to TextureType in OpenVR SDK 1.0.5
+		vr::Texture_t vrTexture = { (void*)inFBOtex, vr::TextureType_OpenGL, vr::ColorSpace_Gamma }; 
 
 		vr::VRTextureBounds_t leftBounds = { 0.f, 0.f, 0.5f, 1.f };
 		vr::VRTextureBounds_t rightBounds = { 0.5f, 0.f, 1.f, 1.f };
