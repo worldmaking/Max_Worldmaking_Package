@@ -749,6 +749,40 @@ public:
 				case vr::TrackedDeviceClass_GenericTracker:
 				{
 					if (trackedDevicePose.bPoseIsValid) {
+
+						//Figure out which tracker it is using some kind of unique identifier
+						vr::ETrackedPropertyError err = vr::TrackedProp_Success;
+						char buf[32];
+						uint32_t unPropLen = vr::VRSystem()->GetStringTrackedDeviceProperty(i, vr::Prop_SerialNumber_String, buf, sizeof(buf), &err);
+						//Append the UID onto the data header going into Max
+						if (err == vr::TrackedProp_Success)
+						{
+							char* result;
+							result = (char*)calloc(strlen("tracker_velocity_") + strlen(buf) + 1, sizeof(char));
+							strcpy(result, "tracker_velocity_");
+							strcat(result, buf);
+							trk_velocity = gensym(result);
+							free(result);
+
+							result = (char*)calloc(strlen("tracker_angular_velocity_") + strlen(buf) + 1, sizeof(char));
+							strcpy(result, "tracker_angular_velocity_");
+							strcat(result, buf);
+							trk_angular_velocity = gensym(result);
+							free(result);
+
+							result = (char*)calloc(strlen("tracker_tracked_position_") + strlen(buf) + 1, sizeof(char));
+							strcpy(result, "tracker_tracked_position_");
+							strcat(result, buf);
+							trk_tracked_position = gensym(result);
+							free(result);
+
+							result = (char*)calloc(strlen("tracker_tracked_quat_") + strlen(buf) + 1, sizeof(char));
+							strcpy(result, "tracker_tracked_quat_");
+							strcat(result, buf);
+							trk_tracked_quat = gensym(result);
+							free(result);
+						}
+
 						mat4& tracked_pose = mDevicePose[i];
 						glm::mat4 world_pose = modelview_mat * tracked_pose;
 
@@ -1430,11 +1464,6 @@ void ext_main(void *r)
 	ps_tracked_position = gensym("tracked_position");
 	ps_tracked_quat = gensym("tracked_quat");
 
-	trk_velocity = gensym("tracker_velocity");
-	trk_angular_velocity = gensym("tracker_angular_velocity");
-
-	trk_tracked_position = gensym("tracker_tracked_position");
-	trk_tracked_quat = gensym("tracker_tracked_quat");
 	// init
 
 	quittask_install((method)htcvive_quit, NULL);

@@ -171,6 +171,7 @@
 						"tags" : "",
 						"style" : "",
 						"subpatcher_template" : "",
+						"visible" : 1,
 						"boxes" : [ 							{
 								"box" : 								{
 									"id" : "obj-1",
@@ -520,7 +521,7 @@
 											"modernui" : 1
 										}
 ,
-										"rect" : [ 34.0, 77.0, 1372.0, 749.0 ],
+										"rect" : [ 42.0, 85.0, 1372.0, 749.0 ],
 										"bglocked" : 0,
 										"openinpresentation" : 0,
 										"default_fontsize" : 12.0,
@@ -547,6 +548,7 @@
 										"tags" : "",
 										"style" : "",
 										"subpatcher_template" : "",
+										"visible" : 1,
 										"boxes" : [ 											{
 												"box" : 												{
 													"id" : "obj-200",
@@ -1569,9 +1571,9 @@
 													"numinlets" : 11,
 													"numoutlets" : 11,
 													"outlettype" : [ "", "", "", "", "", "", "", "", "", "", "" ],
-													"patching_rect" : [ 39.0, 50.0, 2048.0, 22.0 ],
+													"patching_rect" : [ 39.0, 50.0, 1248.0, 22.0 ],
 													"style" : "",
-													"text" : "route tracked_quat tracked_position quat position velocity angular_velocity tracker_tracked_quat tracker_tracked_position tracker_velocity tracker_angular_velocity"
+													"text" : "route tracked_quat tracked_position quat position velocity angular_velocity tracker_tracked_quat_LHR-0DC3551A tracker_tracked_position_LHR-0DC3551A tracker_velocity_LHR-0DC3551A tracker_angular_velocity_LHR-0DC3551A"
 												}
 
 											}
@@ -3425,7 +3427,7 @@
 													"destination" : [ "obj-146", 0 ],
 													"disabled" : 0,
 													"hidden" : 0,
-													"midpoints" : [ 251.399994, 80.75, 273.25, 80.75 ],
+													"midpoints" : [ 171.399994, 80.75, 273.25, 80.75 ],
 													"source" : [ "obj-144", 1 ]
 												}
 
@@ -3445,7 +3447,7 @@
 													"destination" : [ "obj-166", 0 ],
 													"disabled" : 0,
 													"hidden" : 0,
-													"midpoints" : [ 1063.0, 84.0, 1058.25, 84.0 ],
+													"midpoints" : [ 663.0, 84.0, 1058.25, 84.0 ],
 													"source" : [ "obj-144", 5 ]
 												}
 
@@ -3455,7 +3457,7 @@
 													"destination" : [ "obj-17", 0 ],
 													"disabled" : 0,
 													"hidden" : 0,
-													"midpoints" : [ 657.200012, 75.0, 692.25, 75.0 ],
+													"midpoints" : [ 417.200012, 75.0, 692.25, 75.0 ],
 													"source" : [ "obj-144", 3 ]
 												}
 
@@ -3465,7 +3467,7 @@
 													"destination" : [ "obj-170", 0 ],
 													"disabled" : 0,
 													"hidden" : 0,
-													"midpoints" : [ 860.099976, 84.0, 879.75, 84.0 ],
+													"midpoints" : [ 540.099976, 84.0, 879.75, 84.0 ],
 													"source" : [ "obj-144", 4 ]
 												}
 
@@ -3493,7 +3495,7 @@
 													"destination" : [ "obj-19", 0 ],
 													"disabled" : 0,
 													"hidden" : 0,
-													"midpoints" : [ 454.299988, 75.0, 467.5, 75.0 ],
+													"midpoints" : [ 294.299988, 75.0, 467.5, 75.0 ],
 													"source" : [ "obj-144", 2 ]
 												}
 
