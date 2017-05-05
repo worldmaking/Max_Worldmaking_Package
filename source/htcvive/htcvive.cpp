@@ -908,10 +908,42 @@ public:
 		vr::VRTextureBounds_t rightBounds = { 0.5f, 0.f, 1.f, 1.f };
 
 		err = vr::VRCompositor()->Submit(vr::Eye_Left, &vrTexture, &leftBounds);
-		if (err != 0) object_error(&ob, "submit error");
+		switch (err) {
+		case 0:
+			break;
+		case 1:
+			object_error(&ob, "submit error: Request failed.");
+			break;
+		case 100:
+			object_error(&ob, "submit error: Incompatible version.");
+			break;
+		case 101:
+			object_error(&ob, "submit error: Do not have focus.");
+			break;
+		case 102:
+			object_error(&ob, "submit error: Invalid texture.");
+			break;
+		case 103:
+			object_error(&ob, "submit error: Is not scene application.");
+			break;
+		case 104:
+			object_error(&ob, "submit error: Texture is on wrong device.");
+			break;
+		case 105:
+			object_error(&ob, "submit error: Texture uses unsupported format.");
+			break;
+		case 106:
+			object_error(&ob, "submit error: Shared textures not supported.");
+			break;
+		case 107:
+			object_error(&ob, "submit error: Index out of range.");
+			break;
+		case 108:
+			object_error(&ob, "submit error: Already submitted.");
+			break;
+		}
 
 		err = vr::VRCompositor()->Submit(vr::Eye_Right, &vrTexture, &rightBounds);
-		if (err != 0) object_error(&ob, "submit error");
 
 		//glBindTexture(GL_TEXTURE_2D, 0);
 
