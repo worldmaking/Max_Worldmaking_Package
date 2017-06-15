@@ -1,5 +1,8 @@
 #include "al_max.h"
 
+#include "ext.h"
+#include "ext_obex.h"
+
 #define MULTILINE(...) #__VA_ARGS__
 
 static t_class * max_class = 0;
@@ -23,6 +26,7 @@ public:
 	t_object * clang;
 	
 	// attrs;
+	t_symbol * file = NULL;
 	t_atom_long cpp, fastmath, vectorize, use_system_headers;
 	
 	Compile() {
@@ -49,6 +53,33 @@ public:
 		if (clang) {
 			object_release(clang);
 			clang = NULL;
+		}
+	}
+	
+	void file_reload() {
+		if (file) {
+			short vol;
+			t_fourcc type;
+			short res = locatefile_extended(file->s_name, &vol, &type, NULL, 0);
+			if (res != 0) {
+				object_error(&ob, "couldn't find file %s", file->s_name);
+				return;
+			}
+			
+			t_filehandle fh = 0;
+			if(path_opensysfile(file->s_name, vol, &fh, PATH_READ_PERM) == 0) {
+				t_handle h = 0;
+				sysfile_readtohandle(fh, &h);
+				sysmem_nullterminatehandle(h);
+				t_string * code_string = string_new(*h);
+				sysmem_freehandle(h);
+				sysfile_close(fh);
+				
+				object_post(&ob, "compile %s", file->s_name);
+				
+				compile_string(code_string);
+				object_release((t_object *)code_string);
+			}
 		}
 	}
 	
@@ -104,20 +135,99 @@ public:
 	
 	void compile(t_symbol * code) {
 		if (!clang) return;
-		
-		code_string = string_new(standard_header);
+		t_string * code_string = string_new(standard_header);
 		string_append(code_string, code->s_name);
+		compile_string(code_string);
+		object_release((t_object *)code_string);
+	}
+	
+	void compile_string(t_string * code_string) {
+		// TODO: reset compiler properly
 		
-		post("compiling");
-		post("%s", code_string->s_text);
+		clang = (t_object *)object_new(CLASS_NOBOX, gensym("clang"), gensym("ctest"));
+		
+		// set C or C++
+		object_attr_setlong(clang, gensym("cpp"), cpp);
+
+		//post("compiling: %s", code_string->s_text);
+		
+		// add include paths:
+		//		object_method(clang, gensym("include"), gensym("path/to/include"));
+		
+		// add path to the Clang standard headers:
+		object_method(clang, gensym("system_include"), system_header_path);
+		
+		// define macros:
+		//object_method(clang, gensym("define"), gensym("__STDC_LIMIT_MACROS"));
+		//object_method(clang, gensym("define"), gensym("__STDC_CONSTANT_MACROS"));
+#ifdef WIN_VERSION
+		object_method(clang, gensym("define"), gensym("WIN_VERSION"));
+		object_method(clang, gensym("define"), gensym("_MSC_VER"));
+#endif
+#ifdef MAC_VERSION
+		object_method(clang, gensym("define"), gensym("MAC_VERSION"));
+#endif
+		
+		// compile options:
+		object_attr_setlong(clang, gensym("vectorize"), 1);
+		object_attr_setlong(clang, gensym("fastmath"), 1);
+		
+		// push specific symbols:
+		object_method(clang, gensym("addsymbol"), gensym("object_post"), &object_post);
 		
 		
 		t_atom rv, av;
 		atom_setobj(&av, code_string);
-		object_method_typed(clang, gensym("compile"), 1, &av, &rv);
-		int err = atom_getlong(&rv);
+		//int err = 0;
+		t_max_err err = object_method_obj(clang, gensym("compile"), (t_object *)code_string, &rv);
+		if (err != MAX_ERR_NONE || !object_attr_getlong(clang, gensym("didcompile"))) {
+			object_release(clang);
+			clang = NULL;
+		}
 		
-		post("result %i", err);
+		// or, read bitcode:
+		// object_method_sym(clang, gensym("readbitcode"), gensym("path to bitcode"));
+		
+		
+			
+		object_method(clang, gensym("optimize"), gensym("O3"));
+		
+		// at the point jit is called, this clang object becomes opaque
+		// but, must keep it around for as long as any code generated is potentially in use
+		// only when all functions become unreachable is it safe to object_release(clang)
+		object_method(clang, gensym("jit"));
+		
+		// posts to Max console a list of the functions in the module
+		//object_method(clang, gensym("listfunctions"));
+		
+		// post IR header
+		//object_method(clang, gensym("dump"));
+		
+		// write bitcode:
+		//object_method(clang, gensym("writebitcode"), gensym("path to bitcode"));
+		
+		// Get a function pointer:
+		t_atom fun_atom;
+		object_method_sym(clang, gensym("getfunction"), gensym("test"), &fun_atom);
+		if (fun_atom.a_w.w_obj) {
+			testfun = (testfun_t)atom_getobj(&fun_atom);
+			
+			int result = testfun((int)37);
+			outlet_int(outlet_result, result);
+		} else {
+			object_error(&ob, "couldn't get function");
+		}
+		
+		// there is also a "getglobal" that works in the same way as getfunction
+		
+		//t_atom ret_atom;
+		//object_method_sym(clang, gensym("getdatalayout"), gensym("test"), &ret_atom);
+		//post("data layout %s", atom_getsym(&ret_atom)->s_name);
+		//object_method_sym(clang, gensym("gettargettriple"), gensym("test"), &ret_atom);
+		//post("target triple %s", atom_getsym(&ret_atom)->s_name);
+		//object_method_sym(clang, gensym("getmoduleid"), gensym("test"), &ret_atom);
+		//post("module id %s", atom_getsym(&ret_atom)->s_name);
+		
 		
 		/*
 		 
@@ -151,6 +261,12 @@ public:
 	}
 	
 	void test(t_atom_long i) {
+		if (testfun) {
+			outlet_int(outlet_result, testfun((int)i));
+		}
+	}
+	
+	void test1(t_atom_long i) {
 		
 		clang = (t_object *)object_new(CLASS_NOBOX, gensym("clang"), gensym("ctest"));
 
@@ -257,7 +373,6 @@ void * compile_new(t_symbol *s, long argc, t_atom *argv) {
 		attr_args_process(x, (short)argc, argv);
 		
 		// invoke any initialization after the attrs are set from here:
-		
 	}
 	return (x);
 }
@@ -281,6 +396,16 @@ void compile_include(Compile * x, t_symbol * s) { x->include(s); }
 void compile_define(Compile * x, t_symbol * s) { x->define(s); }
 void compile_compile(Compile * x, t_symbol * s) { x->compile(s); }
 void compile_clear(Compile * x) { x->reset_compiler(); }
+
+t_max_err compile_setattr_file(Compile *x, t_symbol *s, long argc, t_atom *argv) {
+	t_symbol *v = _sym_nothing;
+	if(argc && argv) v = atom_getsym(argv);
+	if (v) {
+		x->file = v;
+		x->file_reload();
+	}
+	return MAX_ERR_NONE;
+}
 
 void ext_main(void *r)
 {
@@ -340,6 +465,9 @@ void ext_main(void *r)
 	CLASS_ATTR_LONG(c, "vectorize", 0, Compile, vectorize);
 	CLASS_ATTR_LONG(c, "fastmath", 0, Compile, fastmath);
 	CLASS_ATTR_LONG(c, "use_system_headers", 0, Compile, use_system_headers);
+	
+	CLASS_ATTR_SYM(c, "file", 0, Compile, file);
+	CLASS_ATTR_ACCESSORS(c, "file", 0, compile_setattr_file);
 	
 	class_register(CLASS_BOX, c);
 	max_class = c;
