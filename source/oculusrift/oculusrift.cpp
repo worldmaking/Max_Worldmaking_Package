@@ -274,11 +274,13 @@ public:
 		};
 
 		// in case this is a re-configure, clear out the previous ones:
-		textureset_destroy();
-		mirror_destroy();
+		if (1) {
+			textureset_destroy();
+			mirror_destroy();
 
-		textureset_create();
-		mirror_create();
+			textureset_create();
+			mirror_create();
+		}
 
 		// Initialize our single full screen Fov layer.
 		// (needs to happen after textureset_create)
@@ -1201,9 +1203,6 @@ void * oculusrift_new(t_symbol *s, long argc, t_atom *argv) {
 		
 		// apply attrs:
 		attr_args_process(x, (short)argc, argv);
-		
-		// invoke any initialization after the attrs are set from here:
-		x->connect();
 	}
 	return (x);
 }
