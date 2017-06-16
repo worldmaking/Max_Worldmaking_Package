@@ -26,6 +26,14 @@
 	using glm::mat4;
 */
 
+#ifndef AL_MAX
+#define AL_MAX(a,b) ((a) > (b) ? (a) : (b))
+#endif
+
+#ifndef AL_MIN
+#define AL_MIN(a,b) ((a) < (b) ? (a) : (b))
+#endif
+
 //	q must be a normalized quaternion
 template<typename T, glm::precision P>
 glm::tvec3<T, P> quat_unrotate(glm::quat const & q, glm::tvec3<T, P> & v) {

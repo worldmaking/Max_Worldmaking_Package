@@ -56,6 +56,52 @@ static t_symbol * ps_buttons;
 // inserting a short wait seems to avoid it. This wait in terms of frames:
 #define RECONNECTION_TIME 100
 
+static bool oculus_initialized = 0;
+
+
+void oculusrift_quit() {
+	if (oculus_initialized) ovr_Shutdown();
+	oculus_initialized = 0;
+}
+
+int oculusrift_init() {
+	if (oculus_initialized) return 1;
+
+	// init OVR SDK
+	ovrInitParams initParams = { ovrInit_RequestVersion, OVR_MINOR_VERSION, NULL, 0, 0 };
+	ovrResult result = ovr_Initialize(&initParams);
+	if (OVR_FAILURE(result)) {
+		error("LibOVR: failed to initialize library");
+		ovrErrorInfo errorInfo;
+		ovr_GetLastErrorInfo(&errorInfo);
+		error("ovr_Initialize failed: %s", errorInfo.ErrorString);
+		/*
+		switch (result) {
+		case ovrError_Initialize: object_error(NULL, "Generic initialization error."); break;
+		case ovrError_LibLoad: object_error(NULL, "Couldn't load LibOVRRT."); break;
+		case ovrError_LibVersion: object_error(NULL, "LibOVRRT version incompatibility."); break;
+		case ovrError_ServiceConnection: object_error(NULL, "Couldn't connect to the OVR Service."); break;
+		case ovrError_ServiceVersion: object_error(NULL, "OVR Service version incompatibility."); break;
+		case ovrError_IncompatibleOS: object_error(NULL, "The operating system version is incompatible."); break;
+		case ovrError_DisplayInit: object_error(NULL, "Unable to initialize the HMD display."); break;
+		case ovrError_ServerStart:  object_error(NULL, "Unable to start the server. Is it already running?"); break;
+		case ovrError_Reinitialization: object_error(NULL, "Attempted to re-initialize with a different version."); break;
+		default: object_error(NULL, "unknown initialization error."); break;
+		}*/
+		oculus_initialized = 0;
+	} else {
+
+		quittask_install((method)oculusrift_quit, NULL);
+
+		ovr_IdentifyClient("EngineName: Max/MSP/Jitter\n"
+			"EngineVersion: 7\n"
+			"EnginePluginName: [oculusrift]\n"
+			"EngineEditor: true");
+		oculus_initialized = 1;
+	}
+	return oculus_initialized;
+}
+
 class oculusrift {
 public:
 	t_object ob; // must be first!
@@ -156,8 +202,7 @@ public:
 			return false;
 		}
 
-
-		object_post(&ob, "LibOVR runtime version %s", ovr_GetVersionString());
+		object_post(&ob, "LibOVR SDK %s, runtime %s", OVR_VERSION_STRING, ovr_GetVersionString());
 
 		outlet_anything(outlet_msg, gensym("connected"), 0, NULL);
 
@@ -1022,6 +1067,7 @@ public:
 	}
 
 	t_jit_err dest_changed() {
+		if (!session) connect();
 		//object_post(&ob, "dest_changed");
 
 		t_symbol *context = jit_attr_getsym(this, gensym("drawto"));
@@ -1264,9 +1310,6 @@ void oculusrift_jit_gl_texture(oculusrift * x, t_symbol * s, long argc, t_atom *
 //    for each layer should refer to the texure you want to display.
 //
 
-void oculusrift_quit() {
-	ovr_Shutdown();
-}
 
 void oculusrift_log(int level, const char* message) {
 	post("oculus log %d %s", level, message);
@@ -1297,37 +1340,8 @@ void ext_main(void *r)
 	ps_thumbstick = gensym("thumbstick");
 
 	// init OVR SDK
-	result = ovr_Initialize(NULL);
-	if (OVR_FAILURE(result)) {
-		error( "LibOVR: failed to initialize library");
-		switch (result) {
-			case ovrError_Initialize: object_error(NULL, "Generic initialization error."); break;
-			case ovrError_LibLoad: object_error(NULL, "Couldn't load LibOVRRT."); break;
-			case ovrError_LibVersion: object_error(NULL, "LibOVRRT version incompatibility."); break;
-			case ovrError_ServiceConnection: object_error(NULL, "Couldn't connect to the OVR Service."); break;
-			case ovrError_ServiceVersion: object_error(NULL, "OVR Service version incompatibility."); break;
-			case ovrError_IncompatibleOS: object_error(NULL, "The operating system version is incompatible."); break;
-			case ovrError_DisplayInit: object_error(NULL, "Unable to initialize the HMD display."); break;
-			case ovrError_ServerStart:  object_error(NULL, "Unable to start the server. Is it already running?"); break;
-			case ovrError_Reinitialization: object_error(NULL, "Attempted to re-initialize with a different version."); break;
-			default: object_error(NULL, "unknown initialization error."); break;
-		}
-		return;
+	if (!oculusrift_init()) return;
 
-		/*
-		// was crashy:
-		ovrErrorInfo errInfo;
-		ovr_GetLastErrorInfo(&errInfo);
-		object_error(NULL, errInfo.ErrorString);
-		*/
-	}
-	quittask_install((method)oculusrift_quit, NULL);
-
-	ovr_IdentifyClient("EngineName: Max/MSP/Jitter\n"
-					   "EngineVersion: 7\n"
-					   "EnginePluginName: [oculusrift]\n"
-					   "EngineEditor: true");
-	
 	c = class_new("oculusrift", (method)oculusrift_new, (method)oculusrift_free, (long)sizeof(oculusrift),
 				  0L /* leave NULL!! */, A_GIMME, 0);
 	
