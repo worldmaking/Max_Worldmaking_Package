@@ -1,9 +1,9 @@
 /*
 
-	Might be important:
-		https://forums.oculus.com/viewtopic.php?f=20&t=24361&p=283304&hilit=opengl+0.6#p283304
-	Might be useful:
-		https://forums.oculus.com/viewtopic.php?f=39&t=91&p=277330&hilit=opengl+0.6#p277330
+Might be important:
+https://forums.oculus.com/viewtopic.php?f=20&t=24361&p=283304&hilit=opengl+0.6#p283304
+Might be useful:
+https://forums.oculus.com/viewtopic.php?f=39&t=91&p=277330&hilit=opengl+0.6#p277330
 
 */
 
@@ -34,7 +34,7 @@ struct jittex {
 			}
 		}
 
-		
+
 	}
 
 	bool dest_changed(t_symbol * context) {
@@ -121,7 +121,6 @@ struct jitmat {
 // The OpenVR SDK:
 #include "openvr.h"
 
-
 using glm::vec2;
 using glm::vec3;
 using glm::vec4;
@@ -134,7 +133,7 @@ glm::mat4 mat4_from_openvr(const vr::HmdMatrix34_t &m) {
 		m.m[0][1], m.m[1][1], m.m[2][1], 0.0,
 		m.m[0][2], m.m[1][2], m.m[2][2], 0.0,
 		m.m[0][3], m.m[1][3], m.m[2][3], 1.0f
-		);
+	);
 }
 
 glm::mat4 mat4_from_openvr(const vr::HmdMatrix44_t &m) {
@@ -143,7 +142,7 @@ glm::mat4 mat4_from_openvr(const vr::HmdMatrix44_t &m) {
 		m.m[0][1], m.m[1][1], m.m[2][1], m.m[3][1],
 		m.m[0][2], m.m[1][2], m.m[2][2], m.m[3][2],
 		m.m[0][3], m.m[1][3], m.m[2][3], m.m[3][3]
-		);
+	);
 }
 
 static t_class * max_class = 0;
@@ -164,6 +163,11 @@ static t_symbol * ps_angular_velocity;
 
 static t_symbol * ps_tracked_position;
 static t_symbol * ps_tracked_quat;
+
+static t_symbol * trk_velocity;
+static t_symbol * trk_angular_velocity;
+static t_symbol * trk_tracked_position;
+static t_symbol * trk_tracked_quat;
 
 class htcvive {
 public:
@@ -285,11 +289,12 @@ public:
 		if (!mRenderModels) {
 			object_error(&ob, "Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
 		}
-		
+
 		mCamera = vr::VRTrackedCamera(); // (vr::IVRTrackedCamera *)vr::VR_GetGenericInterface(vr::IVRTrackedCamera_Version, &eError);
 		if (!mCamera) {
 			object_post(&ob, "failed to acquire camera -- is it enabled in the SteamVR settings?");
-		} else {
+		}
+		else {
 			vr::EVRTrackedCameraError camError;
 			bool bHasCamera = false;
 
@@ -298,7 +303,7 @@ public:
 				object_post(&ob, "No Tracked Camera Available! (%s)\n", mCamera->GetCameraErrorNameFromEnum(camError));
 				mCamera = 0;
 			}
-			
+
 			if (use_camera) video_start();
 		}
 
@@ -314,7 +319,7 @@ public:
 			vr::VR_Shutdown();
 			mHMD = 0;
 		}
-		
+
 	}
 
 	// usually called after session is created, and when important attributes are changed
@@ -340,7 +345,7 @@ public:
 				matEyeRight.m[0][1], matEyeRight.m[1][1], matEyeRight.m[2][1], 0.0,
 				matEyeRight.m[0][2], matEyeRight.m[1][2], matEyeRight.m[2][2], 0.0,
 				matEyeRight.m[0][3], matEyeRight.m[1][3], matEyeRight.m[2][3], 1.0f
-				);
+			);
 
 			m_mat4viewEye[i] = matrixObj;
 			float l, r, t, b;
@@ -543,12 +548,12 @@ public:
 	}
 
 	bool textureset_create() {
-		
+
 		return true;
 	}
 
 	void textureset_destroy() {
-		
+
 	}
 
 	void bang() {
@@ -556,13 +561,13 @@ public:
 
 		if (!mHMD) return;
 
-		
+
 		// get desired model matrix (for navigation)
 		glm::vec3 m_position;
 		jit_attr_getfloat_array(this, _jit_sym_position, 3, &m_position.x);
 		t_jit_quat m_jitquat;
 		jit_attr_getfloat_array(this, _jit_sym_quat, 4, &m_jitquat.x);
-		
+
 		glm::mat4 modelview_mat = glm::translate(glm::mat4(1.0f), m_position) * mat4_cast(quat_from_jitter(m_jitquat));
 
 		vr::VREvent_t event;
@@ -590,7 +595,7 @@ public:
 				outlet_anything(outlet_msg, gensym("event"), 1, a);
 			}
 		}
-		
+
 		// get the tracking data here
 		vr::EVRCompositorError err = vr::VRCompositor()->WaitGetPoses(pRenderPoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 		if (err != vr::VRCompositorError_None) {
@@ -666,89 +671,155 @@ public:
 					case vr::TrackedControllerRole_RightHand: {
 						//if (trackedDevicePose.eTrackingResult == vr::TrackingResult_Running_OK) {
 
-							int hand = (role == vr::TrackedControllerRole_RightHand);
-							mHandControllerDeviceIndex[hand] = i;
+						int hand = (role == vr::TrackedControllerRole_RightHand);
+						mHandControllerDeviceIndex[hand] = i;
 
-							if (trackedDevicePose.bPoseIsValid) {
+						if (trackedDevicePose.bPoseIsValid) {
 
-								mat4& tracked_pose = mDevicePose[i];
-								glm::mat4 world_pose = modelview_mat * tracked_pose;
+							mat4& tracked_pose = mDevicePose[i];
+							glm::mat4 world_pose = modelview_mat * tracked_pose;
 
-								// output the raw tracking data:
-								glm::vec3 p = glm::vec3(tracked_pose[3]); // the translation component
-								atom_setfloat(a + 0, p.x);
-								atom_setfloat(a + 1, p.y);
-								atom_setfloat(a + 2, p.z);
-								outlet_anything(outlet_controller[hand], ps_tracked_position, 3, a);
+							// output the raw tracking data:
+							glm::vec3 p = glm::vec3(tracked_pose[3]); // the translation component
+							atom_setfloat(a + 0, p.x);
+							atom_setfloat(a + 1, p.y);
+							atom_setfloat(a + 2, p.z);
+							outlet_anything(outlet_controller[hand], ps_tracked_position, 3, a);
 
-								glm::quat q = glm::quat_cast(tracked_pose);
-								//q = glm::normalize(q);
-								atom_setfloat(a + 0, q.x);
-								atom_setfloat(a + 1, q.y);
-								atom_setfloat(a + 2, q.z);
-								atom_setfloat(a + 3, q.w);
-								outlet_anything(outlet_controller[hand], ps_tracked_quat, 4, a);
+							glm::quat q = glm::quat_cast(tracked_pose);
+							//q = glm::normalize(q);
+							atom_setfloat(a + 0, q.x);
+							atom_setfloat(a + 1, q.y);
+							atom_setfloat(a + 2, q.z);
+							atom_setfloat(a + 3, q.w);
+							outlet_anything(outlet_controller[hand], ps_tracked_quat, 4, a);
 
-								p = glm::vec3(world_pose[3]); // the translation component
-								atom_setfloat(a + 0, p.x);
-								atom_setfloat(a + 1, p.y);
-								atom_setfloat(a + 2, p.z);
-								outlet_anything(outlet_controller[hand], _jit_sym_position, 3, a);
+							p = glm::vec3(world_pose[3]); // the translation component
+							atom_setfloat(a + 0, p.x);
+							atom_setfloat(a + 1, p.y);
+							atom_setfloat(a + 2, p.z);
+							outlet_anything(outlet_controller[hand], _jit_sym_position, 3, a);
 
-								q = glm::quat_cast(world_pose);
-								atom_setfloat(a + 0, q.x);
-								atom_setfloat(a + 1, q.y);
-								atom_setfloat(a + 2, q.z);
-								atom_setfloat(a + 3, q.w);
-								outlet_anything(outlet_controller[hand], _jit_sym_quat, 4, a);
+							q = glm::quat_cast(world_pose);
+							atom_setfloat(a + 0, q.x);
+							atom_setfloat(a + 1, q.y);
+							atom_setfloat(a + 2, q.z);
+							atom_setfloat(a + 3, q.w);
+							outlet_anything(outlet_controller[hand], _jit_sym_quat, 4, a);
 
-								atom_setfloat(a + 0, trackedDevicePose.vVelocity.v[0]);
-								atom_setfloat(a + 1, trackedDevicePose.vVelocity.v[1]);
-								atom_setfloat(a + 2, trackedDevicePose.vVelocity.v[2]);
-								outlet_anything(outlet_controller[hand], ps_velocity, 3, a);
+							atom_setfloat(a + 0, trackedDevicePose.vVelocity.v[0]);
+							atom_setfloat(a + 1, trackedDevicePose.vVelocity.v[1]);
+							atom_setfloat(a + 2, trackedDevicePose.vVelocity.v[2]);
+							outlet_anything(outlet_controller[hand], ps_velocity, 3, a);
 
-								atom_setfloat(a + 0, trackedDevicePose.vAngularVelocity.v[0]);
-								atom_setfloat(a + 1, trackedDevicePose.vAngularVelocity.v[1]);
-								atom_setfloat(a + 2, trackedDevicePose.vAngularVelocity.v[2]);
-								outlet_anything(outlet_controller[hand], ps_angular_velocity, 3, a);
-							}
+							atom_setfloat(a + 0, trackedDevicePose.vAngularVelocity.v[0]);
+							atom_setfloat(a + 1, trackedDevicePose.vAngularVelocity.v[1]);
+							atom_setfloat(a + 2, trackedDevicePose.vAngularVelocity.v[2]);
+							outlet_anything(outlet_controller[hand], ps_angular_velocity, 3, a);
+						}
 
-							vr::VRControllerState_t cs;
-							mHMD->GetControllerState(i, &cs);
+						vr::VRControllerState_t cs;
+						//OpenVR SDK 1.0.4 adds a 3rd arg for size
+						mHMD->GetControllerState(i, &cs, sizeof(cs));
 
-							atom_setlong(a + 0, (cs.ulButtonTouched & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Trigger)) != 0);
-							atom_setfloat(a + 1, cs.rAxis[1].x);
-							outlet_anything(outlet_controller[hand], ps_trigger, 2, a);
+						atom_setlong(a + 0, (cs.ulButtonTouched & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Trigger)) != 0);
+						atom_setfloat(a + 1, cs.rAxis[1].x);
+						outlet_anything(outlet_controller[hand], ps_trigger, 2, a);
 
-							atom_setlong(a + 0, (cs.ulButtonTouched & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad)) != 0);
-							atom_setfloat(a + 1, cs.rAxis[0].x);
-							atom_setfloat(a + 2, cs.rAxis[0].y);
-							atom_setlong(a + 3, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad)) != 0);
-							outlet_anything(outlet_controller[hand], ps_trackpad, 4, a);
+						atom_setlong(a + 0, (cs.ulButtonTouched & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad)) != 0);
+						atom_setfloat(a + 1, cs.rAxis[0].x);
+						atom_setfloat(a + 2, cs.rAxis[0].y);
+						atom_setlong(a + 3, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad)) != 0);
+						outlet_anything(outlet_controller[hand], ps_trackpad, 4, a);
 
-							//TODO: The API appears to partition the Touchpad to D-Pad quadrants internally, investigate!
-							//vr::k_EButton_DPad_Down etc.
+						//TODO: The API appears to partition the Touchpad to D-Pad quadrants internally, investigate!
+						//vr::k_EButton_DPad_Down etc.
 
-							atom_setlong(a + 0, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu)) != 0);
-							atom_setlong(a + 1, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_Grip)) != 0);
-							outlet_anything(outlet_controller[hand], ps_buttons, 2, a);
+						atom_setlong(a + 0, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu)) != 0);
+						atom_setlong(a + 1, (cs.ulButtonPressed & vr::ButtonMaskFromId(vr::k_EButton_Grip)) != 0);
+						outlet_anything(outlet_controller[hand], ps_buttons, 2, a);
 
 						//}
 					}
-						break;
+															  break;
 					default:
 						break;
 					}
 				} break;
+				case vr::TrackedDeviceClass_GenericTracker:
+				{
+					if (trackedDevicePose.bPoseIsValid) {
+
+						//Figure out which tracker it is using some kind of unique identifier
+						vr::ETrackedPropertyError err = vr::TrackedProp_Success;
+						char buf[32];
+						uint32_t unPropLen = vr::VRSystem()->GetStringTrackedDeviceProperty(i, vr::Prop_SerialNumber_String, buf, sizeof(buf), &err);
+						//Append the UID onto the data header going into Max
+						if (err == vr::TrackedProp_Success)
+						{
+							char* result;
+							result = (char*)calloc(strlen("tracker_velocity_") + strlen(buf) + 1, sizeof(char));
+							strcpy(result, "tracker_velocity_");
+							strcat(result, buf);
+							trk_velocity = gensym(result);
+							free(result);
+
+							result = (char*)calloc(strlen("tracker_angular_velocity_") + strlen(buf) + 1, sizeof(char));
+							strcpy(result, "tracker_angular_velocity_");
+							strcat(result, buf);
+							trk_angular_velocity = gensym(result);
+							free(result);
+
+							result = (char*)calloc(strlen("tracker_tracked_position_") + strlen(buf) + 1, sizeof(char));
+							strcpy(result, "tracker_tracked_position_");
+							strcat(result, buf);
+							trk_tracked_position = gensym(result);
+							free(result);
+
+							result = (char*)calloc(strlen("tracker_tracked_quat_") + strlen(buf) + 1, sizeof(char));
+							strcpy(result, "tracker_tracked_quat_");
+							strcat(result, buf);
+							trk_tracked_quat = gensym(result);
+							free(result);
+						}
+
+						mat4& tracked_pose = mDevicePose[i];
+						glm::mat4 world_pose = modelview_mat * tracked_pose;
+
+						// output the raw tracking data:
+						glm::vec3 p = glm::vec3(tracked_pose[3]); // the translation component
+						atom_setfloat(a + 0, p.x);
+						atom_setfloat(a + 1, p.y);
+						atom_setfloat(a + 2, p.z);
+						outlet_anything(outlet_tracking, trk_tracked_position, 3, a);
+						glm::quat q = glm::quat_cast(tracked_pose);
+						//q = glm::normalize(q);
+						atom_setfloat(a + 0, q.x);
+						atom_setfloat(a + 1, q.y);
+						atom_setfloat(a + 2, q.z);
+						atom_setfloat(a + 3, q.w);
+						outlet_anything(outlet_tracking, trk_tracked_quat, 4, a);
+
+						atom_setfloat(a + 0, trackedDevicePose.vVelocity.v[0]);
+						atom_setfloat(a + 1, trackedDevicePose.vVelocity.v[1]);
+						atom_setfloat(a + 2, trackedDevicePose.vVelocity.v[2]);
+						outlet_anything(outlet_tracking, trk_velocity, 3, a);
+
+						atom_setfloat(a + 0, trackedDevicePose.vAngularVelocity.v[0]);
+						atom_setfloat(a + 1, trackedDevicePose.vAngularVelocity.v[1]);
+						atom_setfloat(a + 2, trackedDevicePose.vAngularVelocity.v[2]);
+						outlet_anything(outlet_tracking, trk_angular_velocity, 3, a);
+					}
+				} break;
 				default:
-				break;
+					break;
 				}
 			}
 		}
 
 		// now update cameras:
 		for (int i = 0; i < 2; i++) {
-			glm::mat4 modelvieweye_mat = modelview_mat * mHMDPose * m_mat4viewEye[i]; 
+			glm::mat4 modelvieweye_mat = modelview_mat * mHMDPose * m_mat4viewEye[i];
 
 			// modelview
 			glm::vec3 p = glm::vec3(modelvieweye_mat[3]); // the translation component
@@ -780,7 +851,7 @@ public:
 	void submit() {
 		if (!mHMD) return;
 
-		
+
 		void * texob = jit_object_findregistered(intexture);
 		if (!texob) {
 			object_error(&ob, "no texture to draw");
@@ -899,28 +970,61 @@ public:
 			//jit_ob3d_set_context(ctx);
 		}
 
-		
+
 		vr::EVRCompositorError err;
-		vr::Texture_t vrTexture = { (void*)inFBOtex, vr::API_OpenGL, vr::ColorSpace_Gamma }; 
+		//GraphicsAPIConvention enum was renamed to TextureType in OpenVR SDK 1.0.5
+		vr::Texture_t vrTexture = { (void*)inFBOtex, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
 
 		vr::VRTextureBounds_t leftBounds = { 0.f, 0.f, 0.5f, 1.f };
 		vr::VRTextureBounds_t rightBounds = { 0.5f, 0.f, 1.f, 1.f };
 
 		err = vr::VRCompositor()->Submit(vr::Eye_Left, &vrTexture, &leftBounds);
-		if (err != 0) object_error(&ob, "submit error");
+		switch (err) {
+		case 0:
+			break;
+		case 1:
+			object_error(&ob, "submit error: Request failed.");
+			break;
+		case 100:
+			object_error(&ob, "submit error: Incompatible version.");
+			break;
+		case 101:
+			object_error(&ob, "submit error: Do not have focus.");
+			break;
+		case 102:
+			object_error(&ob, "submit error: Invalid texture.");
+			break;
+		case 103:
+			object_error(&ob, "submit error: Is not scene application.");
+			break;
+		case 104:
+			object_error(&ob, "submit error: Texture is on wrong device.");
+			break;
+		case 105:
+			object_error(&ob, "submit error: Texture uses unsupported format.");
+			break;
+		case 106:
+			object_error(&ob, "submit error: Shared textures not supported.");
+			break;
+		case 107:
+			object_error(&ob, "submit error: Index out of range.");
+			break;
+		case 108:
+			object_error(&ob, "submit error: Already submitted.");
+			break;
+		}
 
 		err = vr::VRCompositor()->Submit(vr::Eye_Right, &vrTexture, &rightBounds);
-		if (err != 0) object_error(&ob, "submit error");
 
 		//glBindTexture(GL_TEXTURE_2D, 0);
 
 		glClearColor(0, 0, 0, 1);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
+
 		// openvr header recommends this after submit:
 		glFlush();
 		glFinish();
-	
+
 
 		// submission done:
 
@@ -1085,7 +1189,7 @@ public:
 
 			vr::VRCompositor()->UnlockGLSharedTextureForAccess(texhandle);
 			vr::VRCompositor()->ReleaseSharedGLTexture(texId, texhandle);
-			
+
 		}
 		return true;
 	}
@@ -1153,7 +1257,7 @@ public:
 		// check FBO status
 		GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
 		if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
-			object_error(&ob, "failed to create Jitter FBO"); 
+			object_error(&ob, "failed to create Jitter FBO");
 			return JIT_ERR_GENERIC;
 		}
 
@@ -1186,17 +1290,17 @@ public:
 	}
 
 	t_jit_err ui(t_line_3d *p_line, t_wind_mouse_info *p_mouse) {
-		
+
 		return JIT_ERR_NONE;
 	}
 
 
 	void mirror_create() {
-		
+
 	}
 
 	void mirror_destroy() {
-		
+
 	}
 
 	static t_symbol * GetTrackedDeviceString(vr::IVRSystem *pHmd, vr::TrackedDeviceIndex_t unDevice, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *peError = NULL)
@@ -1243,7 +1347,8 @@ void htcvive_assist(htcvive *x, void *b, long m, long a, char *s)
 {
 	if (m == ASSIST_INLET) { // inlet
 		sprintf(s, "bang to update tracking, texture to submit, other messages");
-	} else {	// outlet
+	}
+	else {	// outlet
 		switch (a) {
 		case 0: sprintf(s, "output/mirror texture"); break;
 		case 1: sprintf(s, "to left eye camera"); break;
@@ -1330,7 +1435,7 @@ t_max_err htcvive_use_camera_set(htcvive *x, t_object *attr, long argc, t_atom *
 }
 
 void htcvive_quit() {
-	
+
 }
 
 void htcvive_log(int level, const char* message) {
@@ -1360,29 +1465,29 @@ void ext_main(void *r)
 	ps_tracked_quat = gensym("tracked_quat");
 
 	// init
-	
+
 	quittask_install((method)htcvive_quit, NULL);
-	
+
 	c = class_new("htcvive", (method)htcvive_new, (method)htcvive_free, (long)sizeof(htcvive),
-				  0L /* leave NULL!! */, A_GIMME, 0);
-	
+		0L /* leave NULL!! */, A_GIMME, 0);
+
 	long ob3d_flags = JIT_OB3D_NO_MATRIXOUTPUT | JIT_OB3D_DOES_UI;
 	/*
-	 JIT_OB3D_NO_ROTATION_SCALE;
-	 ob3d_flags |= JIT_OB3D_NO_POLY_VARS;
-	 ob3d_flags |= JIT_OB3D_NO_BLEND;
-	 ob3d_flags |= JIT_OB3D_NO_TEXTURE;
-	 ob3d_flags |= JIT_OB3D_NO_MATRIXOUTPUT;
-	 ob3d_flags |= JIT_OB3D_AUTO_ONLY;
-	 ob3d_flags |= JIT_OB3D_NO_DEPTH;
-	 ob3d_flags |= JIT_OB3D_NO_ANTIALIAS;
-	 ob3d_flags |= JIT_OB3D_NO_FOG;
-	 ob3d_flags |= JIT_OB3D_NO_LIGHTING_MATERIAL;
-	 ob3d_flags |= JIT_OB3D_NO_SHADER;
-	 ob3d_flags |= JIT_OB3D_NO_BOUNDS;
-	 ob3d_flags |= JIT_OB3D_NO_COLOR;
-	 */
-	
+	JIT_OB3D_NO_ROTATION_SCALE;
+	ob3d_flags |= JIT_OB3D_NO_POLY_VARS;
+	ob3d_flags |= JIT_OB3D_NO_BLEND;
+	ob3d_flags |= JIT_OB3D_NO_TEXTURE;
+	ob3d_flags |= JIT_OB3D_NO_MATRIXOUTPUT;
+	ob3d_flags |= JIT_OB3D_AUTO_ONLY;
+	ob3d_flags |= JIT_OB3D_NO_DEPTH;
+	ob3d_flags |= JIT_OB3D_NO_ANTIALIAS;
+	ob3d_flags |= JIT_OB3D_NO_FOG;
+	ob3d_flags |= JIT_OB3D_NO_LIGHTING_MATERIAL;
+	ob3d_flags |= JIT_OB3D_NO_SHADER;
+	ob3d_flags |= JIT_OB3D_NO_BOUNDS;
+	ob3d_flags |= JIT_OB3D_NO_COLOR;
+	*/
+
 	void * ob3d = jit_ob3d_setup(c, calcoffset(htcvive, ob3d), ob3d_flags);
 	// define our OB3D draw methods
 	//jit_class_addmethod(c, (method)(htcvive_draw), "ob3d_draw", A_CANT, 0L);
@@ -1393,11 +1498,11 @@ void ext_main(void *r)
 	}
 	// must register for ob3d use
 	jit_class_addmethod(c, (method)jit_object_register, "register", A_CANT, 0L);
-	
 
-	
+
+
 	/* you CAN'T call this from the patcher */
-	class_addmethod(c, (method)htcvive_assist,			"assist",		A_CANT, 0);
+	class_addmethod(c, (method)htcvive_assist, "assist", A_CANT, 0);
 
 
 	class_addmethod(c, (method)htcvive_jit_gl_texture, "jit_gl_texture", A_GIMME, 0);
@@ -1425,9 +1530,9 @@ void ext_main(void *r)
 	CLASS_ATTR_ENUMINDEX4(c, "use_camera", 0, "no video", "distorted", "undistorted", "undistorted_maximized");
 	CLASS_ATTR_ACCESSORS(c, "use_camera", NULL, htcvive_use_camera_set);
 
-//	CLASS_ATTR_LONG(c, "mirror", 0, htcvive, mirror);
-//	CLASS_ATTR_STYLE_LABEL(c, "mirror", 0, "onoff", "mirror HMD display in main window");
-	
+	//	CLASS_ATTR_LONG(c, "mirror", 0, htcvive, mirror);
+	//	CLASS_ATTR_STYLE_LABEL(c, "mirror", 0, "onoff", "mirror HMD display in main window");
+
 	class_register(CLASS_BOX, c);
 	max_class = c;
 }

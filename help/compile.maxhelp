@@ -4,12 +4,12 @@
 		"appversion" : 		{
 			"major" : 7,
 			"minor" : 3,
-			"revision" : 1,
+			"revision" : 3,
 			"architecture" : "x86",
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 290.0, 425.0, 640.0, 480.0 ],
+		"rect" : [ 63.0, 362.0, 634.0, 408.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -38,12 +38,53 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-15",
+					"linecount" : 2,
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 129.0, 325.5, 304.0, 35.0 ],
+					"style" : "",
+					"text" : "\"Macintosh HD:/Users/grrrwaaa/Documents/Max 7/Packages/Max_Worldmaking_Package/help/\""
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-12",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 364.0, 18.0, 89.0, 22.0 ],
+					"style" : "",
+					"text" : "loadmess path"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-8",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 2,
+					"outlettype" : [ "", "" ],
+					"patching_rect" : [ 364.0, 53.0, 69.0, 22.0 ],
+					"save" : [ "#N", "thispatcher", ";", "#Q", "end", ";" ],
+					"style" : "",
+					"text" : "thispatcher"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-9",
 					"linecount" : 6,
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 296.0, 275.0, 246.0, 89.0 ],
+					"patching_rect" : [ 130.0, 218.0, 246.0, 87.0 ],
 					"style" : "",
 					"text" : "Working:\n- C/C++ sources, defines, include paths, pushing symbols\n\nNot working:\n- C++ standard lib, linking external dlls"
 				}
@@ -56,7 +97,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 300.0, 96.0, 60.0, 22.0 ],
+					"patching_rect" : [ 207.0, 79.0, 60.0, 22.0 ],
 					"style" : "",
 					"text" : "loadbang"
 				}
@@ -69,7 +110,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 122.0, 309.0, 50.0, 22.0 ],
+					"patching_rect" : [ 29.0, 292.0, 50.0, 22.0 ],
 					"style" : "",
 					"text" : "-74"
 				}
@@ -82,7 +123,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 296.0, 166.0, 47.0, 22.0 ],
+					"patching_rect" : [ 203.0, 149.0, 47.0, 22.0 ],
 					"style" : "",
 					"text" : "test 74"
 				}
@@ -96,7 +137,7 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "bang" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 223.0, 112.0, 50.0, 22.0 ],
+					"patching_rect" : [ 130.0, 95.0, 50.0, 22.0 ],
 					"style" : ""
 				}
 
@@ -108,7 +149,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 122.0, 149.0, 24.0, 24.0 ],
+					"patching_rect" : [ 29.0, 132.0, 24.0, 24.0 ],
 					"style" : ""
 				}
 
@@ -120,7 +161,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 123.0, 196.0, 52.0, 22.0 ],
+					"patching_rect" : [ 30.0, 179.0, 52.0, 22.0 ],
 					"style" : "",
 					"text" : "compile"
 				}
@@ -133,7 +174,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 232.0, 166.0, 50.0, 22.0 ],
+					"patching_rect" : [ 139.0, 149.0, 50.0, 22.0 ],
 					"style" : "",
 					"text" : "test $1"
 				}
@@ -146,6 +187,15 @@
 					"disabled" : 0,
 					"hidden" : 0,
 					"source" : [ "obj-1", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-8", 0 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-12", 0 ]
 				}
 
 			}
@@ -185,10 +235,19 @@
 				}
 
 			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-15", 1 ],
+					"disabled" : 0,
+					"hidden" : 0,
+					"source" : [ "obj-8", 1 ]
+				}
+
+			}
  ],
 		"dependency_cache" : [ 			{
-				"name" : "compile.mxe",
-				"type" : "iLaF"
+				"name" : "compile.mxo",
+				"type" : "iLaX"
 			}
  ],
 		"autosave" : 0
