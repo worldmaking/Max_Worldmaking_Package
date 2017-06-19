@@ -3,6 +3,10 @@
 #include <float.h>
 #include <stdint.h>
 #include <limits.h>
+
+// I can't get these C++ includes to play nice.
+// Looks like I'll need to shell, rather than using Clang JIT
+//#include <string>
 //#include <iostream>
 
 #include <GLFW/glfw3.h>

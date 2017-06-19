@@ -3,6 +3,7 @@
 #include "ext.h"
 #include "ext_obex.h"
 
+#include <string>
 #include <dlfcn.h> // dlopen
 
 #define MULTILINE(...) #__VA_ARGS__
@@ -28,6 +29,9 @@ public:
 	
 	void * outlet_result;
 	
+	// flag is set once all attributes have been set
+	// purpose is to delay @file compile until all other attrs are initialized
+	int post_init = 0;
 	t_string * code_string;
 	t_object * clang;
 	
@@ -36,7 +40,7 @@ public:
 	gimmefun_t gimmefun;
 	
 	// attrs;
-	t_symbol * file = NULL;
+	t_symbol * file = _sym_nothing;
 	t_atom_long cpp, fastmath, vectorize, use_system_headers;
 	t_symbol * system_includes[MAX_SYM_ARRAY_ITEMS];
 	t_symbol * includes[MAX_SYM_ARRAY_ITEMS];
@@ -76,8 +80,16 @@ public:
 		}
 	}
 	
+	void init() {
+		post_init = 1;
+		
+		if (file && file != _sym_nothing) {
+			file_reload();
+		}
+	}
+	
 	void file_reload() {
-		if (file) {
+		if (post_init && file) {
 			short vol;
 			t_fourcc type;
 			short res = locatefile_extended(file->s_name, &vol, &type, NULL, 0);
@@ -172,125 +184,133 @@ public:
 	}
 	
 	void compile_string(t_string * code_string) {
-		// TODO: reset compiler properly
-		
-		clang = (t_object *)object_new(CLASS_NOBOX, gensym("clang"), gensym("ctest"));
-		
-		// set C or C++
-		object_attr_setlong(clang, gensym("cpp"), cpp);
-		
-		//object_method(clang, gensym("include_standard_headers"));
+		try {
+			// TODO: reset compiler properly
+			
+			clang = (t_object *)object_new(CLASS_NOBOX, gensym("clang"), gensym("ctest"));
+			
+			// set C or C++
+			object_attr_setlong(clang, gensym("cpp"), cpp);
+			
+			//object_method(clang, gensym("include_standard_headers"));
 
-		//post("compiling: %s", code_string->s_text);
-		
-		// add path to the Clang standard headers:
-		object_method(clang, gensym("system_include"), system_header_path);
-		//object_method(clang, gensym("system_include"), gensym("/usr/local/include"));
-		
-		for (int i=0; i<MAX_SYM_ARRAY_ITEMS; i++) {
-			t_symbol * s;
+			//post("compiling: %s", code_string->s_text);
 			
-			s = system_includes[i];
-			if (s != _sym_nothing) {
-				object_method(clang, gensym("system_include"), s);
+			// add path to the Clang standard headers:
+			object_method(clang, gensym("system_include"), system_header_path);
+			//object_method(clang, gensym("system_include"), gensym("/usr/local/include"));
+			
+			for (int i=0; i<MAX_SYM_ARRAY_ITEMS; i++) {
+				t_symbol * s;
+				
+				s = system_includes[i];
+				if (s != _sym_nothing) {
+					object_method(clang, gensym("system_include"), s);
+				}
+				
+				s = includes[i];
+				if (s != _sym_nothing) {
+					object_method(clang, gensym("include"), s);
+				}
+				
+				s = defines[i];
+				if (s != _sym_nothing) {
+					object_method(clang, gensym("define"), s);
+				}
+				
+				s = libraries[i];
+				if (s != _sym_nothing) {
+					load_library(s->s_name);
+				}
 			}
 			
-			s = includes[i];
-			if (s != _sym_nothing) {
-				object_method(clang, gensym("include"), s);
+			// define macros:
+			object_method(clang, gensym("define"), gensym("__STDC_LIMIT_MACROS"));
+			object_method(clang, gensym("define"), gensym("__STDC_CONSTANT_MACROS"));
+	#ifdef WIN_VERSION
+			object_method(clang, gensym("define"), gensym("WIN_VERSION"));
+			object_method(clang, gensym("define"), gensym("_MSC_VER"));
+	#endif
+	#ifdef MAC_VERSION
+			object_method(clang, gensym("define"), gensym("MAC_VERSION"));
+	#endif
+			
+			// compile options:
+			object_attr_setlong(clang, gensym("vectorize"), 1);
+			object_attr_setlong(clang, gensym("fastmath"), 1);
+			
+			// push specific symbols:
+			// is this necessary? seems to not be necessary on OSX, maybe it is needed on Windows?
+			//object_method(clang, gensym("addsymbol"), gensym("object_post"), &object_post);
+			
+			// load some libs
+			// this will find stuff in /usr/local/lib, for example
+			//load_library("libglfw.dylib");
+			//load_library("libpcl_common.dylib");
+			
+			//object_method(clang, gensym("addsymbol"), gensym("compile_dlopen"), &compile_dlopen);
+			
+			
+			t_atom rv, av;
+			atom_setobj(&av, code_string);
+			//int err = 0;
+			t_max_err err = object_method_obj(clang, gensym("compile"), (t_object *)code_string, &rv);
+			if (err != MAX_ERR_NONE || !object_attr_getlong(clang, gensym("didcompile"))) {
+				object_release(clang);
+				clang = NULL;
 			}
 			
-			s = defines[i];
-			if (s != _sym_nothing) {
-				object_method(clang, gensym("define"), s);
-			}
+			// or, read bitcode:
+			// object_method_sym(clang, gensym("readbitcode"), gensym("path to bitcode"));
 			
-			s = libraries[i];
-			if (s != _sym_nothing) {
-				load_library(s->s_name);
+			
+				
+			object_method(clang, gensym("optimize"), gensym("O3"));
+			
+			// at the point jit is called, this clang object becomes opaque
+			// but, must keep it around for as long as any code generated is potentially in use
+			// only when all functions become unreachable is it safe to object_release(clang)
+			object_method(clang, gensym("jit"));
+			
+			// posts to Max console a list of the functions in the module
+			//object_method(clang, gensym("listfunctions"));
+			
+			// post IR header
+			//object_method(clang, gensym("dump"));
+			
+			// write bitcode:
+			//object_method(clang, gensym("writebitcode"), gensym("path to bitcode"));
+			
+			// Get a function pointer:
+			void * fp = getfunction(gensym("test"));
+			if (fp) {
+				testfun = (testfun_t)fp;
+				int result = testfun((int)37);
+				outlet_int(outlet_result, result);
 			}
+			initfun = (initfun_t)getfunction(gensym("init"));
+			gimmefun = (gimmefun_t)getfunction(gensym("anything"));
+			
+			if (initfun) initfun((t_object *)this);
+			
+			// there is also a "getglobal" that works in the same way as getfunction
+			
+			//t_atom ret_atom;
+			//object_method_sym(clang, gensym("getdatalayout"), gensym("test"), &ret_atom);
+			//post("data layout %s", atom_getsym(&ret_atom)->s_name);
+			//object_method_sym(clang, gensym("gettargettriple"), gensym("test"), &ret_atom);
+			//post("target triple %s", atom_getsym(&ret_atom)->s_name);
+			//object_method_sym(clang, gensym("getmoduleid"), gensym("test"), &ret_atom);
+			//post("module id %s", atom_getsym(&ret_atom)->s_name);
+			
+			// could reset_compiler now, we're done with it?
+		} catch (const std::exception& ex) {
+			object_error(&ob, "exception %s", ex.what());
+		} catch (const std::string& ex) {
+			object_error(&ob, "exception %s", ex.data());
+		} catch (...) {
+			object_error(&ob, "exception (unknown)");
 		}
-		
-		// define macros:
-		object_method(clang, gensym("define"), gensym("__STDC_LIMIT_MACROS"));
-		object_method(clang, gensym("define"), gensym("__STDC_CONSTANT_MACROS"));
-#ifdef WIN_VERSION
-		object_method(clang, gensym("define"), gensym("WIN_VERSION"));
-		object_method(clang, gensym("define"), gensym("_MSC_VER"));
-#endif
-#ifdef MAC_VERSION
-		object_method(clang, gensym("define"), gensym("MAC_VERSION"));
-#endif
-		
-		// compile options:
-		object_attr_setlong(clang, gensym("vectorize"), 1);
-		object_attr_setlong(clang, gensym("fastmath"), 1);
-		
-		// push specific symbols:
-		// is this necessary? seems to not be necessary on OSX, maybe it is needed on Windows?
-		//object_method(clang, gensym("addsymbol"), gensym("object_post"), &object_post);
-		
-		// load some libs
-		// this will find stuff in /usr/local/lib, for example
-		//load_library("libglfw.dylib");
-		//load_library("libpcl_common.dylib");
-		
-		//object_method(clang, gensym("addsymbol"), gensym("compile_dlopen"), &compile_dlopen);
-		
-		
-		t_atom rv, av;
-		atom_setobj(&av, code_string);
-		//int err = 0;
-		t_max_err err = object_method_obj(clang, gensym("compile"), (t_object *)code_string, &rv);
-		if (err != MAX_ERR_NONE || !object_attr_getlong(clang, gensym("didcompile"))) {
-			object_release(clang);
-			clang = NULL;
-		}
-		
-		// or, read bitcode:
-		// object_method_sym(clang, gensym("readbitcode"), gensym("path to bitcode"));
-		
-		
-			
-		object_method(clang, gensym("optimize"), gensym("O3"));
-		
-		// at the point jit is called, this clang object becomes opaque
-		// but, must keep it around for as long as any code generated is potentially in use
-		// only when all functions become unreachable is it safe to object_release(clang)
-		object_method(clang, gensym("jit"));
-		
-		// posts to Max console a list of the functions in the module
-		//object_method(clang, gensym("listfunctions"));
-		
-		// post IR header
-		//object_method(clang, gensym("dump"));
-		
-		// write bitcode:
-		//object_method(clang, gensym("writebitcode"), gensym("path to bitcode"));
-		
-		// Get a function pointer:
-		void * fp = getfunction(gensym("test"));
-		if (fp) {
-			testfun = (testfun_t)fp;
-			int result = testfun((int)37);
-			outlet_int(outlet_result, result);
-		}
-		initfun = (initfun_t)getfunction(gensym("init"));
-		gimmefun = (gimmefun_t)getfunction(gensym("anything"));
-		
-		if (initfun) initfun((t_object *)this);
-		
-		// there is also a "getglobal" that works in the same way as getfunction
-		
-		//t_atom ret_atom;
-		//object_method_sym(clang, gensym("getdatalayout"), gensym("test"), &ret_atom);
-		//post("data layout %s", atom_getsym(&ret_atom)->s_name);
-		//object_method_sym(clang, gensym("gettargettriple"), gensym("test"), &ret_atom);
-		//post("target triple %s", atom_getsym(&ret_atom)->s_name);
-		//object_method_sym(clang, gensym("getmoduleid"), gensym("test"), &ret_atom);
-		//post("module id %s", atom_getsym(&ret_atom)->s_name);
-		
-		// could reset_compiler now, we're done with it?
 	}
 	
 	void * getfunction(t_symbol * name) {
@@ -326,6 +346,7 @@ void * compile_new(t_symbol *s, long argc, t_atom *argv) {
 		attr_args_process(x, (short)argc, argv);
 		
 		// invoke any initialization after the attrs are set from here:
+		x->init();
 	}
 	return (x);
 }
