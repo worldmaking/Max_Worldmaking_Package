@@ -171,6 +171,7 @@ public:
 	void *		outlet_cloud;
 	void *		outlet_uv;
 	void *		outlet_rgb;
+	void *		outlet_colour_cloud;
 	void *		outlet_depth;
 	void *		outlet_mesh;
 	void *		outlet_player;
@@ -184,12 +185,14 @@ public:
 	jitmat<vec2> uv_mat; // texture coordinates to get RGB for each cloud coordinate
 	jitmat<uint32_t> index_mat; // indices for stitched matrix
 
+	jitmat<vec3> colour_cloud_mat;
+
 	jitmat<vec2> rectify_mat, tmp_mat;
 	jitmat<vec3> skel_mat;
 	jitmat<char> player_mat;
 	int hasColorMap;
 	int capturing;
-	int new_depth_data, new_rgb_data, new_cloud_data, new_uv_data, new_indices_data;
+	int new_depth_data, new_rgb_data, new_cloud_data, new_uv_data, new_indices_data, new_colour_cloud_data;
 	t_systhread capture_thread;
 	t_systhread_mutex depth_mutex;
 	IKinectSensor * device;
@@ -201,7 +204,7 @@ public:
 
 	// attrs
 	int stitch;
-	int unique, usecolor, usedepth, align_depth_to_color, uselock;
+	int unique, use_colour, use_depth, use_colour_cloud, align_depth_to_color, uselock;
 	int player, skeleton, seated, near_mode, audio, high_quality_color;
 	int skeleton_smoothing;
 	int device_count;
@@ -215,24 +218,34 @@ public:
 
 	kinect2() {
 		
+		
 		outlet_msg = outlet_new(&ob, 0);
 		outlet_skeleton = outlet_new(&ob, 0);
-		outlet_player = outlet_new(&ob, "jit_matrix");
+		// mesh related:
 		outlet_mesh = outlet_new(&ob, NULL);
-		outlet_depth = outlet_new(&ob, "jit_matrix");
-		outlet_rgb = outlet_new(&ob, "jit_matrix");
 		outlet_uv = outlet_new(&ob, "jit_matrix");
 		outlet_cloud = outlet_new(&ob, "jit_matrix");
+		// depth related:
+		outlet_player = outlet_new(&ob, "jit_matrix");
+		outlet_depth = outlet_new(&ob, "jit_matrix");
+		// colour related:
+		outlet_colour_cloud = outlet_new(&ob, "jit_matrix");
+		outlet_rgb = outlet_new(&ob, "jit_matrix");
 
 		depth_mat.init(1, _jit_sym_long, cDepthWidth, cDepthHeight);
-		cloud_mat.init(3, _jit_sym_float32, cDepthWidth, cDepthHeight);
-		uv_mat.init(2, _jit_sym_float32, cDepthWidth, cDepthHeight);
 		rgb_mat.init(4, _jit_sym_char, cColorWidth, cColorHeight);
+		colour_cloud_mat.init(3, _jit_sym_float32, cColorWidth, cColorHeight);
+
+		uv_mat.init(2, _jit_sym_float32, cDepthWidth * cDepthHeight, 1);
+		cloud_mat.init(3, _jit_sym_float32, cDepthWidth * cDepthHeight, 1);
+
 
 		index_mat.init(1, _jit_sym_long, (cDepthWidth * cDepthHeight) * 6, 1);
 
-		usecolor = 1;
-		usedepth = 1;
+		use_colour = 1;
+		use_colour_cloud = 0;
+
+		use_depth = 1;
 		unique = 1;
 		stitch = 1;
 
@@ -314,7 +327,7 @@ public:
 		HRESULT hr = m_reader->AcquireLatestFrame(&frame);
 		if (FAILED(hr)) return;
 
-		if (usecolor && SUCCEEDED(frame->get_ColorFrameReference(&colorframeref)) && SUCCEEDED(colorframeref->AcquireFrame(&colorframe))) {
+		if (use_colour && SUCCEEDED(frame->get_ColorFrameReference(&colorframeref)) && SUCCEEDED(colorframeref->AcquireFrame(&colorframe))) {
 			static const int nCells = cColorWidth * cColorHeight;
 			RGBQUAD *src = m_rgb_buffer;
 			HRESULT hr = colorframe->CopyConvertedFrameDataToArray(nCells * sizeof(RGBQUAD), reinterpret_cast<BYTE*>(src), ColorImageFormat_Bgra);
@@ -324,13 +337,13 @@ public:
 					dst[i].r = src[i].rgbRed;
 					dst[i].g = src[i].rgbGreen;
 					dst[i].b = src[i].rgbBlue;
-					dst[i].a = 1.f;
+					dst[i].a = 255;
 				}
 				new_rgb_data = 1;
 			}
 		}
 
-		if (usedepth && SUCCEEDED(frame->get_DepthFrameReference(&depthframeref)) && SUCCEEDED(depthframeref->AcquireFrame(&depthframe))) {
+		if (use_depth && SUCCEEDED(frame->get_DepthFrameReference(&depthframeref)) && SUCCEEDED(depthframeref->AcquireFrame(&depthframe))) {
 
 			INT64 relativeTime = 0;
 			depthframe->get_RelativeTime(&relativeTime);
@@ -344,33 +357,51 @@ public:
 			*/
 
 			UINT capacity;
-			UINT16 * src;
+			UINT16 * src; // depth in mm
 			hr = depthframe->AccessUnderlyingBuffer(&capacity, &src);
 			if (SUCCEEDED(hr)) {
 				uint32_t * dst = (uint32_t *)depth_mat.back;
 				for (UINT i = 0; i < capacity; i++) dst[i] = src[i];
 				new_depth_data = 1; 
 
+				// TODO: 
+				// map to an intermediate buffer instead
+				// since we want to try to limit the amount of data spat out
+				// we *can* do this just the same way we do with the index buffer
+				// by noting each vertex whether it is valid or not
+				// and the cloud_mat and uv_mat matrices would then be variable size
+				// but then the index_mat values also need to be changed...
+				// ... however it turns out that nearly all points were valid (about 90%) so this doesn't seem worth it.
 				hr = m_mapper->MapDepthFrameToCameraSpace(
 					cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
 					cDepthWidth*cDepthHeight, (CameraSpacePoint *)cloud_mat.back); // Output CameraSpacePoint array and size
 				if (SUCCEEDED(hr)) {
 					new_cloud_data = 1;
+
+					// let's look at how many of these are valid points:
+					int valid = 0;
 				
-					if (usecolor) {
+					if (use_colour) {
 						// TODO dim or dim-1? add 0.5 for center of pixel?
 						vec2 uvscale = vec2(1.f / cColorWidth, 1.f / cColorHeight);
 						// iterate the points to get UVs
 						for (UINT i = 0, y = 0; y < cDepthHeight; y++) {
 							for (UINT x = 0; x < cDepthWidth; x++, i++) {
 								DepthSpacePoint dp = { (float)x, (float)y };
+								UINT16 depth_mm = src[i];
 								vec2 uvpt;
-								m_mapper->MapDepthPointToColorSpace(dp, src[i], (ColorSpacePoint *)(&uvpt));
+								m_mapper->MapDepthPointToColorSpace(dp, depth_mm, (ColorSpacePoint *)(&uvpt));
 								uv_mat.back[i] = uvpt * uvscale;
+								if (depth_mm > 0 && depth_mm < 8000) {
+									valid++;
+								}
 							}
 						}
 						new_uv_data = 1;
 					}
+
+					// I found that typically about 195,000 out of 217,000 points were valid
+					//post("valid %d\n", valid);
 
 					if (stitch > 0) {
 						int steps = MIN(stitch, cDepthHeight/2);
@@ -427,6 +458,17 @@ public:
 					}
 				}
 			}
+
+			if (use_colour_cloud) {
+				// I'd like to also output a matrix giving a 3D position for each camera space point
+				hr = m_mapper->MapColorFrameToCameraSpace(
+					cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
+					cColorWidth*cColorHeight, (CameraSpacePoint *)colour_cloud_mat.back); // Output CameraSpacePoint array and size)
+				if (SUCCEEDED(hr)) {
+					new_colour_cloud_data = 1;
+
+				}
+			}
 		}
 		
 		SafeRelease(colorframe);
@@ -449,14 +491,14 @@ public:
 
 
 	void bang() {
-		if (usecolor && (new_rgb_data || unique == 0)) {
+		if (use_colour && (new_rgb_data || unique == 0)) {
 			outlet_anything(outlet_rgb, _jit_sym_jit_matrix, 1, rgb_mat.name);
 			new_rgb_data = 0;
 		}
 
 		//if (skeleton) outputSkeleton();
 		//if (player) outlet_anything(outlet_player, _jit_sym_jit_matrix, 1, player_mat.name);
-		if (usedepth) {
+		if (use_depth) {
 			if (new_depth_data || unique == 0) {
 				//if (uselock) systhread_mutex_lock(depth_mutex);
 				outlet_anything(outlet_depth, _jit_sym_jit_matrix, 1, depth_mat.name);
@@ -473,6 +515,10 @@ public:
 			}
 			if (new_cloud_data || unique == 0) {
 				outlet_anything(outlet_cloud, _jit_sym_jit_matrix, 1, cloud_mat.name);
+				new_cloud_data = 0;
+			}
+			if (new_colour_cloud_data || unique == 0) {
+				outlet_anything(outlet_colour_cloud, _jit_sym_jit_matrix, 1, colour_cloud_mat.name);
 				new_cloud_data = 0;
 			}
 
@@ -512,7 +558,17 @@ void kinect_assist(kinect2 *x, void *b, long m, long a, char *s)
 		sprintf(s, "I am inlet %ld", a);
 	}
 	else {	// outlet
-		sprintf(s, "I am outlet %ld", a);
+		switch (a) {
+		case 0: sprintf(s, "colour (jit_matrix)"); break;
+		case 1: sprintf(s, "3D cloud at colour dim (jit_matrix)"); break;
+		case 2: sprintf(s, "depth (jit_matrix)"); break;
+		case 3: sprintf(s, "player at depth dim (jit_matrix)"); break;
+		case 4: sprintf(s, "cloud for mesh (jit_matrix)"); break;
+		case 5: sprintf(s, "texture coordinates for mesh (jit_matrix)"); break;
+		case 6: sprintf(s, "indices for mesh (jit_matrix)"); break;
+		case 7: sprintf(s, "skeleton"); break;
+		default: sprintf(s, "other messages"); break;
+		}
 	}
 }
 
@@ -528,8 +584,9 @@ void ext_main(void *r)
 	class_addmethod(c, (method)kinect_bang, "bang", 0);
 	class_addmethod(c, (method)kinect_close, "close", 0);
 
-	CLASS_ATTR_LONG(c, "usedepth", 0, kinect2, usedepth);
-	CLASS_ATTR_LONG(c, "usecolor", 0, kinect2, usecolor);
+	CLASS_ATTR_LONG(c, "use_depth", 0, kinect2, use_depth);
+	CLASS_ATTR_LONG(c, "use_colour", 0, kinect2, use_colour);
+	CLASS_ATTR_LONG(c, "use_colour_cloud", 0, kinect2, use_colour_cloud);
 
 	CLASS_ATTR_LONG(c, "stitch", 0, kinect2, stitch);
 
