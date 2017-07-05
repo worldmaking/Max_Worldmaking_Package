@@ -1,3 +1,25 @@
+/*
+ 
+ // dynattr
+ 
+ void *attr = object_attr_get(x, paramname);
+ if (attr == 0) {
+ // attr did not exist; create it:
+
+ 
+ t_object *attrobj = attribute_new(paramname->s_name, sym_paramty, 0, 0, 0);
+ err = object_addattr(x, attrobj);
+ if (err == MAX_ERR_NONE) {
+ 
+ err = object_attr_addattr_parse((t_object *)x, paramname->s_name, "dynamicattr", gensym("long"), 0, "1");
+ 
+ err = object_attr_setvalueof(x, paramname, 1, argv);
+ 
+ 
+ 
+
+ */
+
 #include "al_max.h"
 
 #include "ext.h"
@@ -14,12 +36,12 @@ static t_class * max_class = 0;
 class dyn {
 public:
 	
-	typedef int (*testfun_t)(int);
-	typedef int (*initfun_t)(t_object *);
-	typedef void (*gimmefun_t)(t_object *, t_symbol *, long, t_atom *);
+	typedef int (*testfun_t)(void * instance, int);
+	typedef void * (*initfun_t)(void *);
+	typedef void (*quitfun_t)(void *host, void * instance);
+	typedef void (*gimmefun_t)(void * instance, t_symbol *, long, t_atom *);
 	
 	t_object ob;
-	void * outlet_result;
 	void * outlet_msg;
 	
 	// attrs;
@@ -32,13 +54,14 @@ public:
 #else
 	void * lib_handle = 0;
 #endif
+	void * instance_handle = 0;
 	testfun_t testfun = 0;
 	initfun_t initfun = 0;
+	quitfun_t quitfun = 0;
 	gimmefun_t gimmefun = 0;
 	
 	dyn() {
 		outlet_msg = outlet_new(&ob, 0);
-		outlet_result = outlet_new(&ob, 0);
 	}
 	
 	~dyn() {
@@ -48,6 +71,11 @@ public:
 	void unload() {
 		if (lib_handle) {
 			// call the dylib's close handler
+			if (quitfun) {
+				
+				quitfun(this, instance_handle);
+				
+			}
 			
 #ifdef WIN_VERSION
 			if (FreeLibrary(lib_handle) == 0) {
@@ -65,6 +93,7 @@ public:
 		}
 		testfun = 0;
 		initfun = 0;
+		quitfun = 0;
 		gimmefun = 0;
 		
 		t_atom a[1];
@@ -75,7 +104,8 @@ public:
 	void reload() {
 		if (file) {
 			if (filewatcher) {
-				freeobject((t_object *)filewatcher);
+				filewatcher_stop(filewatcher);
+				object_free((t_object *)filewatcher);
 				filewatcher = 0;
 			}
 			
@@ -122,11 +152,21 @@ public:
 					} else {
 #ifdef WIN_VERSION
 						testfun = (testfun_t)GetProcAddress(lib_handle, "test");
+						initfun = (initfun_t)GetProcAddress(lib_handle, "init");
+						quitfun = (quitfun_t)GetProcAddress(lib_handle, "quit");
 						gimmefun = (gimmefun_t)GetProcAddress(lib_handle, "anything");
 #else
 						testfun = (testfun_t)dlsym(lib_handle, "test");
+						initfun = (initfun_t)dlsym(lib_handle, "init");
+						quitfun = (quitfun_t)dlsym(lib_handle, "quit");
 						gimmefun = (gimmefun_t)dlsym(lib_handle, "anything");
 #endif
+						
+						if (initfun) {
+							instance_handle = initfun(this);
+							object_post(&ob, "init result %p", instance_handle);
+						}
+						
 						// loaded OK:
 						t_atom a[1];
 						atom_setlong(a+0, 1);
@@ -185,12 +225,12 @@ void dyn_assist(dyn *x, void *b, long m, long a, char *s)
 }
 
 void dyn_anything(dyn *x, t_symbol *s, long argc, t_atom *argv) {
-	if (x->gimmefun) x->gimmefun((t_object *)x, s, argc, argv);
+	if (x->gimmefun) x->gimmefun(x->instance_handle, s, argc, argv);
 }
 
 void dyn_test(dyn *x, t_atom_long i) {
 	if (x->testfun) {
-		object_post(&x->ob, "test(%d) -> %d", i, x->testfun(i));
+		object_post(&x->ob, "test(%d) -> %d", i, x->testfun(x->instance_handle, i));
 	}
 }
 
