@@ -8,6 +8,8 @@
 // Looks like I'll need to shell, rather than using Clang JIT
 //#include <string>
 //#include <iostream>
+//#define GLM_FORCE_RADIANS
+//#include "glm/glm.hpp"
 
 #include <GLFW/glfw3.h>
 
