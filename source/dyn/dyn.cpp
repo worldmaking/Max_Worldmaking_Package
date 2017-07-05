@@ -27,7 +27,11 @@
 #include "ext_obex.h"
 
 #include <string>
+#ifdef WIN_VERSION
+
+#else
 #include <dlfcn.h> // dlopen
+#endif
 
 #define MULTILINE(...) #__VA_ARGS__
 

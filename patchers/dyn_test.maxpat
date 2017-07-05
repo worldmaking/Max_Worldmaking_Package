@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 426.0, 79.0, 736.0, 363.0 ],
+		"rect" : [ 426.0, 85.0, 736.0, 363.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -56,7 +56,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 438.0, 33.0, 247.0, 234.0 ],
+					"patching_rect" : [ 438.0, 33.0, 247.0, 241.0 ],
 					"style" : "",
 					"text" : "TODO\n\nverify on Windows...\n\nadd a better plugin interface\ncall library's init(), return some state object (perhaps with handlers embedded), could even be a t_object if we want.\n\nmultiple instances: dlopen/close is playing well, but our instances aren't -- if one unloads() it can mess up another -- need some refcounting\n\ndynlet\n\ndynattr"
 				}
@@ -80,7 +80,7 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 276.0, 223.0, 34.0, 22.0 ],
+					"patching_rect" : [ 216.0, 237.0, 34.0, 22.0 ],
 					"style" : "",
 					"text" : "print"
 				}
@@ -94,7 +94,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "int" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 212.0, 259.0, 24.0, 24.0 ],
+					"patching_rect" : [ 152.0, 273.0, 24.0, 24.0 ],
 					"style" : ""
 				}
 
@@ -106,7 +106,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
-					"patching_rect" : [ 186.0, 223.0, 77.0, 22.0 ],
+					"patching_rect" : [ 126.0, 237.0, 77.0, 22.0 ],
 					"style" : "",
 					"text" : "route loaded"
 				}
@@ -119,7 +119,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 186.0, 259.0, 24.0, 24.0 ],
+					"patching_rect" : [ 126.0, 273.0, 24.0, 24.0 ],
 					"style" : ""
 				}
 
@@ -219,8 +219,6 @@
 		"lines" : [ 			{
 				"patchline" : 				{
 					"destination" : [ "obj-3", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-1", 0 ]
 				}
 
@@ -228,8 +226,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-10", 0 ]
 				}
 
@@ -237,8 +233,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-16", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"order" : 1,
 					"source" : [ "obj-17", 0 ]
 				}
@@ -247,8 +241,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-19", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"order" : 0,
 					"source" : [ "obj-17", 0 ]
 				}
@@ -257,9 +249,7 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-4", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
-					"midpoints" : [ 221.5, 293.0, 384.5, 293.0, 384.5, 126.0, 135.5, 126.0 ],
+					"midpoints" : [ 161.5, 316.0, 384.5, 316.0, 384.5, 126.0, 135.5, 126.0 ],
 					"source" : [ "obj-19", 0 ]
 				}
 
@@ -267,28 +257,22 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-17", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"order" : 1,
-					"source" : [ "obj-2", 1 ]
+					"source" : [ "obj-2", 0 ]
 				}
 
 			}
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-20", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"order" : 0,
-					"source" : [ "obj-2", 1 ]
+					"source" : [ "obj-2", 0 ]
 				}
 
 			}
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-7", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-23", 0 ]
 				}
 
@@ -296,8 +280,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-2", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-27", 0 ]
 				}
 
@@ -305,8 +287,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-7", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-3", 0 ]
 				}
 
@@ -314,8 +294,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-2", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-4", 0 ]
 				}
 
@@ -323,8 +301,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-2", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-6", 0 ]
 				}
 
@@ -332,16 +308,14 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-4", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-7", 0 ]
 				}
 
 			}
  ],
 		"dependency_cache" : [ 			{
-				"name" : "dyn.mxo",
-				"type" : "iLaX"
+				"name" : "dyn.mxe",
+				"type" : "iLaF"
 			}
  ],
 		"autosave" : 0
