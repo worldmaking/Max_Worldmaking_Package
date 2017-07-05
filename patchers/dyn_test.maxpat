@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 426.0, 85.0, 736.0, 363.0 ],
+		"rect" : [ 426.0, 85.0, 904.0, 363.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -38,6 +38,20 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-5",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 206.0, 147.0, 47.0, 22.0 ],
+					"presentation_rect" : [ 206.0, 146.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "unload"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-27",
 					"maxclass" : "message",
 					"numinlets" : 2,
@@ -56,9 +70,9 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 438.0, 33.0, 247.0, 241.0 ],
+					"patching_rect" : [ 412.0, 56.0, 366.0, 241.0 ],
 					"style" : "",
-					"text" : "TODO\n\nverify on Windows...\n\nadd a better plugin interface\ncall library's init(), return some state object (perhaps with handlers embedded), could even be a t_object if we want.\n\nmultiple instances: dlopen/close is playing well, but our instances aren't -- if one unloads() it can mess up another -- need some refcounting\n\ndynlet\n\ndynattr"
+					"text" : "TODO\n\nWorks on Windows, except for the annoying thing of holding onto the dll; so unload is needed before recompiling\n(which makes a good argument for using a shell external in Max)\n\nadd a better plugin interface\ncall library's init(), return some state object (perhaps with handlers embedded), could even be a t_object if we want.\n\nmultiple instances: dlopen/close is playing well, but our instances aren't -- if one unloads() it can mess up another -- need some refcounting\n\ndynlet\n\ndynattr"
 				}
 
 			}
@@ -295,6 +309,13 @@
 				"patchline" : 				{
 					"destination" : [ "obj-2", 0 ],
 					"source" : [ "obj-4", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-2", 0 ],
+					"source" : [ "obj-5", 0 ]
 				}
 
 			}

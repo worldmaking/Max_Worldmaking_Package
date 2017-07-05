@@ -50,17 +50,17 @@ Foo foo;
 
 extern "C" {
 
-	int init(t_object * host) {
+	__declspec(dllexport) int init(t_object * host) {
 		object_post(host, "init");
 		
 		return 0;	
 	}
 
-	int test(int x) {
+	__declspec(dllexport) int test(int x) {
 		return (glm::linearRand(0, x-1));
 	}
 
-	void anything(t_object * x, t_symbol * s, long argc, t_atom * argv) {
+	__declspec(dllexport) void anything(t_object * x, t_symbol * s, long argc, t_atom * argv) {
 		object_post(x, "%s(#%d)\n", s->s_name, argc);
 	}
 }
