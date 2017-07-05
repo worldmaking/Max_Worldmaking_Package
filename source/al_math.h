@@ -193,8 +193,9 @@ m = glm::affineInverse(m);	// Fast inverse for affine matrix.
 m = glm::inverseTranspose(m);
 
 # Quaternions
-// uses wxyz order:
+// constructor uses wxyz order:
 q = quat(w, x, y, z);
+// however the contents are actually stored as xyzw
 
 q = q * rot;				// rot is in model space (local)
 q = rot * q;				// rot is in world space (global)
