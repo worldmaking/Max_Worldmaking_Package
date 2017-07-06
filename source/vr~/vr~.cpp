@@ -14,6 +14,11 @@ static t_class * max_class = 0;
 
 inline float mix(float x, float y, float a) { return x + a*(y-x); }
 
+// Docs say there should only be 1 renderer object, use it for all sources
+IPLContext phonon_context;
+IPLhandle phonon_renderer = 0;
+IPLRenderingSettings phonon_settings;
+
 class VRMSP {
 public:
 	t_pxobject ob; // max objExamplet, must be first!
@@ -23,13 +28,11 @@ public:
 	glm::vec3 direction;
 	
 	struct {
-		IPLContext context;
-		IPLRenderingSettings settings;
 		IPLHrtfParams hrtfParams;
 		IPLAudioFormat source_format;
 		IPLAudioFormat output_format;
 		
-		IPLhandle renderer = 0;
+		// Docs say create one of these for each audio source
 		IPLhandle binaural = 0;
 		
 		// pre-allocated to maximum vector size, in case this is cheaper?
@@ -51,12 +54,12 @@ public:
 		direction.z = -1;
 		
 		// TODO: consider mapping to sysmem handers?
-		phonon.context.allocateCallback = 0;
-		phonon.context.freeCallback = 0;
+		phonon_context.allocateCallback = 0;
+		phonon_context.freeCallback = 0;
+		phonon_context.logCallback = phonon_log_function;
 		
-		phonon.context.logCallback = phonon_log_function;
 		// use default convolution setting, as the alternative depends on AMD gpus
-		phonon.settings.convolutionType = IPL_CONVOLUTIONTYPE_PHONON;
+		phonon_settings.convolutionType = IPL_CONVOLUTIONTYPE_PHONON;
 		
 		// various options:
 		phonon.hrtfParams.type = IPL_HRTFDATABASETYPE_DEFAULT; // or CUSTIOM
@@ -79,7 +82,7 @@ public:
 	
 	void phonon_cleanup() {
 		
-		if (phonon.renderer) iplDestroyBinauralRenderer(&phonon.renderer);
+		
 		if (phonon.binaural) iplDestroyBinauralEffect(&phonon.binaural);
 	}
 
@@ -96,15 +99,21 @@ public:
 		// reset:
 		phonon_cleanup();
 		
-		phonon.settings.samplingRate = samplerate;
-		phonon.settings.frameSize = maxvectorsize;
-		
+		// (re)create renderer with these settings:
+		if (!phonon_renderer || phonon_settings.frameSize != maxvectorsize || phonon_settings.samplingRate != samplerate) {
+			
+			// trash old renderer:
+			if (phonon_renderer) iplDestroyBinauralRenderer(&phonon_renderer);
+
+			phonon_settings.samplingRate = samplerate;
+			phonon_settings.frameSize = maxvectorsize;
+			
+			iplCreateBinauralRenderer(phonon_context, phonon_settings, phonon.hrtfParams, &phonon_renderer);
+
+		}
 		object_post((t_object *)this, "sr %f vs %d", samplerate, maxvectorsize);
 		
-		// create renderer with these settings:
 		phonon_cleanup();
-		
-		iplCreateBinauralRenderer(phonon.context, phonon.settings, phonon.hrtfParams, &phonon.renderer);
 		
 		// a single mono source
 		phonon.source_format.channelLayoutType  = IPL_CHANNELLAYOUTTYPE_SPEAKERS;
@@ -125,7 +134,7 @@ public:
 		
 		
 		// create binaural effect:
-		iplCreateBinauralEffect(phonon.renderer, phonon.source_format, phonon.output_format, &phonon.binaural);
+		iplCreateBinauralEffect(phonon_renderer, phonon.source_format, phonon.output_format, &phonon.binaural);
 		
 		// connect to MSP dsp chain:
 		long options = 0;
@@ -244,6 +253,10 @@ void vrmsp_assist(VRMSP *x, void *b, long m, long a, char *s)
 		sprintf(s, "I am outlet %ld", a);
 	}
 }
+
+// TODO: put this in a quittask:
+//if (phonon_renderer) iplDestroyBinauralRenderer(&phonon_renderer);
+
 
 void ext_main(void *r)
 {
