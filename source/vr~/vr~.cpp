@@ -20,7 +20,6 @@ public:
 	
 	// attr
 	t_atom_long interp = 1;
-	t_atom_long dynamic = 1;
 	glm::vec3 direction;
 	
 	struct {
@@ -170,6 +169,7 @@ public:
 		// TODO: apply head tracking quat transform to direction
 		glm::vec3 dirn = glm::normalize(direction);
 		
+		/*
 		// rotate at 3 hz:
 		static float t = 0.f;
 		t += M_PI * 2. * 3. * sampleframes/(44100.);
@@ -177,7 +177,8 @@ public:
 		dir.x = sin(t);
 		dir.y = 0.;
 		dir.z = cos(t);
-
+		 */
+		
 		// Note:
 		// IPL_HRTFINTERPOLATION_BILINEAR has high CPU cost
 		// Typically, bilinear filtering is most useful for wide-band noise-like sounds, such as radio static, mechanical noise, fire, etc.
@@ -190,7 +191,7 @@ public:
 			outbuffer.interleavedBuffer = phonon.output_buffer;
 			iplApplyBinauralEffect(phonon.binaural,
 								   inbuffer,
-								   dir, //*(IPLVector3 *)(&dirn.x),
+								   *(IPLVector3 *)(&dirn.x),
 								   interp ? IPL_HRTFINTERPOLATION_BILINEAR : IPL_HRTFINTERPOLATION_NEAREST,
 								   outbuffer);
 		}
@@ -261,8 +262,6 @@ void ext_main(void *r)
 	
 	CLASS_ATTR_LONG(c, "interp", 0, VRMSP, interp);
 	CLASS_ATTR_STYLE(c, "interp", 0, "onoff");
-	CLASS_ATTR_LONG(c, "dynamic", 0, VRMSP, dynamic);
-	CLASS_ATTR_STYLE(c, "dynamic", 0, "onoff");
 	
 	CLASS_ATTR_FLOAT_ARRAY(c, "direction", 0, VRMSP, direction, 3);
 	
