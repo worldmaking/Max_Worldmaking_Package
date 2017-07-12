@@ -311,198 +311,192 @@ public:
 			return;
 		}
 
-		device->OpenMultiSourceFrameReader(
-			FrameSourceTypes::FrameSourceTypes_Depth | FrameSourceTypes::FrameSourceTypes_Color,
-			&m_reader);
+		DWORD ftypes = 0;
+		if (use_colour) ftypes |= FrameSourceTypes::FrameSourceTypes_Color;
+		if (use_depth) ftypes |= FrameSourceTypes::FrameSourceTypes_Depth;
+		device->OpenMultiSourceFrameReader(ftypes, &m_reader);
 		
+
 		capturing = 1;
 		while (capturing) {
-			getKinectData();
-		}
-		SafeRelease(m_reader);
-	}
 
-	void getKinectData() {
-		float zmul = face_negative_z ? -1.f : 1.f;
+			float zmul = face_negative_z ? -1.f : 1.f;
 
-		IMultiSourceFrame* frame = nullptr;
-		IDepthFrame* depthframe = nullptr;
-		IDepthFrameReference* depthframeref = nullptr;
-		IColorFrame* colorframe = nullptr;
-		IColorFrameReference* colorframeref = nullptr;
-		HRESULT hr = m_reader->AcquireLatestFrame(&frame);
-		if (FAILED(hr)) return;
-
-		if (use_colour && SUCCEEDED(frame->get_ColorFrameReference(&colorframeref)) && SUCCEEDED(colorframeref->AcquireFrame(&colorframe))) {
-			static const int nCells = cColorWidth * cColorHeight;
-			RGBQUAD *src = m_rgb_buffer;
-			HRESULT hr = colorframe->CopyConvertedFrameDataToArray(nCells * sizeof(RGBQUAD), reinterpret_cast<BYTE*>(src), ColorImageFormat_Bgra);
-			if (SUCCEEDED(hr)) {
-				ARGB * dst = (ARGB *)rgb_mat.back;
-				for (int i = 0; i < nCells; ++i) {
-					dst[i].r = src[i].rgbRed;
-					dst[i].g = src[i].rgbGreen;
-					dst[i].b = src[i].rgbBlue;
-					dst[i].a = 255;
-				}
-				new_rgb_data = 1;
-			}
-		}
-
-		if (use_depth && SUCCEEDED(frame->get_DepthFrameReference(&depthframeref)) && SUCCEEDED(depthframeref->AcquireFrame(&depthframe))) {
-
-			INT64 relativeTime = 0;
-			depthframe->get_RelativeTime(&relativeTime);
+			IMultiSourceFrame* frame = nullptr;
+			IDepthFrame* depthframe = nullptr;
+			IDepthFrameReference* depthframeref = nullptr;
+			IColorFrame* colorframe = nullptr;
+			IColorFrameReference* colorframeref = nullptr;
+			HRESULT hr = m_reader->AcquireLatestFrame(&frame);
+			if (FAILED(hr)) continue;
 
 			/*
 			if (SUCCEEDED(frame->get_FrameDescription(&frameDescription))) {
-				frameDescription->get_HorizontalFieldOfView(&this->horizontalFieldOfView));
-				frameDescription->get_VerticalFieldOfView(&this->verticalFieldOfView));
-				frameDescription->get_DiagonalFieldOfView(&this->diagonalFieldOfView));
+			frameDescription->get_HorizontalFieldOfView(&this->horizontalFieldOfView));
+			frameDescription->get_VerticalFieldOfView(&this->verticalFieldOfView));
+			frameDescription->get_DiagonalFieldOfView(&this->diagonalFieldOfView));
 			}
 			*/
 
-			UINT capacity;
-			UINT16 * src; // depth in mm
-			hr = depthframe->AccessUnderlyingBuffer(&capacity, &src);
-			if (SUCCEEDED(hr)) {
-				uint32_t * dst = (uint32_t *)depth_mat.back;
-				for (UINT i = 0; i < capacity; i++) dst[i] = src[i];
-				new_depth_data = 1; 
-
-				// TODO: 
-				// map to an intermediate buffer instead
-				// since we want to try to limit the amount of data spat out
-				// we *can* do this just the same way we do with the index buffer
-				// by noting each vertex whether it is valid or not
-				// and the cloud_mat and uv_mat matrices would then be variable size
-				// but then the index_mat values also need to be changed...
-				// ... however it turns out that nearly all points were valid (about 90%) so this doesn't seem worth it.
-				hr = m_mapper->MapDepthFrameToCameraSpace(
-					cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
-					cDepthWidth*cDepthHeight, (CameraSpacePoint *)cloud_mat.back); // Output CameraSpacePoint array and size
+			if (use_colour && SUCCEEDED(frame->get_ColorFrameReference(&colorframeref)) && SUCCEEDED(colorframeref->AcquireFrame(&colorframe))) {
+				static const int nCells = cColorWidth * cColorHeight;
+				RGBQUAD *src = m_rgb_buffer;
+				HRESULT hr = colorframe->CopyConvertedFrameDataToArray(nCells * sizeof(RGBQUAD), reinterpret_cast<BYTE*>(src), ColorImageFormat_Bgra);
 				if (SUCCEEDED(hr)) {
-
-					if (face_negative_z) {
-						glm::vec3 * p = cloud_mat.back;
-						for (int i=0; i<capacity; i++) {
-							p->z = -p->z;
-							p->x = -p->x;
-							p++;
-						}
+					ARGB * dst = (ARGB *)rgb_mat.back;
+					for (int i = 0; i < nCells; ++i) {
+						dst[i].r = src[i].rgbRed;
+						dst[i].g = src[i].rgbGreen;
+						dst[i].b = src[i].rgbBlue;
+						dst[i].a = 255;
+						new_rgb_data = 1;
 					}
+				}
+			}
 
-					new_cloud_data = 1;
+			if (use_depth && SUCCEEDED(frame->get_DepthFrameReference(&depthframeref)) && SUCCEEDED(depthframeref->AcquireFrame(&depthframe))) {
+				INT64 relativeTime = 0;
+				depthframe->get_RelativeTime(&relativeTime);
+				UINT capacity;
+				UINT16 * src; // depth in mm
+				hr = depthframe->AccessUnderlyingBuffer(&capacity, &src);
+				if (SUCCEEDED(hr)) {
+					uint32_t * dst = (uint32_t *)depth_mat.back;
+					for (UINT i = 0; i < capacity; i++) dst[i] = src[i];
+					new_depth_data = 1; 
 
-					// let's look at how many of these are valid points:
-					int valid = 0;
+					// TODO: 
+					// map to an intermediate buffer instead
+					// since we want to try to limit the amount of data spat out
+					// we *can* do this just the same way we do with the index buffer
+					// by noting each vertex whether it is valid or not
+					// and the cloud_mat and uv_mat matrices would then be variable size
+					// but then the index_mat values also need to be changed...
+					// ... however it turns out that nearly all points were valid (about 90%) so this doesn't seem worth it.
+					hr = m_mapper->MapDepthFrameToCameraSpace(
+						cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
+						cDepthWidth*cDepthHeight, (CameraSpacePoint *)cloud_mat.back); // Output CameraSpacePoint array and size
+					if (SUCCEEDED(hr)) {
+
+						if (face_negative_z) {
+							glm::vec3 * p = cloud_mat.back;
+							for (int i = 0; i<capacity; i++) {
+								p->z = -p->z;
+								p->x = -p->x;
+								p++;
+							}
+						}
+
+						new_cloud_data = 1;
+
+						// let's look at how many of these are valid points:
+						int valid = 0;
 				
-					if (use_colour) {
-						// TODO dim or dim-1? add 0.5 for center of pixel?
-						vec2 uvscale = vec2(1.f / cColorWidth, 1.f / cColorHeight);
-						// iterate the points to get UVs
-						for (UINT i = 0, y = 0; y < cDepthHeight; y++) {
-							for (UINT x = 0; x < cDepthWidth; x++, i++) {
-								DepthSpacePoint dp = { (float)x, (float)y };
-								UINT16 depth_mm = src[i];
-								vec2 uvpt;
-								m_mapper->MapDepthPointToColorSpace(dp, depth_mm, (ColorSpacePoint *)(&uvpt));
-								uv_mat.back[i] = uvpt * uvscale;
-								if (depth_mm > 0 && depth_mm < 8000) {
-									valid++;
+						if (use_colour) {
+							// TODO dim or dim-1? add 0.5 for center of pixel?
+							vec2 uvscale = vec2(1.f / cColorWidth, 1.f / cColorHeight);
+							// iterate the points to get UVs
+							for (UINT i = 0, y = 0; y < cDepthHeight; y++) {
+								for (UINT x = 0; x < cDepthWidth; x++, i++) {
+									DepthSpacePoint dp = { (float)x, (float)y };
+									UINT16 depth_mm = src[i];
+									vec2 uvpt;
+									m_mapper->MapDepthPointToColorSpace(dp, depth_mm, (ColorSpacePoint *)(&uvpt));
+									uv_mat.back[i] = uvpt * uvscale;
+									if (depth_mm > 0 && depth_mm < 8000) {
+										valid++;
+									}
 								}
 							}
+							new_uv_data = 1;
 						}
-						new_uv_data = 1;
+
+						// I found that typically about 195,000 out of 217,000 points were valid
+						//post("valid %d\n", valid);
+
+						if (stitch > 0) {
+							int steps = MIN(stitch, cDepthHeight/2);
+							float facesMaxLength = steps * 0.1f;
+							vec3 * vertices = cloud_mat.back;
+							uint32_t * indices = index_mat.back;
+							int count = 0;
+							// maybe this couldbe faster?
+							for (int j = 0; j < cDepthHeight - steps; j += steps) {
+								for (int i = 0; i < cDepthWidth - steps; i += steps) {
+									auto topLeft = cDepthWidth * j + i;
+									auto topRight = topLeft + steps;
+									auto bottomLeft = topLeft + cDepthWidth * steps;
+									auto bottomRight = bottomLeft + steps;
+
+									const vec3 & vTL = vertices[topLeft];
+									const vec3 & vTR = vertices[topRight];
+									const vec3 & vBL = vertices[bottomLeft];
+									const vec3 & vBR = vertices[bottomRight];
+
+									//upper left triangle
+									if (vTL.z*zmul > 0 && vTR.z*zmul > 0 && vBL.z*zmul > 0
+										&& abs(vTL.z - vTR.z) < facesMaxLength
+										&& abs(vTL.z - vBL.z) < facesMaxLength) {
+										*indices++ = topLeft;
+										*indices++ = bottomLeft;
+										*indices++ = topRight;
+										count += 3;
+									}
+
+									//bottom right triangle
+									if (vBR.z*zmul > 0 && vTR.z*zmul > 0 && vBL.z*zmul > 0
+										&& abs(vBR.z - vTR.z) < facesMaxLength
+										&& abs(vBR.z - vBL.z) < facesMaxLength) {
+										*indices++ = topRight;
+										*indices++ = bottomRight;
+										*indices++ = bottomLeft;
+										count += 3;
+									}
+								}
+							}
+
+							// somehow update matrix
+							if (count >= 6) {
+								// pretend that the output matrix has changed size (even though the underlying pointer is the same)
+								t_jit_matrix_info index_info;
+								jit_object_method(index_mat.mat, _jit_sym_getinfo, &index_info);
+								index_info.dim[0] = count;
+								index_info.dimstride[1] = index_info.dimstride[0] * count;
+								jit_object_method(index_mat.mat, _jit_sym_setinfo_ex, &index_info);
+
+								new_indices_data = 1;
+							}
+						}
 					}
+				}
 
-					// I found that typically about 195,000 out of 217,000 points were valid
-					//post("valid %d\n", valid);
-
-					if (stitch > 0) {
-						int steps = MIN(stitch, cDepthHeight/2);
-
-						float facesMaxLength = steps * 0.1f;
-						vec3 * vertices = cloud_mat.back;
-						uint32_t * indices = index_mat.back;
-						int count = 0;
-						// maybe this couldbe faster?
-						for (int j = 0; j < cDepthHeight - steps; j += steps) {
-							for (int i = 0; i < cDepthWidth - steps; i += steps) {
-								auto topLeft = cDepthWidth * j + i;
-								auto topRight = topLeft + steps;
-								auto bottomLeft = topLeft + cDepthWidth * steps;
-								auto bottomRight = bottomLeft + steps;
-
-								const vec3 & vTL = vertices[topLeft];
-								const vec3 & vTR = vertices[topRight];
-								const vec3 & vBL = vertices[bottomLeft];
-								const vec3 & vBR = vertices[bottomRight];
-
-								//upper left triangle
-								if (vTL.z*zmul > 0 && vTR.z*zmul > 0 && vBL.z*zmul > 0
-									&& abs(vTL.z - vTR.z) < facesMaxLength
-									&& abs(vTL.z - vBL.z) < facesMaxLength) {
-									*indices++ = topLeft;
-									*indices++ = bottomLeft;
-									*indices++ = topRight;
-									count += 3;
-								}
-
-								//bottom right triangle
-								if (vBR.z*zmul > 0 && vTR.z*zmul > 0 && vBL.z*zmul > 0
-									&& abs(vBR.z - vTR.z) < facesMaxLength
-									&& abs(vBR.z - vBL.z) < facesMaxLength) {
-									*indices++ = topRight;
-									*indices++ = bottomRight;
-									*indices++ = bottomLeft;
-									count += 3;
-								}
+				if (use_colour_cloud) {
+					// I'd like to also output a matrix giving a 3D position for each camera space point
+					hr = m_mapper->MapColorFrameToCameraSpace(
+						cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
+						cColorWidth*cColorHeight, (CameraSpacePoint *)colour_cloud_mat.back); // Output CameraSpacePoint array and size)
+					if (SUCCEEDED(hr)) {
+						if (face_negative_z) {
+							int n = cColorWidth*cColorHeight;
+							glm::vec3 * p = colour_cloud_mat.back;
+							while (n--) {
+								p->z = -p->z;
+								p->x = -p->x;
+								p++;
 							}
 						}
-
-						// somehow update matrix
-						if (count >= 6) {
-							// pretend that the output matrix has changed size (even though the underlying pointer is the same)
-							t_jit_matrix_info index_info;
-							jit_object_method(index_mat.mat, _jit_sym_getinfo, &index_info);
-							index_info.dim[0] = count;
-							index_info.dimstride[1] = index_info.dimstride[0] * count;
-							jit_object_method(index_mat.mat, _jit_sym_setinfo_ex, &index_info);
-
-							new_indices_data = 1;
-						}
+						new_colour_cloud_data = 1;
 					}
 				}
 			}
 
-			if (use_colour_cloud) {
-				// I'd like to also output a matrix giving a 3D position for each camera space point
-				hr = m_mapper->MapColorFrameToCameraSpace(
-					cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
-					cColorWidth*cColorHeight, (CameraSpacePoint *)colour_cloud_mat.back); // Output CameraSpacePoint array and size)
-				if (SUCCEEDED(hr)) {
-
-					if (face_negative_z) {
-						int n = cColorWidth*cColorHeight;
-						glm::vec3 * p = colour_cloud_mat.back;
-						while (n--) {
-							p->z = -p->z;
-							p->x = -p->x;
-							p++;
-						}
-					}
-
-					new_colour_cloud_data = 1;
-
-				}
-			}
+			SafeRelease(colorframe);
+			SafeRelease(depthframe);
+			SafeRelease(colorframeref);
+			SafeRelease(depthframeref);
 		}
-		
-		SafeRelease(colorframe);
-		SafeRelease(depthframe);
-		SafeRelease(colorframeref);
-		SafeRelease(depthframeref);
+
+		SafeRelease(m_reader);
 	}
 
 	void close() {

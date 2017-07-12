@@ -52,13 +52,13 @@
 , 			{
 				"box" : 				{
 					"id" : "obj-7",
-					"linecount" : 13,
+					"linecount" : 14,
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 94.5, 308.0, 437.0, 181.0 ],
+					"patching_rect" : [ 94.5, 308.0, 447.0, 194.0 ],
 					"style" : "",
-					"text" : "ok hot reloading c++ works\n\nusing MaxAPI symbols works\n\ncan load & use 3rd party libs too, but have to specify in @attrs\n\nnext problem: including C++ standard headers barfs, probably because stdc++ lib is not linked? need to dig into the clang API to fix that, eek.\n\n---\n\nOK totally different idea: shell out to a clang++ command line, build module as a shared lib, dlopen it back in?"
+					"text" : "ok hot reloading c++ works\n\nusing MaxAPI symbols works\n\ncan load & use 3rd party libs too, but have to specify in @attrs; not very x-compatible... \n\nnext problem: including C++ standard headers barfs, probably because stdc++ lib is not linked? need to dig into the clang API to fix that, eek.\n\n---\n\nOK totally different idea: shell out to a clang++ command line, build module as a shared lib, dlopen it back in?"
 				}
 
 			}
@@ -148,9 +148,9 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 67.0, 195.0, 492.0, 35.0 ],
+					"patching_rect" : [ 67.0, 195.0, 579.0, 35.0 ],
 					"style" : "",
-					"text" : "compile @includes /usr/local/include /usr/local/include/pcl-1.8 @libraries libglfw.dylib @file compile_test.cpp"
+					"text" : "compile @includes /usr/include/c++/4.2.1 /usr/local/include /usr/local/include/pcl-1.8 @libraries libglfw.dylib @file compile_test.cpp"
 				}
 
 			}

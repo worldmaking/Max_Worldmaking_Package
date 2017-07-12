@@ -1,0 +1,30 @@
+{
+  "DVTSourceControlWorkspaceBlueprintPrimaryRemoteRepositoryKey" : "68976B1971097123B3BFF61C52102148E53D1CEA",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyRepositoryLocationsKey" : {
+
+  },
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyStatesKey" : {
+    "68976B1971097123B3BFF61C52102148E53D1CEA" : 9223372036854775807,
+    "20DC6287C6D318433B681296E0BF364C4882CD47" : 9223372036854775807
+  },
+  "DVTSourceControlWorkspaceBlueprintIdentifierKey" : "42394C7D-CB96-44FB-8CCC-77858DE24B5A",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyPathsKey" : {
+    "68976B1971097123B3BFF61C52102148E53D1CEA" : "Max_Worldmaking_Package\/",
+    "20DC6287C6D318433B681296E0BF364C4882CD47" : "max-sdk\/"
+  },
+  "DVTSourceControlWorkspaceBlueprintNameKey" : "dyn",
+  "DVTSourceControlWorkspaceBlueprintVersion" : 204,
+  "DVTSourceControlWorkspaceBlueprintRelativePathToProjectKey" : "source\/dyn\/dyn.xcodeproj",
+  "DVTSourceControlWorkspaceBlueprintRemoteRepositoriesKey" : [
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "github.com:Cycling74\/max-sdk.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "20DC6287C6D318433B681296E0BF364C4882CD47"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "github.com:worldmaking\/Max_Worldmaking_Package.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "68976B1971097123B3BFF61C52102148E53D1CEA"
+    }
+  ]
+}

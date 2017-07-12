@@ -75,7 +75,7 @@ function ws_connect() {
             post('DISCONNECTED from ' + address);
             connected = false;
             // set up an auto-reconnect task:
-            //connectTask = setInterval(ws_connect, 1000);
+            connectTask = setTimeout(ws_connect, 1000);
         };
 
         wsocket.onmessage = function(ev) {

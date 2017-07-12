@@ -1,5 +1,9 @@
 #include "al_cv.hpp"
 
+/*
+ OSX: brew install opencv3 --with-contrib
+ */
+
 void ext_main(void *r)
 {
 	t_class *c;
