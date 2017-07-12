@@ -205,6 +205,7 @@ public:
 	// attrs
 	int stitch;
 	int unique, use_colour, use_depth, use_colour_cloud, align_depth_to_color, uselock;
+	int flip_z = 1;
 	int player, skeleton, seated, near_mode, audio, high_quality_color;
 	int skeleton_smoothing;
 	int device_count;
@@ -376,6 +377,16 @@ public:
 					cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
 					cDepthWidth*cDepthHeight, (CameraSpacePoint *)cloud_mat.back); // Output CameraSpacePoint array and size
 				if (SUCCEEDED(hr)) {
+
+					if (flip_z) {
+						int n = cloud_mat.dim.x*cloud_mat.dim.y;
+						glm::vec3 * p = cloud_mat.back;
+						while(n--) {
+							p->z = -p->z;
+							p++;
+						}
+					}
+
 					new_cloud_data = 1;
 
 					// let's look at how many of these are valid points:
@@ -465,6 +476,16 @@ public:
 					cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
 					cColorWidth*cColorHeight, (CameraSpacePoint *)colour_cloud_mat.back); // Output CameraSpacePoint array and size)
 				if (SUCCEEDED(hr)) {
+
+					if (flip_z) {
+						int n = colour_cloud_mat.dim.x*colour_cloud_mat.dim.y;
+						glm::vec3 * p = colour_cloud_mat.back;
+						while (n--) {
+							p->z = -p->z;
+							p++;
+						}
+					}
+
 					new_colour_cloud_data = 1;
 
 				}
@@ -585,8 +606,13 @@ void ext_main(void *r)
 	class_addmethod(c, (method)kinect_close, "close", 0);
 
 	CLASS_ATTR_LONG(c, "use_depth", 0, kinect2, use_depth);
+	CLASS_ATTR_STYLE(c, "use_depth", 0, "onoff");
 	CLASS_ATTR_LONG(c, "use_colour", 0, kinect2, use_colour);
+	CLASS_ATTR_STYLE(c, "use_colour", 0, "onoff");
 	CLASS_ATTR_LONG(c, "use_colour_cloud", 0, kinect2, use_colour_cloud);
+	CLASS_ATTR_STYLE(c, "use_colour_cloud", 0, "onoff");
+	CLASS_ATTR_LONG(c, "flip_z", 0, kinect2, flip_z);
+	CLASS_ATTR_STYLE(c, "flip_z", 0, "onoff");
 
 	CLASS_ATTR_LONG(c, "stitch", 0, kinect2, stitch);
 
