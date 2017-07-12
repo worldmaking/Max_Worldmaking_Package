@@ -158,6 +158,9 @@ struct DepthPlayer {
 };
 #pragma pack(pop)
 
+static t_symbol * ps_vertex_matrix;
+static t_symbol * ps_texcoord_matrix;
+static t_symbol * ps_index_matrix;
 static t_class * max_class = 0;
 static const int        cDepthWidth = 512;
 static const int        cDepthHeight = 424;
@@ -168,8 +171,8 @@ class kinect2 {
 public:
 	t_object ob; // max objkinectt, must be first!
 	// outlets:
-	void *		outlet_cloud;
-	void *		outlet_uv;
+	//void *		outlet_cloud;
+	//void *		outlet_uv;
 	void *		outlet_rgb;
 	void *		outlet_colour_cloud;
 	void *		outlet_depth;
@@ -205,7 +208,7 @@ public:
 	// attrs
 	int stitch;
 	int unique, use_colour, use_depth, use_colour_cloud, align_depth_to_color, uselock;
-	int flip_z = 1;
+	int face_negative_z = 1;
 	int player, skeleton, seated, near_mode, audio, high_quality_color;
 	int skeleton_smoothing;
 	int device_count;
@@ -223,9 +226,9 @@ public:
 		outlet_msg = outlet_new(&ob, 0);
 		outlet_skeleton = outlet_new(&ob, 0);
 		// mesh related:
-		outlet_mesh = outlet_new(&ob, NULL);
-		outlet_uv = outlet_new(&ob, "jit_matrix");
-		outlet_cloud = outlet_new(&ob, "jit_matrix");
+		outlet_mesh = outlet_new(&ob, "jit_matrix");
+		//outlet_uv = outlet_new(&ob, "jit_matrix");
+		//outlet_cloud = outlet_new(&ob, "jit_matrix");
 		// depth related:
 		outlet_player = outlet_new(&ob, "jit_matrix");
 		outlet_depth = outlet_new(&ob, "jit_matrix");
@@ -245,10 +248,10 @@ public:
 
 		use_colour = 1;
 		use_colour_cloud = 0;
-
 		use_depth = 1;
 		unique = 1;
 		stitch = 1;
+		face_negative_z = 1;
 
 
 		device = 0;
@@ -320,6 +323,8 @@ public:
 	}
 
 	void getKinectData() {
+		float zmul = face_negative_z ? -1.f : 1.f;
+
 		IMultiSourceFrame* frame = nullptr;
 		IDepthFrame* depthframe = nullptr;
 		IDepthFrameReference* depthframeref = nullptr;
@@ -378,11 +383,11 @@ public:
 					cDepthWidth*cDepthHeight, (CameraSpacePoint *)cloud_mat.back); // Output CameraSpacePoint array and size
 				if (SUCCEEDED(hr)) {
 
-					if (flip_z) {
-						int n = cloud_mat.dim.x*cloud_mat.dim.y;
+					if (face_negative_z) {
 						glm::vec3 * p = cloud_mat.back;
-						while(n--) {
+						for (int i=0; i<capacity; i++) {
 							p->z = -p->z;
+							p->x = -p->x;
 							p++;
 						}
 					}
@@ -416,6 +421,7 @@ public:
 
 					if (stitch > 0) {
 						int steps = MIN(stitch, cDepthHeight/2);
+
 						float facesMaxLength = steps * 0.1f;
 						vec3 * vertices = cloud_mat.back;
 						uint32_t * indices = index_mat.back;
@@ -434,7 +440,7 @@ public:
 								const vec3 & vBR = vertices[bottomRight];
 
 								//upper left triangle
-								if (vTL.z > 0 && vTR.z > 0 && vBL.z > 0
+								if (vTL.z*zmul > 0 && vTR.z*zmul > 0 && vBL.z*zmul > 0
 									&& abs(vTL.z - vTR.z) < facesMaxLength
 									&& abs(vTL.z - vBL.z) < facesMaxLength) {
 									*indices++ = topLeft;
@@ -444,7 +450,7 @@ public:
 								}
 
 								//bottom right triangle
-								if (vBR.z > 0 && vTR.z > 0 && vBL.z > 0
+								if (vBR.z*zmul > 0 && vTR.z*zmul > 0 && vBL.z*zmul > 0
 									&& abs(vBR.z - vTR.z) < facesMaxLength
 									&& abs(vBR.z - vBL.z) < facesMaxLength) {
 									*indices++ = topRight;
@@ -477,11 +483,12 @@ public:
 					cColorWidth*cColorHeight, (CameraSpacePoint *)colour_cloud_mat.back); // Output CameraSpacePoint array and size)
 				if (SUCCEEDED(hr)) {
 
-					if (flip_z) {
-						int n = colour_cloud_mat.dim.x*colour_cloud_mat.dim.y;
+					if (face_negative_z) {
+						int n = cColorWidth*cColorHeight;
 						glm::vec3 * p = colour_cloud_mat.back;
 						while (n--) {
 							p->z = -p->z;
+							p->x = -p->x;
 							p++;
 						}
 					}
@@ -526,16 +533,16 @@ public:
 				//if (uselock) systhread_mutex_unlock(depth_mutex);
 				new_depth_data = 0;
 			}
-			if (new_uv_data || unique == 0) {
-				outlet_anything(outlet_uv, _jit_sym_jit_matrix, 1, uv_mat.name);
-				new_uv_data = 0;
-			}
 			if (new_indices_data || unique == 0) {
-				outlet_anything(outlet_mesh, _jit_sym_jit_matrix, 1, index_mat.name);
+				outlet_anything(outlet_mesh, ps_index_matrix, 1, index_mat.name);
 				new_indices_data = 0;
 			}
+			if (new_uv_data || unique == 0) {
+				outlet_anything(outlet_mesh, ps_texcoord_matrix, 1, uv_mat.name);
+				new_uv_data = 0;
+			}
 			if (new_cloud_data || unique == 0) {
-				outlet_anything(outlet_cloud, _jit_sym_jit_matrix, 1, cloud_mat.name);
+				outlet_anything(outlet_mesh, ps_vertex_matrix, 1, cloud_mat.name);
 				new_cloud_data = 0;
 			}
 			if (new_colour_cloud_data || unique == 0) {
@@ -584,10 +591,8 @@ void kinect_assist(kinect2 *x, void *b, long m, long a, char *s)
 		case 1: sprintf(s, "3D cloud at colour dim (jit_matrix)"); break;
 		case 2: sprintf(s, "depth (jit_matrix)"); break;
 		case 3: sprintf(s, "player at depth dim (jit_matrix)"); break;
-		case 4: sprintf(s, "cloud for mesh (jit_matrix)"); break;
-		case 5: sprintf(s, "texture coordinates for mesh (jit_matrix)"); break;
-		case 6: sprintf(s, "indices for mesh (jit_matrix)"); break;
-		case 7: sprintf(s, "skeleton"); break;
+		case 4: sprintf(s, "matrices for jit.gl.mesh (jit_matrix)"); break;
+		case 5: sprintf(s, "skeleton"); break;
 		default: sprintf(s, "other messages"); break;
 		}
 	}
@@ -596,6 +601,10 @@ void kinect_assist(kinect2 *x, void *b, long m, long a, char *s)
 void ext_main(void *r)
 {
 	initialize_jitlib();
+
+	ps_vertex_matrix = gensym("vertex_matrix");
+	ps_texcoord_matrix = gensym("texcoord_matrix");
+	ps_index_matrix = gensym("index_matrix");
 
 	t_class *c;
 
@@ -611,8 +620,8 @@ void ext_main(void *r)
 	CLASS_ATTR_STYLE(c, "use_colour", 0, "onoff");
 	CLASS_ATTR_LONG(c, "use_colour_cloud", 0, kinect2, use_colour_cloud);
 	CLASS_ATTR_STYLE(c, "use_colour_cloud", 0, "onoff");
-	CLASS_ATTR_LONG(c, "flip_z", 0, kinect2, flip_z);
-	CLASS_ATTR_STYLE(c, "flip_z", 0, "onoff");
+	CLASS_ATTR_LONG(c, "face_negative_z", 0, kinect2, face_negative_z);
+	CLASS_ATTR_STYLE(c, "face_negative_z", 0, "onoff");
 
 	CLASS_ATTR_LONG(c, "stitch", 0, kinect2, stitch);
 

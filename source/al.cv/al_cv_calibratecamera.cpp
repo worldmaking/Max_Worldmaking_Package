@@ -181,6 +181,8 @@ public:
 			return;
 		}
 
+		
+
 		for (unsigned int i = 0; i<tvecs.size(); i++) {
 			// let's look at rvecs & tvecs:
 			//post("tvec %d %f %f %f", i, tvecs[i].at<double>(0), tvecs[i].at<double>(1), tvecs[i].at<double>(2));
