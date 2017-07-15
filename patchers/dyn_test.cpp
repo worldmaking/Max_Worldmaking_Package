@@ -1,66 +1,33 @@
-#if defined(__x86_64__) || defined(_M_X64)
-	typedef double 		t_atom_float;
-	typedef long long 	t_atom_long;
-#else 
-	typedef float 		t_atom_float;
-	typedef long 		t_atom_long;
-#endif 
-
-struct t_object;
-
-struct t_symbol {
-	char *s_name;
-	t_object *s_thing;
-};
-
-struct t_atom {
-	short a_type;
-	union {
-		t_atom_long w_long;
-		t_atom_float w_float;
-		t_symbol *w_sym;
-		t_object *w_obj;
-	} a_w;
-};
-
-extern "C" {
-
-	t_symbol *gensym(const char *s);
-
-	extern void object_post(void *, const char *, ...);
-	void object_warn(void *, const char *, ...);
-	void object_error(void *, const char *, ...);
-
-}
-
+#include "al_max.h"
 #include "al_math.h"
 
-struct Foo {
+struct Instance {
+	t_object * host = 0;
 	
-	Foo() {
-		object_post(0, "ctor");
+	Instance(t_object * host) : host(host) {
+		object_post(host, "created dynamic instance %p", this);
 	}
-	~Foo() {
-		object_post(0, "dtor");
+	
+	~Instance() {
+		object_post(host, "destroying dynamic instance %p", this);
 	}
 };
 
-// yes, ctor/dtor work
-Foo foo;
-
 extern "C" {
 
-	__declspec(dllexport) int init(t_object * host) {
-		object_post(host, "init");
-		
-		return 0;	
+	C74_EXPORT void * init(t_object * host) {
+		return new Instance(host);
+	}
+	
+	C74_EXPORT void quit(t_object * host, Instance * I) {
+		delete I;
 	}
 
-	__declspec(dllexport) int test(int x) {
-		return (glm::linearRand(0, x-1));
+	C74_EXPORT t_atom_long test(Instance * I, t_atom_long x) {
+		return glm::linearRand((int)0, (int)x-1);
 	}
 
-	__declspec(dllexport) void anything(t_object * x, t_symbol * s, long argc, t_atom * argv) {
+	C74_EXPORT void anything(t_object * x, t_symbol * s, long argc, t_atom * argv) {
 		object_post(x, "%s(#%d)\n", s->s_name, argc);
 	}
 }

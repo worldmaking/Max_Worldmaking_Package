@@ -40,7 +40,7 @@ static t_class * max_class = 0;
 class dyn {
 public:
 	
-	typedef int (*testfun_t)(void * instance, int);
+	typedef t_atom_long (*testfun_t)(void * instance, t_atom_long);
 	typedef void * (*initfun_t)(void *);
 	typedef void (*quitfun_t)(void *host, void * instance);
 	typedef void (*gimmefun_t)(void * instance, t_symbol *, long, t_atom *);
@@ -232,9 +232,10 @@ void dyn_anything(dyn *x, t_symbol *s, long argc, t_atom *argv) {
 	if (x->gimmefun) x->gimmefun(x->instance_handle, s, argc, argv);
 }
 
-void dyn_test(dyn *x, t_atom_long i) {
-	if (x->testfun) {
-		object_post(&x->ob, "test(%d) -> %d", i, x->testfun(x->instance_handle, i));
+void dyn_test(dyn *x, t_symbol *s, long argc, t_atom *argv) {
+	if (argc && x->testfun && x->instance_handle) {
+		t_atom_long i = atom_getlong(argv);
+		object_post(&x->ob, "test(%d) -> %ld", i, x->testfun(x->instance_handle, i));
 	}
 }
 
@@ -266,6 +267,8 @@ t_max_err dyn_setattr_autowatch(dyn *x, t_symbol *s, long argc, t_atom *argv) {
 void ext_main(void *r)
 {
 	t_class *c;
+
+	object_post(0, "ctor %d %d %d", sizeof(t_atom_long), sizeof(int), sizeof(long));
 	
 	common_symbols_init();
 	
@@ -276,7 +279,7 @@ void ext_main(void *r)
 	
 	class_addmethod(c, (method)dyn_reload, "reload", 0);
 	class_addmethod(c, (method)dyn_unload, "unload", 0);
-	class_addmethod(c, (method)dyn_test, "test", A_LONG, 0);
+	class_addmethod(c, (method)dyn_test, "test", A_GIMME, 0);
 	class_addmethod(c, (method)dyn_anything, "anything", A_GIMME, 0);
 	
 	CLASS_ATTR_SYM(c, "file", 0, dyn, file);
