@@ -37,6 +37,8 @@
 
 static t_class * max_class = 0;
 
+static t_systhread;
+
 class dyn {
 public:
 	
@@ -47,6 +49,7 @@ public:
 	
 	t_object ob;
 	void * outlet_msg;
+	void * outlet_out1;
 	
 	// attrs;
 	t_symbol * file = _sym_nothing;
@@ -66,19 +69,32 @@ public:
 	
 	dyn() {
 		outlet_msg = outlet_new(&ob, 0);
+		
+		// create at least one dynamic outlet:
+		t_object * b;
+		object_obex_lookup(&ob,gensym("#B"),(t_object **)&b);
+		object_method(b, gensym("dynlet_begin"));
+		outlet_out1 = outlet_append(&ob, 0, 0);
+		object_method(b, gensym("dynlet_end"));
+		object_obex_storeflags(&ob, gensym("out1"), (t_object *)outlet_out1, OBJ_FLAG_REF);
 	}
 	
 	~dyn() {
+		if (filewatcher) {
+			filewatcher_stop(filewatcher);
+			object_free((t_object *)filewatcher);
+			filewatcher = 0;
+		}
+		
 		unload();
 	}
 	
 	void unload() {
+		
 		if (lib_handle) {
 			// call the dylib's close handler
 			if (quitfun) {
-				
 				quitfun(this, instance_handle);
-				
 			}
 			
 #ifdef WIN_VERSION
@@ -107,6 +123,7 @@ public:
 	
 	void reload() {
 		if (file) {
+			
 			if (filewatcher) {
 				filewatcher_stop(filewatcher);
 				object_free((t_object *)filewatcher);
@@ -168,7 +185,7 @@ public:
 						
 						if (initfun) {
 							instance_handle = initfun(this);
-							object_post(&ob, "init result %p", instance_handle);
+							//object_post(&ob, "init result %p", instance_handle);
 						}
 						
 						// loaded OK:
@@ -184,30 +201,12 @@ public:
 	}
 };
 
-void * dyn_new(t_symbol *s, long argc, t_atom *argv) {
-	dyn *x = NULL;
-	if ((x = (dyn *)object_alloc(max_class))) {
-		
-		x = new (x) dyn();
-		
-		// apply attrs:
-		attr_args_process(x, (short)argc, argv);
-		
-		// consider 1st arg if no @file attr
-		if (x->file == _sym_nothing && argc && atom_gettype(argv) == A_SYM) {
-			x->file = atom_getsym(argv);
-			x->reload();
-		}
-	}
-	return (x);
-}
-
-void dyn_free(dyn *x) {
-	x->~dyn();
+void dyn_reload_deferred(dyn *x) {
+	x->reload();
 }
 
 void dyn_reload(dyn *x) {
-	x->reload();
+	defer_low(x, (method)dyn_reload_deferred, 0, 0, 0);
 }
 
 void dyn_unload(dyn *x) {
@@ -215,7 +214,7 @@ void dyn_unload(dyn *x) {
 }
 
 void dyn_filechanged(dyn *x, char *filename, short path) {
-	x->reload();
+	defer_low(x, (method)dyn_reload_deferred, 0, 0, 0);
 }
 
 void dyn_assist(dyn *x, void *b, long m, long a, char *s)
@@ -232,6 +231,10 @@ void dyn_anything(dyn *x, t_symbol *s, long argc, t_atom *argv) {
 	if (x->gimmefun) x->gimmefun(x->instance_handle, s, argc, argv);
 }
 
+void dyn_bang(dyn * x) {
+	dyn_anything(x, _sym_bang, 0, 0);
+}
+
 void dyn_test(dyn *x, t_atom_long i) {
 	if (x->testfun) {
 		object_post(&x->ob, "test(%d) -> %d", i, x->testfun(x->instance_handle, i));
@@ -243,7 +246,7 @@ t_max_err dyn_setattr_file(dyn *x, t_symbol *s, long argc, t_atom *argv) {
 	if(argc && argv) v = atom_getsym(argv);
 	if (v) {
 		x->file = v;
-		x->reload();
+		defer_low(x, (method)dyn_reload_deferred, 0, 0, 0);
 	}
 	return MAX_ERR_NONE;
 }
@@ -263,6 +266,30 @@ t_max_err dyn_setattr_autowatch(dyn *x, t_symbol *s, long argc, t_atom *argv) {
 	return MAX_ERR_NONE;
 }
 
+void * dyn_new(t_symbol *s, long argc, t_atom *argv) {
+	dyn *x = NULL;
+	if ((x = (dyn *)object_alloc(max_class))) {
+		
+		x = new (x) dyn();
+		
+		// apply attrs:
+		attr_args_process(x, (short)argc, argv);
+		
+		// consider 1st arg if no @file attr
+		if (x->file == _sym_nothing && argc && atom_gettype(argv) == A_SYM) {
+			x->file = atom_getsym(argv);
+			//x->reload();
+			
+			defer_low(x, (method)dyn_reload_deferred, 0, 0, 0);
+		}
+	}
+	return (x);
+}
+
+void dyn_free(dyn *x) {
+	x->~dyn();
+}
+
 void ext_main(void *r)
 {
 	t_class *c;
@@ -277,6 +304,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)dyn_reload, "reload", 0);
 	class_addmethod(c, (method)dyn_unload, "unload", 0);
 	class_addmethod(c, (method)dyn_test, "test", A_LONG, 0);
+	class_addmethod(c, (method)dyn_bang, "bang", 0);
 	class_addmethod(c, (method)dyn_anything, "anything", A_GIMME, 0);
 	
 	CLASS_ATTR_SYM(c, "file", 0, dyn, file);

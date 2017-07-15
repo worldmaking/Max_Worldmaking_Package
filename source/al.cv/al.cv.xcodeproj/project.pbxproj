@@ -11,7 +11,6 @@
 		8969DD221F048B1400D14631 /* al_cv_calibratecamera.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8969DD1F1F048B1400D14631 /* al_cv_calibratecamera.cpp */; };
 		8969DD231F048B1400D14631 /* al_cv_findchessboard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8969DD201F048B1400D14631 /* al_cv_findchessboard.cpp */; };
 		8969DD241F048B1400D14631 /* al_cv_solvepnp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8969DD211F048B1400D14631 /* al_cv_solvepnp.cpp */; };
-		8969DD261F048B1C00D14631 /* al_aruco.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8969DD251F048B1C00D14631 /* al_aruco.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -139,7 +138,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				8969DD231F048B1400D14631 /* al_cv_findchessboard.cpp in Sources */,
-				8969DD261F048B1C00D14631 /* al_aruco.cpp in Sources */,
 				8969DD221F048B1400D14631 /* al_cv_calibratecamera.cpp in Sources */,
 				8969DD241F048B1400D14631 /* al_cv_solvepnp.cpp in Sources */,
 				22CF114E0EE9A6A70054F513 /* al.cv.cpp in Sources */,
@@ -172,6 +170,7 @@
 					"\"$(C74SUPPORT)/max-includes\"",
 					"\"$(C74SUPPORT)/msp-includes\"",
 					"\"$(C74SUPPORT)/jit-includes\"",
+					../,
 				);
 				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
 				PRODUCT_NAME = al.cv;
@@ -188,6 +187,7 @@
 					"\"$(C74SUPPORT)/max-includes\"",
 					"\"$(C74SUPPORT)/msp-includes\"",
 					"\"$(C74SUPPORT)/jit-includes\"",
+					../,
 				);
 				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
 				PRODUCT_NAME = al.cv;
