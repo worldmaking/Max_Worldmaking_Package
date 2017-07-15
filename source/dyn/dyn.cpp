@@ -235,10 +235,11 @@ void dyn_bang(dyn * x) {
 	dyn_anything(x, _sym_bang, 0, 0);
 }
 
-void dyn_test(dyn *x, t_symbol *s, long argc, t_atom *argv) {
-	if (argc && x->testfun && x->instance_handle) {
-		t_atom_long i = atom_getlong(argv);
-		//object_post(&x->ob, "test(%d) -> %ld", i, x->testfun(x->instance_handle, i));
+void dyn_test(dyn *x, t_atom_long i) {
+	if (x->testfun && x->instance_handle) {
+		t_atom a[1];
+		atom_setlong(a, x->testfun(x->instance_handle, i));
+		outlet_anything(x->outlet_msg, gensym("test"), 1, a);
 	}
 }
 
@@ -307,7 +308,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)dyn_reload, "reload", 0);
 	class_addmethod(c, (method)dyn_unload, "unload", 0);
 
-	class_addmethod(c, (method)dyn_test, "test", A_GIMME, 0);
+	class_addmethod(c, (method)dyn_test, "test", A_LONG, 0);
 	class_addmethod(c, (method)dyn_bang, "bang", 0);
 	class_addmethod(c, (method)dyn_anything, "anything", A_GIMME, 0);
 	
