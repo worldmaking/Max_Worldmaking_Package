@@ -160,7 +160,15 @@ public:
 			
 			char libname[MAX_FILENAME_CHARS];
 #ifdef WIN_VERSION
+
+			
+#ifdef C74_X64
+			// Max 64-bit should look into a /x64 subfolder 
+			snprintf_zero(libname, MAX_FILENAME_CHARS, "%s.x64.dll", file->s_name);
+#else
 			snprintf_zero(libname, MAX_FILENAME_CHARS, "%s.dll", file->s_name);
+#endif
+
 #else
 			snprintf_zero(libname, MAX_FILENAME_CHARS, "%s.dylib", file->s_name);
 #endif
@@ -180,7 +188,7 @@ public:
 				if (path_toabsolutesystempath(vol, libname, folderpath) == 0
 					&& path_nameconform(folderpath, systempath, PATH_STYLE_SLASH, PATH_TYPE_BOOT) == 0) {
 					
-					//object_post(&ob, "path %s", systempath);
+					object_post(&ob, "path %s", systempath);
 					
 					unload();
 					
@@ -191,12 +199,30 @@ public:
 #endif
 					if (!lib_handle) {
 #ifdef WIN_VERSION
-						char err[256];
-						FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(),
-									  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), err, 255, NULL);
-						object_error(&ob, "%s", err);
+						int errcode = GetLastError();
+						
+						//char err[256];
+						//FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errcode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), err, 255, NULL);
+						//object_error(&ob, "failed to load: %s", err);
+
+						LPVOID msg_buf;
+						DWORD rv = FormatMessage(
+							FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+							NULL,
+							errcode,
+							MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+							(LPSTR)&msg_buf,
+							0,
+							NULL);
+						if (rv > 0) {
+							object_error(&ob, "failed to load (%d): %s\n", errcode, msg_buf);
+							LocalFree(msg_buf);
+						}
+						else {
+							object_error(&ob, "failed to load (%d): unknown error code\n", errcode);
+						}
 #else
-						object_error(&ob, "%s", dlerror());
+						object_error(&ob, "failed to load: %s", dlerror());
 #endif
 					} else {
 #ifdef WIN_VERSION
@@ -213,7 +239,7 @@ public:
 						
 						if (initfun) {
 							instance_handle = initfun(this);
-							//object_post(&ob, "init result %p", instance_handle);
+							object_post(&ob, "init result %p", instance_handle);
 						}
 						
 						// loaded OK:
@@ -324,7 +350,7 @@ void ext_main(void *r)
 {
 	t_class *c;
 
-	object_post(0, "ctor %d %d %d", sizeof(t_atom_long), sizeof(int), sizeof(long));
+	object_post(0, "ext_main %d %d %d", sizeof(t_atom_long), sizeof(int), sizeof(long));
 	
 	common_symbols_init();
 	
