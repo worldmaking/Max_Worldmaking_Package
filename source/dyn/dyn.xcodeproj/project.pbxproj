@@ -166,8 +166,16 @@
 					"\"$(C74SUPPORT)/msp-includes\"",
 					"\"$(C74SUPPORT)/jit-includes\"",
 					"\"$(PROJECT_DIR)/..\"",
+					"\"$(PROJECT_DIR)/../libuv/include\"",
 				);
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
+				LIBRARY_SEARCH_PATHS = "\"$(PROJECT_DIR)/../libuv/lib/osx\"";
+				OTHER_LDFLAGS = (
+					"$(OTHER_LDFLAGS)",
+					"$(C74_SYM_LINKER_FLAGS)",
+					"-lpthread",
+					"-ldl",
+					"-luv",
+				);
 				PRODUCT_NAME = dyn;
 			};
 			name = Development;
@@ -182,8 +190,16 @@
 					"\"$(C74SUPPORT)/msp-includes\"",
 					"\"$(C74SUPPORT)/jit-includes\"",
 					"\"$(PROJECT_DIR)/..\"",
+					"\"$(PROJECT_DIR)/../libuv/include\"",
 				);
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
+				LIBRARY_SEARCH_PATHS = "\"$(PROJECT_DIR)/../libuv/lib/osx\"";
+				OTHER_LDFLAGS = (
+					"$(OTHER_LDFLAGS)",
+					"$(C74_SYM_LINKER_FLAGS)",
+					"-lpthread",
+					"-ldl",
+					"-luv",
+				);
 				PRODUCT_NAME = dyn;
 			};
 			name = Deployment;

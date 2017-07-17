@@ -1,0 +1,2 @@
+Libs: -L${libdir} -luv -lpthread -ldl 
+Cflags: -I${includedir}

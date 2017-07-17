@@ -5,7 +5,7 @@
 			"major" : 7,
 			"minor" : 3,
 			"revision" : 4,
-			"architecture" : "x86",
+			"architecture" : "x64",
 			"modernui" : 1
 		}
 ,
@@ -38,12 +38,24 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-8",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 216.0, 273.0, 80.0, 22.0 ],
+					"style" : "",
+					"text" : "print dyn-info"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-9",
 					"maxclass" : "button",
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 323.0, 153.0, 24.0, 24.0 ],
+					"patching_rect" : [ 323.0, 147.0, 24.0, 24.0 ],
 					"style" : ""
 				}
 
@@ -81,7 +93,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 412.0, 56.0, 366.0, 241.0 ],
+					"patching_rect" : [ 412.0, 56.0, 366.0, 234.0 ],
 					"style" : "",
 					"text" : "TODO\n\nWorks on Windows, except for the annoying thing of holding onto the dll; so unload is needed before recompiling\n(which makes a good argument for using a shell external in Max)\n\nadd a better plugin interface\ncall library's init(), return some state object (perhaps with handlers embedded), could even be a t_object if we want.\n\nmultiple instances: dlopen/close is playing well, but our instances aren't -- if one unloads() it can mess up another -- need some refcounting\n\ndynlet\n\ndynattr"
 				}
@@ -105,9 +117,9 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 216.0, 237.0, 34.0, 22.0 ],
+					"patching_rect" : [ 216.0, 237.0, 83.0, 22.0 ],
 					"style" : "",
-					"text" : "print"
+					"text" : "print dyn-msg"
 				}
 
 			}
@@ -273,6 +285,13 @@
 			}
 , 			{
 				"patchline" : 				{
+					"destination" : [ "obj-8", 0 ],
+					"source" : [ "obj-17", 1 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
 					"destination" : [ "obj-4", 0 ],
 					"midpoints" : [ 161.5, 316.0, 384.5, 316.0, 384.5, 126.0, 135.5, 126.0 ],
 					"source" : [ "obj-19", 0 ]
@@ -282,7 +301,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-17", 0 ],
-					"order" : 1,
 					"source" : [ "obj-2", 0 ]
 				}
 
@@ -290,8 +308,7 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-20", 0 ],
-					"order" : 0,
-					"source" : [ "obj-2", 0 ]
+					"source" : [ "obj-2", 1 ]
 				}
 
 			}
@@ -353,8 +370,8 @@
 			}
  ],
 		"dependency_cache" : [ 			{
-				"name" : "dyn.mxe",
-				"type" : "iLaF"
+				"name" : "dyn.mxo",
+				"type" : "iLaX"
 			}
  ],
 		"autosave" : 0

@@ -20,6 +20,7 @@
 
  */
 
+
 #include "al_max.h"
 
 #include "ext.h"
@@ -28,9 +29,15 @@
 
 #include <string>
 #ifdef WIN_VERSION
-
+	// Windows
 #else
-#include <dlfcn.h> // dlopen
+	// OSX
+	#include <dlfcn.h> // dlopen
+	#define USE_UV 1
+#endif
+
+#ifdef USE_UV
+#include "uv.h"
 #endif
 
 #define MULTILINE(...) #__VA_ARGS__
@@ -67,6 +74,10 @@ public:
 	quitfun_t quitfun = 0;
 	gimmefun_t gimmefun = 0;
 	
+#ifdef USE_UV
+	uv_loop_t uvloop;
+#endif
+	
 	dyn() {
 		outlet_msg = outlet_new(&ob, 0);
 		
@@ -77,6 +88,11 @@ public:
 		outlet_out1 = outlet_append(&ob, 0, 0);
 		object_method(b, gensym("dynlet_end"));
 		object_obex_storeflags(&ob, gensym("out1"), (t_object *)outlet_out1, OBJ_FLAG_REF);
+		
+#ifdef USE_UV
+		int err = uv_loop_init(&uvloop);
+		if (err) object_error(&ob, "uv error %s", uv_strerror(err));
+#endif
 	}
 	
 	~dyn() {
@@ -87,7 +103,19 @@ public:
 		}
 		
 		unload();
+#ifdef USE_UV
+		uv_loop_close(&uvloop);
+#endif
 	}
+	
+#ifdef USE_UV
+	// somehow need to pulse this
+	// it should always be from the same thread
+	// maybe a qelem
+	void uvtick() {
+		uv_run(&uvloop, UV_RUN_DEFAULT);
+	}
+#endif
 	
 	void unload() {
 		
