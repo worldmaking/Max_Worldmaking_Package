@@ -159,6 +159,7 @@ struct DepthPlayer {
 #pragma pack(pop)
 
 static t_symbol * ps_vertex_matrix;
+static t_symbol * ps_normal_matrix;
 static t_symbol * ps_texcoord_matrix;
 static t_symbol * ps_index_matrix;
 static t_class * max_class = 0;
@@ -185,6 +186,7 @@ public:
 	jitmat<ARGB> rgb_mat;
 	jitmat<uint32_t> depth_mat;
 	jitmat<vec3> cloud_mat;
+	jitmat<vec3> normal_mat;
 	jitmat<vec2> uv_mat; // texture coordinates to get RGB for each cloud coordinate
 	jitmat<uint32_t> index_mat; // indices for stitched matrix
 
@@ -206,7 +208,7 @@ public:
 	RGBQUAD * m_rgb_buffer;
 
 	// attrs
-	int stitch;
+	int stitch, autonormals;
 	int unique, use_colour, use_depth, use_colour_cloud, align_depth_to_color, uselock;
 	int face_negative_z = 1;
 	int player, skeleton, seated, near_mode, audio, high_quality_color;
@@ -219,9 +221,10 @@ public:
 	vec4 orientation;
 	quat orientation_glm;
 	t_symbol * serial;
+	t_atom_float triangle_limit;
+	t_atom_float normal_temporal_smooth;
 
 	kinect2() {
-		
 		
 		outlet_msg = outlet_new(&ob, 0);
 		outlet_skeleton = outlet_new(&ob, 0);
@@ -240,9 +243,9 @@ public:
 		rgb_mat.init(4, _jit_sym_char, cColorWidth, cColorHeight);
 		colour_cloud_mat.init(3, _jit_sym_float32, cColorWidth, cColorHeight);
 
-		uv_mat.init(2, _jit_sym_float32, cDepthWidth * cDepthHeight, 1);
-		cloud_mat.init(3, _jit_sym_float32, cDepthWidth * cDepthHeight, 1);
-
+		uv_mat.init(2, _jit_sym_float32, cDepthWidth, cDepthHeight);
+		cloud_mat.init(3, _jit_sym_float32, cDepthWidth, cDepthHeight);
+		normal_mat.init(3, _jit_sym_float32, cDepthWidth, cDepthHeight);
 
 		index_mat.init(1, _jit_sym_long, (cDepthWidth * cDepthHeight) * 6, 1);
 
@@ -251,8 +254,10 @@ public:
 		use_depth = 1;
 		unique = 1;
 		stitch = 1;
+		autonormals = 1;
+		normal_temporal_smooth = 0.1;
 		face_negative_z = 1;
-
+		triangle_limit = 0.1;
 
 		device = 0;
 		new_depth_data = new_rgb_data = new_cloud_data = new_uv_data = new_indices_data = 0;
@@ -416,8 +421,9 @@ public:
 
 						if (stitch > 0) {
 							int steps = MIN(stitch, cDepthHeight/2);
-							float facesMaxLength = steps * 0.1f;
+							float facesMaxLength = steps * triangle_limit;
 							vec3 * vertices = cloud_mat.back;
+							vec3 * normals = normal_mat.back;
 							uint32_t * indices = index_mat.back;
 							int count = 0;
 							// maybe this couldbe faster?
@@ -433,24 +439,45 @@ public:
 									const vec3 & vBL = vertices[bottomLeft];
 									const vec3 & vBR = vertices[bottomRight];
 
+									// cw, ccw
+									// cw, ccw
+									glm::vec3 nTL = glm::normalize(glm::cross(vBL - vTL, vTR - vTL));
+									glm::vec3 nBR = glm::normalize(glm::cross(vBL - vTR, vBR - vTR));
+
+									bool okTL = 0;
 									//upper left triangle
 									if (vTL.z*zmul > 0 && vTR.z*zmul > 0 && vBL.z*zmul > 0
 										&& abs(vTL.z - vTR.z) < facesMaxLength
 										&& abs(vTL.z - vBL.z) < facesMaxLength) {
+										okTL = 1;
+
 										*indices++ = topLeft;
-										*indices++ = bottomLeft;
-										*indices++ = topRight;
+										*indices++ = bottomLeft; // shared
+										*indices++ = topRight; //shared
 										count += 3;
+
+										normals[topLeft] = nTL;
 									}
 
 									//bottom right triangle
 									if (vBR.z*zmul > 0 && vTR.z*zmul > 0 && vBL.z*zmul > 0
 										&& abs(vBR.z - vTR.z) < facesMaxLength
 										&& abs(vBR.z - vBL.z) < facesMaxLength) {
-										*indices++ = topRight;
+										*indices++ = topRight; //shared
+										*indices++ = bottomLeft;//shared
 										*indices++ = bottomRight;
-										*indices++ = bottomLeft;
 										count += 3;
+
+										normals[bottomRight] = nBR;
+										if (okTL) {
+											glm::vec3 navg = glm::normalize(nTL + nBR);
+											normals[bottomLeft] = navg;
+											normals[topRight] = navg;
+										}
+										else {
+											normals[bottomLeft] = nBR;
+											normals[topRight] = nBR;
+										}
 									}
 								}
 							}
@@ -537,6 +564,7 @@ public:
 			}
 			if (new_cloud_data || unique == 0) {
 				outlet_anything(outlet_mesh, ps_vertex_matrix, 1, cloud_mat.name);
+				outlet_anything(outlet_mesh, ps_normal_matrix, 1, normal_mat.name);
 				new_cloud_data = 0;
 			}
 			if (new_colour_cloud_data || unique == 0) {
@@ -597,6 +625,7 @@ void ext_main(void *r)
 	initialize_jitlib();
 
 	ps_vertex_matrix = gensym("vertex_matrix");
+	ps_normal_matrix = gensym("normal_matrix");
 	ps_texcoord_matrix = gensym("texcoord_matrix");
 	ps_index_matrix = gensym("index_matrix");
 
@@ -616,6 +645,8 @@ void ext_main(void *r)
 	CLASS_ATTR_STYLE(c, "use_colour_cloud", 0, "onoff");
 	CLASS_ATTR_LONG(c, "face_negative_z", 0, kinect2, face_negative_z);
 	CLASS_ATTR_STYLE(c, "face_negative_z", 0, "onoff");
+
+	CLASS_ATTR_FLOAT(c, "triangle_limit", 0, kinect2, triangle_limit);
 
 	CLASS_ATTR_LONG(c, "stitch", 0, kinect2, stitch);
 
