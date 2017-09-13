@@ -5256,6 +5256,7 @@
 						"tags" : "",
 						"style" : "",
 						"subpatcher_template" : "",
+						"visible" : 1,
 						"boxes" : [ 							{
 								"box" : 								{
 									"id" : "obj-17",
@@ -5380,7 +5381,7 @@
 									"numinlets" : 1,
 									"numoutlets" : 2,
 									"outlettype" : [ "jit_gl_texture", "" ],
-									"patching_rect" : [ 23.5, 368.0, 137.0, 22.0 ],
+									"patching_rect" : [ 23.5, 413.0, 137.0, 22.0 ],
 									"style" : "",
 									"text" : "jit.gl.texture vive @flip 0"
 								}
@@ -5393,7 +5394,7 @@
 									"numinlets" : 9,
 									"numoutlets" : 2,
 									"outlettype" : [ "jit_matrix", "" ],
-									"patching_rect" : [ 124.5, 560.0, 346.0, 22.0 ],
+									"patching_rect" : [ 48.5, 654.0, 346.0, 22.0 ],
 									"style" : "",
 									"text" : "jit.gl.mesh kinect_space @draw_mode triangles @color 1 1 1 1"
 								}
@@ -5430,8 +5431,8 @@
 									"id" : "obj-3",
 									"maxclass" : "newobj",
 									"numinlets" : 1,
-									"numoutlets" : 9,
-									"outlettype" : [ "jit_matrix", "jit_matrix", "jit_matrix", "jit_matrix", "jit_matrix", "jit_matrix", "", "", "" ],
+									"numoutlets" : 7,
+									"outlettype" : [ "jit_matrix", "jit_matrix", "jit_matrix", "jit_matrix", "jit_matrix", "", "" ],
 									"patching_rect" : [ 23.5, 302.0, 233.5, 22.0 ],
 									"style" : "",
 									"text" : "kinect2"
@@ -5618,6 +5619,19 @@
 								}
 
 							}
+, 							{
+								"box" : 								{
+									"attr" : "scale",
+									"id" : "obj-8",
+									"maxclass" : "attrui",
+									"numinlets" : 1,
+									"numoutlets" : 1,
+									"outlettype" : [ "" ],
+									"patching_rect" : [ 102.5, 546.0, 194.0, 22.0 ],
+									"style" : ""
+								}
+
+							}
  ],
 						"lines" : [ 							{
 								"patchline" : 								{
@@ -5697,24 +5711,6 @@
 									"disabled" : 0,
 									"hidden" : 0,
 									"source" : [ "obj-3", 0 ]
-								}
-
-							}
-, 							{
-								"patchline" : 								{
-									"destination" : [ "obj-5", 8 ],
-									"disabled" : 0,
-									"hidden" : 0,
-									"source" : [ "obj-3", 6 ]
-								}
-
-							}
-, 							{
-								"patchline" : 								{
-									"destination" : [ "obj-5", 1 ],
-									"disabled" : 0,
-									"hidden" : 0,
-									"source" : [ "obj-3", 5 ]
 								}
 
 							}
@@ -5805,6 +5801,15 @@
 									"disabled" : 0,
 									"hidden" : 0,
 									"source" : [ "obj-62", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-5", 0 ],
+									"disabled" : 0,
+									"hidden" : 0,
+									"source" : [ "obj-8", 0 ]
 								}
 
 							}
