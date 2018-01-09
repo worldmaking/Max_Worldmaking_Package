@@ -6,7 +6,7 @@ rem set up the environment of the console for VS2015
 call "%VCPATH%vcvarsall.bat" x86_amd64
 
 rem create a dll referring to the Max libs
-"%VCPATH%\\bin\\cl.exe" /D "WIN_VERSION" /D "WIN32" /D "NDEBUG" /O2 dyn_test.cpp /I "%cd%\\..\\source" /I "%cd%\\..\\..\\max-sdk\\source\\c74support\\max-includes\\" /I "%cd%\\..\\..\\max-sdk\\source\\c74support\\msp-includes\\" /I "%cd%\\..\\..\\max-sdk\\source\\c74support\\jit-includes\\" /link /DLL /MACHINE:X64 "%cd%\\..\\..\\max-sdk\\source\\c74support\\max-includes\\x64\\MaxAPI.lib" "%cd%\\..\\..\\max-sdk\\source\\c74support\\msp-includes\\x64\\MaxAudio.lib" "%cd%\\..\\..\\max-sdk\\source\\c74support\\jit-includes\\x64\\jitlib.lib" 
+"%VCPATH%\\bin\\cl.exe" /D "WIN_VERSION" /D "WIN64" /D "NDEBUG" /O2 dyn_test.cpp /I "%cd%\\..\\source" /I "%cd%\\..\\..\\max-sdk\\source\\c74support\\max-includes\\" /I "%cd%\\..\\..\\max-sdk\\source\\c74support\\msp-includes\\" /I "%cd%\\..\\..\\max-sdk\\source\\c74support\\jit-includes\\" /link /DLL /MACHINE:X64 "%cd%\\..\\..\\max-sdk\\source\\c74support\\max-includes\\x64\\MaxAPI.lib" "%cd%\\..\\..\\max-sdk\\source\\c74support\\msp-includes\\x64\\MaxAudio.lib" "%cd%\\..\\..\\max-sdk\\source\\c74support\\jit-includes\\x64\\jitlib.lib" 
 
 rem couldn't find a way to stop cl.exe from generating these, so clean up after
 del dyn_test.obj dyn_test.exp dyn_test.lib
