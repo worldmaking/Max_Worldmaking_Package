@@ -182,6 +182,7 @@ public:
 	void *		outlet_skeleton;
 	void *		outlet_msg;
 
+	t_systhread_mutex mlock;
 
 	jitmat<ARGB> rgb_mat;
 	jitmat<uint32_t> depth_mat;
@@ -206,6 +207,8 @@ public:
 	IMultiSourceFrameReader* m_reader;   // Kinect data source
 	ICoordinateMapper* m_mapper;         // Converts between depth, color, and 3d coordinates
 	RGBQUAD * m_rgb_buffer;
+	UINT16 * m_depth_buffer;
+	vec3 * m_cloud_buffer;
 
 	// attrs
 	int stitch, autonormals;
@@ -239,6 +242,8 @@ public:
 		outlet_colour_cloud = outlet_new(&ob, "jit_matrix");
 		outlet_rgb = outlet_new(&ob, "jit_matrix");
 
+		systhread_mutex_new(&mlock, 0);
+
 		depth_mat.init(1, _jit_sym_long, cDepthWidth, cDepthHeight);
 		rgb_mat.init(4, _jit_sym_char, cColorWidth, cColorHeight);
 		colour_cloud_mat.init(3, _jit_sym_float32, cColorWidth, cColorHeight);
@@ -264,11 +269,16 @@ public:
 		m_reader = nullptr;
 		m_mapper = nullptr;
 		m_rgb_buffer = new RGBQUAD[cColorWidth * cColorHeight];
+		m_depth_buffer = new UINT16[cDepthHeight * cDepthWidth];
+		m_cloud_buffer = new vec3[cDepthWidth * cDepthHeight];
 	}
 
 	~kinect2() {
 		close();
+		systhread_mutex_free(mlock);
 		if (m_rgb_buffer) delete[] m_rgb_buffer;
+		if (m_depth_buffer) delete[] m_depth_buffer;
+		if (m_cloud_buffer) delete[] m_cloud_buffer;
 	}
 
 	void open(t_symbol *s, long argc, t_atom * argv) {
@@ -335,6 +345,8 @@ public:
 			HRESULT hr = m_reader->AcquireLatestFrame(&frame);
 			if (FAILED(hr)) continue;
 
+			systhread_mutex_lock(mlock);
+
 			/*
 			if (SUCCEEDED(frame->get_FrameDescription(&frameDescription))) {
 			frameDescription->get_HorizontalFieldOfView(&this->horizontalFieldOfView));
@@ -358,6 +370,8 @@ public:
 					}
 				}
 			}
+			SafeRelease(colorframe);
+			SafeRelease(colorframeref);
 
 			if (use_depth && SUCCEEDED(frame->get_DepthFrameReference(&depthframeref)) && SUCCEEDED(depthframeref->AcquireFrame(&depthframe))) {
 				INT64 relativeTime = 0;
@@ -367,7 +381,14 @@ public:
 				hr = depthframe->AccessUnderlyingBuffer(&capacity, &src);
 				if (SUCCEEDED(hr)) {
 					uint32_t * dst = (uint32_t *)depth_mat.back;
-					for (UINT i = 0; i < capacity; i++) dst[i] = src[i];
+					// make a local copy of depth:
+					for (UINT i = 0; i < capacity; i++) {
+						m_depth_buffer[i] = src[i];
+						dst[i] = src[i];
+					}
+					// done with depth frame already
+					SafeRelease(depthframe);
+					SafeRelease(depthframeref);
 					new_depth_data = 1; 
 
 					// TODO: 
@@ -379,16 +400,30 @@ public:
 					// but then the index_mat values also need to be changed...
 					// ... however it turns out that nearly all points were valid (about 90%) so this doesn't seem worth it.
 					hr = m_mapper->MapDepthFrameToCameraSpace(
-						cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
-						cDepthWidth*cDepthHeight, (CameraSpacePoint *)cloud_mat.back); // Output CameraSpacePoint array and size
+						cDepthWidth*cDepthHeight, m_depth_buffer,        // Depth frame data and size of depth frame
+						cDepthWidth*cDepthHeight, (CameraSpacePoint *)m_cloud_buffer); // Output CameraSpacePoint array and size
 					if (SUCCEEDED(hr)) {
-
+						// copy into cloud, with transform
 						if (face_negative_z) {
+							glm::vec3 * o = m_cloud_buffer;
 							glm::vec3 * p = cloud_mat.back;
 							for (int i = 0; i<capacity; i++) {
-								p->z = -p->z;
-								p->x = -p->x;
+								p->x = -o->x;
+								p->y =  o->y;
+								p->z = -o->z;
 								p++;
+								o++;
+							}
+						}
+						else {
+							glm::vec3 * o = m_cloud_buffer;
+							glm::vec3 * p = cloud_mat.back;
+							for (int i = 0; i<capacity; i++) {
+								p->x =  o->x;
+								p->y =  o->y;
+								p->z =  o->z;
+								p++;
+								o++;
 							}
 						}
 
@@ -404,7 +439,7 @@ public:
 							for (UINT i = 0, y = 0; y < cDepthHeight; y++) {
 								for (UINT x = 0; x < cDepthWidth; x++, i++) {
 									DepthSpacePoint dp = { (float)x, (float)y };
-									UINT16 depth_mm = src[i];
+									UINT16 depth_mm = m_depth_buffer[i];
 									vec2 uvpt;
 									m_mapper->MapDepthPointToColorSpace(dp, depth_mm, (ColorSpacePoint *)(&uvpt));
 									uv_mat.back[i] = uvpt * uvscale;
@@ -493,6 +528,10 @@ public:
 
 								new_indices_data = 1;
 							}
+							else {
+
+								object_error(&ob, "not enough indices");
+							}
 						}
 					}
 				}
@@ -500,7 +539,7 @@ public:
 				if (use_colour_cloud) {
 					// I'd like to also output a matrix giving a 3D position for each camera space point
 					hr = m_mapper->MapColorFrameToCameraSpace(
-						cDepthWidth*cDepthHeight, src,        // Depth frame data and size of depth frame
+						cDepthWidth*cDepthHeight, m_depth_buffer,        // Depth frame data and size of depth frame
 						cColorWidth*cColorHeight, (CameraSpacePoint *)colour_cloud_mat.back); // Output CameraSpacePoint array and size)
 					if (SUCCEEDED(hr)) {
 						if (face_negative_z) {
@@ -517,10 +556,10 @@ public:
 				}
 			}
 
-			SafeRelease(colorframe);
 			SafeRelease(depthframe);
-			SafeRelease(colorframeref);
 			SafeRelease(depthframeref);
+
+			systhread_mutex_unlock(mlock);
 		}
 
 		SafeRelease(m_reader);
@@ -540,40 +579,39 @@ public:
 
 
 	void bang() {
-		if (use_colour && (new_rgb_data || unique == 0)) {
-			outlet_anything(outlet_rgb, _jit_sym_jit_matrix, 1, rgb_mat.name);
-			new_rgb_data = 0;
+		if (systhread_mutex_trylock(mlock) == 0) {
+			if (use_colour && (new_rgb_data || unique == 0)) {
+				outlet_anything(outlet_rgb, _jit_sym_jit_matrix, 1, rgb_mat.name);
+				new_rgb_data = 0;
+			}
+
+			//if (skeleton) outputSkeleton();
+			//if (player) outlet_anything(outlet_player, _jit_sym_jit_matrix, 1, player_mat.name);
+			if (use_depth) {
+				if (new_uv_data || unique == 0) {
+					outlet_anything(outlet_mesh, ps_texcoord_matrix, 1, uv_mat.name);
+					new_uv_data = 0;
+				}
+				if (new_indices_data || unique == 0) {
+					outlet_anything(outlet_mesh, ps_index_matrix, 1, index_mat.name);
+					outlet_anything(outlet_mesh, ps_normal_matrix, 1, normal_mat.name);
+					outlet_anything(outlet_mesh, ps_vertex_matrix, 1, cloud_mat.name);
+					new_indices_data = 0;
+				}
+				if (new_depth_data || unique == 0) {
+					//if (uselock) systhread_mutex_lock(depth_mutex);
+					outlet_anything(outlet_depth, _jit_sym_jit_matrix, 1, depth_mat.name);
+					//if (uselock) systhread_mutex_unlock(depth_mutex);
+					new_depth_data = 0;
+				}
+				if (new_colour_cloud_data || unique == 0) {
+					outlet_anything(outlet_colour_cloud, _jit_sym_jit_matrix, 1, colour_cloud_mat.name);
+					new_cloud_data = 0;
+				}
+
+			}
+			systhread_mutex_unlock(mlock);
 		}
-
-		//if (skeleton) outputSkeleton();
-		//if (player) outlet_anything(outlet_player, _jit_sym_jit_matrix, 1, player_mat.name);
-		if (use_depth) {
-			if (new_depth_data || unique == 0) {
-				//if (uselock) systhread_mutex_lock(depth_mutex);
-				outlet_anything(outlet_depth, _jit_sym_jit_matrix, 1, depth_mat.name);
-				//if (uselock) systhread_mutex_unlock(depth_mutex);
-				new_depth_data = 0;
-			}
-			if (new_indices_data || unique == 0) {
-				outlet_anything(outlet_mesh, ps_index_matrix, 1, index_mat.name);
-				new_indices_data = 0;
-			}
-			if (new_uv_data || unique == 0) {
-				outlet_anything(outlet_mesh, ps_texcoord_matrix, 1, uv_mat.name);
-				new_uv_data = 0;
-			}
-			if (new_cloud_data || unique == 0) {
-				outlet_anything(outlet_mesh, ps_vertex_matrix, 1, cloud_mat.name);
-				outlet_anything(outlet_mesh, ps_normal_matrix, 1, normal_mat.name);
-				new_cloud_data = 0;
-			}
-			if (new_colour_cloud_data || unique == 0) {
-				outlet_anything(outlet_colour_cloud, _jit_sym_jit_matrix, 1, colour_cloud_mat.name);
-				new_cloud_data = 0;
-			}
-
-		}
-
 	}
 };
 
@@ -636,6 +674,11 @@ void ext_main(void *r)
 	class_addmethod(c, (method)kinect_open, "open", A_GIMME, 0);
 	class_addmethod(c, (method)kinect_bang, "bang", 0);
 	class_addmethod(c, (method)kinect_close, "close", 0);
+
+
+
+	CLASS_ATTR_LONG(c, "unique", 0, kinect2, unique);
+	CLASS_ATTR_STYLE(c, "unique", 0, "onoff");
 
 	CLASS_ATTR_LONG(c, "use_depth", 0, kinect2, use_depth);
 	CLASS_ATTR_STYLE(c, "use_depth", 0, "onoff");
