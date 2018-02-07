@@ -336,6 +336,16 @@ void ws_list(ws * x, t_symbol * s, int argc, t_atom * argv) {
 	ws_anything(x, NULL, argc, argv);
 }
 
+void ws_test_size(ws * x, t_atom_long size) {
+	
+	std::string s(size, 'a');
+	s[size-1] = '!';
+	
+	object_post(&x->ob, "size %d %s", size, s.data());
+	
+	x->send(s);
+}
+
 void ext_main(void *r)
 {
 	t_class *c;
@@ -349,6 +359,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)ws_dictionary, "dictionary", A_SYM, 0);
 	class_addmethod(c, (method)ws_anything, "anything", A_GIMME, 0);
 	class_addmethod(c, (method)ws_list, "list", A_GIMME, 0);
+	class_addmethod(c, (method)ws_test_size, "test_size", A_LONG, 0);
 	
 	CLASS_ATTR_LONG(c, "port", 0, ws, port);
 	

@@ -85,7 +85,7 @@ function ws_connect() {
         		var tree = JSON.parse(ev.data);
         		post("parsed " + JSON.stringify(tree));
         	} else {
-        		post("received msg:" + ev.data.length + ": " + ev.data.substr(0, 50));
+        		post("received msg:" + ev.data.length + ": " + ev.data.substr(0, 50) + ".." + ev.data.substr(ev.data.length-5));
         	}
         };
 

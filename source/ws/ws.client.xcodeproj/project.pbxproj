@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		22CF11AE0EE9A8840054F513 /* ws.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 22CF11AD0EE9A8840054F513 /* ws.cpp */; };
+		22CF11AE0EE9A8840054F513 /* ws.client.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 22CF11AD0EE9A8840054F513 /* ws.client.cpp */; };
 		899A5A021C495E0200681F7D /* commonsyms.c in Sources */ = {isa = PBXBuildFile; fileRef = 899A5A011C495E0200681F7D /* commonsyms.c */; };
 		89E3AAAF1C4851FC008DAF37 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 89E3AAAD1C4851FC008DAF37 /* CoreFoundation.framework */; };
 		89E3AAB01C4851FC008DAF37 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 89E3AAAE1C4851FC008DAF37 /* IOKit.framework */; };
@@ -15,8 +15,8 @@
 
 /* Begin PBXFileReference section */
 		22CF10220EE984600054F513 /* maxmspsdk.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = maxmspsdk.xcconfig; path = ../maxmspsdk.xcconfig; sourceTree = SOURCE_ROOT; };
-		22CF11AD0EE9A8840054F513 /* ws.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ws.cpp; sourceTree = "<group>"; };
-		2FBBEAE508F335360078DB84 /* ws.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ws.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
+		22CF11AD0EE9A8840054F513 /* ws.client.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ws.client.cpp; sourceTree = "<group>"; };
+		2FBBEAE508F335360078DB84 /* ws.client.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ws.client.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
 		899A5A001C49424000681F7D /* ws_help.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = ws_help.html; path = ../../help/ws_help.html; sourceTree = "<group>"; };
 		899A5A011C495E0200681F7D /* commonsyms.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = commonsyms.c; path = "../../../max-sdk/source/c74support/max-includes/common/commonsyms.c"; sourceTree = "<group>"; };
 		89E3AAAD1C4851FC008DAF37 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
@@ -138,7 +138,7 @@
 				89E3AAAD1C4851FC008DAF37 /* CoreFoundation.framework */,
 				89E3AAAE1C4851FC008DAF37 /* IOKit.framework */,
 				22CF10220EE984600054F513 /* maxmspsdk.xcconfig */,
-				22CF11AD0EE9A8840054F513 /* ws.cpp */,
+				22CF11AD0EE9A8840054F513 /* ws.client.cpp */,
 				899A5A001C49424000681F7D /* ws_help.html */,
 				89E3AAB11C48AEAB008DAF37 /* websocketpp */,
 				19C28FB4FE9D528D11CA2CBB /* Products */,
@@ -149,7 +149,7 @@
 		19C28FB4FE9D528D11CA2CBB /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2FBBEAE508F335360078DB84 /* ws.mxo */,
+				2FBBEAE508F335360078DB84 /* ws.client.mxo */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -461,7 +461,7 @@
 			);
 			name = "max-external";
 			productName = iterator;
-			productReference = 2FBBEAE508F335360078DB84 /* ws.mxo */;
+			productReference = 2FBBEAE508F335360078DB84 /* ws.client.mxo */;
 			productType = "com.apple.product-type.bundle";
 		};
 /* End PBXNativeTarget section */
@@ -472,7 +472,7 @@
 			attributes = {
 				LastUpgradeCheck = 0610;
 			};
-			buildConfigurationList = 2FBBEACF08F335010078DB84 /* Build configuration list for PBXProject "ws" */;
+			buildConfigurationList = 2FBBEACF08F335010078DB84 /* Build configuration list for PBXProject "ws.client" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
 			hasScannedForEncodings = 1;
@@ -514,7 +514,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				899A5A021C495E0200681F7D /* commonsyms.c in Sources */,
-				22CF11AE0EE9A8840054F513 /* ws.cpp in Sources */,
+				22CF11AE0EE9A8840054F513 /* ws.client.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -555,7 +555,7 @@
 					"-DASIO_STANDALONE",
 				);
 				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
-				PRODUCT_NAME = ws;
+				PRODUCT_NAME = ws.client;
 			};
 			name = Development;
 		};
@@ -579,14 +579,14 @@
 					"-DASIO_STANDALONE",
 				);
 				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
-				PRODUCT_NAME = ws;
+				PRODUCT_NAME = ws.client;
 			};
 			name = Deployment;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2FBBEACF08F335010078DB84 /* Build configuration list for PBXProject "ws" */ = {
+		2FBBEACF08F335010078DB84 /* Build configuration list for PBXProject "ws.client" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2FBBEAD008F335010078DB84 /* Development */,

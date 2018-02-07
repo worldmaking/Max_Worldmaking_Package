@@ -253,6 +253,22 @@ public:
 			}
 		}
 	}
+	
+	t_max_err notify(t_symbol *s, t_symbol *msg, void *sender, void *data) {
+		long argc = 16;
+		t_atom temp[16];
+		t_atom *argv = temp;
+		if (sender == this) {
+			if (msg == _sym_attr_modified) {
+				t_symbol * attrname = (t_symbol *)object_method((t_object *)data,gensym("getname"));
+				object_attr_getvalueof(this, attrname, &argc, &argv);
+				if (argc && argv) {
+					if (gimmefun) gimmefun(instance_handle, attrname, argc, argv);
+				}
+			}
+		}
+		return MAX_ERR_NONE;
+	}
 };
 
 void dyn_reload_deferred(dyn *x) {
@@ -283,6 +299,10 @@ void dyn_assist(dyn *x, void *b, long m, long a, char *s)
 
 void dyn_anything(dyn *x, t_symbol *s, long argc, t_atom *argv) {
 	if (x->gimmefun) x->gimmefun(x->instance_handle, s, argc, argv);
+}
+
+t_max_err dyn_notify(dyn *x, t_symbol *s, t_symbol *msg, void *sender, void *data) {
+	return x->notify(s, msg, sender, data);
 }
 
 void dyn_bang(dyn * x) {
@@ -358,6 +378,7 @@ void ext_main(void *r)
 	
 	class_addmethod(c, (method)dyn_assist, "assist", A_CANT, 0);
 	class_addmethod(c, (method)dyn_filechanged,"filechanged",A_CANT, 0);
+	class_addmethod(c, (method)dyn_notify,	"notify",	A_CANT, 0);
 	
 	class_addmethod(c, (method)dyn_reload, "reload", 0);
 	class_addmethod(c, (method)dyn_unload, "unload", 0);
