@@ -1,4 +1,8 @@
 
+// see https://stackoverflow.com/questions/32969289/error-in-websocketpp-library-and-boost-in-windows-visual-studio-2015
+#define WEBSOCKETPP_NOEXCEPT 1 
+#define WEBSOCKETPP_CPP11_CHRONO 1
+
 #include <new> // for in-place constructor
 #include <string>
 #include <list>
@@ -7,6 +11,7 @@
 #include <sstream>
 #include <set>
 #include <map>
+
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 
