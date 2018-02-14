@@ -88,7 +88,8 @@ public:
 	
 	void open() {
 		
-		std::string uri = "ws://" + std::string(host->s_name) + std::to_string(port);
+		std::string uri = "ws://" + std::string(host->s_name) + ":" + std::to_string(port);
+		object_post(&ob, "connecting to %s", uri.c_str());
 
 		if (connected) {
 			object_warn(&ob, "connection already open");
@@ -99,10 +100,10 @@ public:
 			websocketpp::lib::error_code ec;
 			con = wsclient.get_connection(uri, ec);
 			if (!con) {
-				object_error(&ob, "failed to create connection: %s", ec.message().c_str());
+				object_error(&ob, "failed to create connection to %s: %s", uri.c_str(), ec.message().c_str());
 			} else {
 				wsclient.connect(con);
-				object_post(&ob, "ws.client connecting...");
+				object_post(&ob, "ws.client connecting to %s...", uri.c_str());
 			}
 			
 		} catch (const std::exception& ex) {
@@ -332,7 +333,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)ws_test_size, "test_size", A_LONG, 0);
 	
 	CLASS_ATTR_LONG(c, "port", 0, ws_client, port);
-	CLASS_ATTR_LONG(c, "host", 0, ws_client, host);
+	CLASS_ATTR_SYM(c, "host", 0, ws_client, host);
 	CLASS_ATTR_LONG(c, "poll_limit", 0, ws_client, poll_limit); // = max events per bang
 	CLASS_ATTR_LONG(c, "autoconnect", 0, ws_client, autoconnect); // = max events per bang
 	
