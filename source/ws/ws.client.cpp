@@ -37,6 +37,7 @@ public:
 	t_atom_long port = 8080;
 	t_atom_long poll_limit = 1000;
 	t_atom_long autoconnect = 1;
+	t_symbol * host;
 	
 	t_atom_long connected = 0;
 	
@@ -45,6 +46,8 @@ public:
 	websocketpp::connection_hdl connection_hdl;
 	
 	ws_client() {
+		host = gensym("localhost");
+
 		outlet_msg = outlet_new(&ob, 0);
 		outlet_frame = outlet_new(&ob, 0);
 	}
@@ -79,10 +82,14 @@ public:
 	}
 	
 	~ws_client() {
+		if (connected) close();
 		wsclient.stop_perpetual();
 	}
 	
-	void open(const std::string& uri = "ws://localhost:8080") {
+	void open() {
+		
+		std::string uri = "ws://" + std::string(host->s_name) + std::to_string(port);
+
 		if (connected) {
 			object_warn(&ob, "connection already open");
 			return;
@@ -112,7 +119,7 @@ public:
 			object_warn(&ob, "no open connection to close");
 			return;
 		}
-		wsclient.close(connection_hdl,websocketpp::close::status::normal,reason);
+		wsclient.close(connection_hdl, websocketpp::close::status::normal, reason);
 	}
 	
 	void bang() {
@@ -325,6 +332,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)ws_test_size, "test_size", A_LONG, 0);
 	
 	CLASS_ATTR_LONG(c, "port", 0, ws_client, port);
+	CLASS_ATTR_LONG(c, "host", 0, ws_client, host);
 	CLASS_ATTR_LONG(c, "poll_limit", 0, ws_client, poll_limit); // = max events per bang
 	CLASS_ATTR_LONG(c, "autoconnect", 0, ws_client, autoconnect); // = max events per bang
 	
