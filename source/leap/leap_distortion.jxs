@@ -1,0 +1,56 @@
+<jittershader name="leap_distortion">
+	<param name="image" type="int" default="0" />
+	<param name="calibration" type="int" default="1" />
+	<param name="scale_and_offset" type="vec4" default="0.125 0.125 0.5 0.5" />
+	<language name="glsl" version="1.0">
+		<bind param="image" program="fp" />
+		<bind param="calibration" program="fp" />
+		<bind param="scale_and_offset" program="vp" />
+		<program name="vp" type="vertex">
+<![CDATA[
+
+uniform vec4 scale_and_offset;
+varying vec2 texcoord;
+
+void main() {
+
+	gl_FrontColor = gl_Color;
+	texcoord = vec2(gl_MultiTexCoord0);
+
+	// turn texcoord into a position:
+	vec2 t = -(texcoord - scale_and_offset.zw)/scale_and_offset.xy;
+	vec4 v = vec4(t, -1., 1.);
+
+	gl_Position = gl_ProjectionMatrix * v;
+}
+
+]]>		
+		</program>
+		<program name="fp" type="fragment">
+<![CDATA[
+
+uniform sampler2D image;
+uniform sampler2D calibration;
+varying vec2 texcoord;
+
+void main(void) {
+	vec2 t = texture2D(calibration, texcoord).xw;
+	vec4 i = texture2D(image, texcoord);
+
+	// compute soft edges:
+	vec2 vt = 8.*(0.25 - (t-0.5)*(t-0.5));
+	float vignette = clamp(vt.x * vt.y, 0., 1.);
+
+	if(t.x > 0.0 && t.x < 1.0
+		&& t.y > 0.0 && t.y < 1.0)
+	{
+		gl_FragColor = texture2D(image, t);
+		gl_FragColor *= vec4(vignette);
+	} else {
+		gl_FragColor = vec4(0, 0, 0, 1.0);
+	}
+}
+]]>		
+		</program>		
+	</language>
+</jittershader>
