@@ -132,7 +132,7 @@ public:
 		if (!connected) return;
 		
 		wsclient.send(connection_hdl,msg,websocketpp::frame::opcode::text);
-		object_post(&ob, "Sent Message: %s", msg.c_str());
+		//object_post(&ob, "Sent Message: %s", msg.c_str());
 	}
 	
 	////// websocketpp handlers //////
