@@ -493,7 +493,7 @@ namespace detail
 	template <typename genType>
 	GLM_FUNC_QUALIFIER genType step(genType edge, genType x)
 	{
-		return mix(static_cast<genType>(1), static_cast<genType>(0), glm::lessThan(x, edge));
+		return mix(static_cast<genType>(1), static_cast<genType>(0), x < edge);
 	}
 
 	template <template <typename, precision> class vecType, typename T, precision P>

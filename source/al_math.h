@@ -1,253 +1,125 @@
-#ifndef al_math_h
-#define al_math_h
+#ifndef AL_MATH_H
+#define AL_MATH_H
 
-// how many glm headers do we really need?
-#define GLM_FORCE_RADIANS
-#include "glm/glm.hpp"
-#include "glm/gtc/quaternion.hpp"
-#include "glm/gtc/matrix_access.hpp"
-#include "glm/gtc/matrix_inverse.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/noise.hpp"
-#include "glm/gtc/random.hpp"
-#include "glm/gtc/type_ptr.hpp"
-
-// unstable extensions
-//#include "glm/gtx/norm.hpp"
-//#include "glm/gtx/std_based_type.hpp"
-
-/* 
-	You probably want to put this in your header:
-
-	using glm::vec2;
-	using glm::vec3;
-	using glm::vec4;
-	using glm::quat;
-	using glm::mat4;
-*/
-
-#ifndef AL_MAX
-#define AL_MAX(a,b) ((a) > (b) ? (a) : (b))
-#endif
+#include "al_glm.h"
 
 #ifndef AL_MIN
-#define AL_MIN(a,b) ((a) < (b) ? (a) : (b))
+#define AL_MIN(x,y) (x<y?x:y)
 #endif
 
-//	q must be a normalized quaternion
-template<typename T, glm::precision P>
-glm::tvec3<T, P> quat_unrotate(glm::quat const & q, glm::tvec3<T, P> & v) {
-	// return quat_mul(quat_mul(quat_conj(q), vec4(v, 0)), q).xyz;
-	// reduced:
-	glm::tvec4<T, P> p(
-		q.w*v.x - q.y*v.z + q.z*v.y,  // x
-		q.w*v.y - q.z*v.x + q.x*v.z,  // y
-		q.w*v.z - q.x*v.y + q.y*v.x,  // z
-		q.x*v.x + q.y*v.y + q.z*v.z   // w
-		);
-	return glm::tvec3<T, P>(
-		p.w*q.x + p.x*q.w + p.y*q.z - p.z*q.y,  // x
-		p.w*q.y + p.y*q.w + p.z*q.x - p.x*q.z,  // y
-		p.w*q.z + p.z*q.w + p.x*q.y - p.y*q.x   // z
-		);
-}
-
-//	q must be a normalized quaternion
-template<typename T, glm::precision P>
-glm::tvec3<T, P> quat_rotate(glm::quat const & q, glm::tvec3<T, P> & v) {
-	glm::tvec4<T, P> p(
-		q.w*v.x + q.y*v.z - q.z*v.y,	// x
-		q.w*v.y + q.z*v.x - q.x*v.z,	// y
-		q.w*v.z + q.x*v.y - q.y*v.x,	// z
-		-q.x*v.x - q.y*v.y - q.z*v.z	// w
-		);
-	return glm::tvec3<T, P>(
-		p.x*q.w - p.w*q.x + p.z*q.y - p.y*q.z,	// x
-		p.y*q.w - p.w*q.y + p.x*q.z - p.z*q.x,	// y
-		p.z*q.w - p.w*q.z + p.y*q.x - p.x*q.y	// z
-		);
-}
-
-template<typename T, glm::precision P>
-inline glm::tvec3<T, P> quat_ux(glm::tquat<T, P> const & q) {
-	return glm::tvec3<T, P>(
-		T(1) - T(2) * ((q.y * q.y) + (q.z * q.z)),
-		T(2) * ((q.x * q.y) + (q.w * q.z)),
-		T(2) * ((q.x * q.z) - (q.w * q.y))
-		);
-}
-
-template<typename T, glm::precision P>
-inline glm::tvec3<T, P> quat_uy(glm::tquat<T, P> const & q) {
-	return glm::tvec3<T, P>(
-		T(2) * ((q.x * q.y) - (q.w * q.z)),
-		T(1) - 2 * ((q.x * q.x) + (q.z * q.z)),
-		T(2) * ((q.y * q.z) + (q.w * q.x))
-		);
-}
-
-template<typename T, glm::precision P>
-inline glm::tvec3<T, P> quat_uz(glm::tquat<T, P> const & q) {
-	return glm::tvec3<T, P>(
-		T(2) * ((q.x * q.z) + (q.w * q.y)),
-		T(2) * ((q.y * q.z) - (q.w * q.x)),
-		T(1) - T(2) * ((q.x * q.x) + (q.y * q.y))
-		);
-}
-
+#ifndef AL_MAX
+#define AL_MAX(x,y) (x>y?x:y)
 #endif
 
+inline double al_floor(double v) { return (int64_t)(v) - ((v)<0.0 && (v)!=(int64_t)(v)); } 
+inline float al_floor(float v) { return (int64_t)(v) - ((v)<0.f && (v)!=(int64_t)(v)); }
 
-/*
-Quick tut on glm:
-@see http://glm.g-truc.net/0.9.4/api/a00141.html
-@see http://glm.g-truc.net/0.9.5/api/modules.html
+inline double al_ceil(double v) { return (((v)>0.0)&&((v)!=(int64_t)(v))) ? 1.0+(v) : (v); }
+inline float al_ceil(float v) { return (((v)>0.f)&&((v)!=(int32_t)(v))) ? 1.f+(v) : (v); }
 
-# Vectors
+inline double al_fract(double v) { return ((v)>=0.0) ? (v)-(int64_t)(v) : (-v)-(int64_t)(v); }
+inline float al_fract(float v) { return ((v)>=0.f) ? (v)-(int32_t)(v) : (-v)-(int32_t)(v); }
 
-v3 = vec3(0.);
-v4 = vec4(v3, 1.);
+inline bool al_isnan(float v) { return v!=v; }
+inline float al_fixnan(float v) { return al_isnan(v)?0.f:v; }
 
-v.x; // access v.x, v.y, v.z etc.
+inline bool al_isnan(glm::vec2 v) { 
+	return al_isnan(v.x) || al_isnan(v.y); 
+}
+inline bool al_isnan(glm::vec3 v) { 
+	return al_isnan(v.x) || al_isnan(v.y) || al_isnan(v.z); 
+}
+inline bool al_isnan(glm::vec4 v) { 
+	return al_isnan(v.x) || al_isnan(v.y) || al_isnan(v.z) || al_isnan(v.w); 
+}
+inline bool al_isnan(glm::quat v) { 
+	return al_isnan(v.x) || al_isnan(v.y) || al_isnan(v.z) || al_isnan(v.w); 
+}
 
-i = v.length();					// no. elements in type
-s = glm::length(v);				// length of vector
-s = glm::length2(v);				// length squared
+inline glm::vec2 al_fixnan(glm::vec2 v) { 
+	return glm::vec2( al_fixnan(v.x), al_fixnan(v.y));
+}
+inline glm::vec3 al_fixnan(glm::vec3 v) { 
+	return glm::vec3( al_fixnan(v.x), al_fixnan(v.y), al_fixnan(v.z) );
+}
+inline glm::vec4 al_fixnan(glm::vec4 v) { 
+	return glm::vec4( al_fixnan(v.x), al_fixnan(v.y), al_fixnan(v.z), al_fixnan(v.w) );
+}
+inline glm::quat al_fixnan(glm::quat v) { 
+	return glm::quat( al_fixnan(v.x), al_fixnan(v.y), al_fixnan(v.z), al_fixnan(v.w) );
+}
 
-v = glm::normalize(v);		// will create NaNs if vector is zero length
-v = glm::cross(v1, v2);
-s = glm::dot(v1, v2);
-s = glm::distance(v1, v2);
-v = glm::faceforward(vn, vi, vref);	//If dot(Nref, I) < 0.0, return N, otherwise, return -N.
-v = glm::reflect(vi, vn);	// reflect vi around vn
-v = glm::refract(vi, vn, eta);
+// element-wise min & max
+inline float al_min(glm::vec2 v) { return glm::min(v.x, v.y); }
+inline float al_min(glm::vec3 v) { return glm::min(glm::min(v.x, v.y), v.z); }
+inline float al_min(glm::vec4 v) { return glm::min(glm::min(v.x, v.y), glm::min(v.z, v.w)); }
+inline float al_max(glm::vec2 v) { return glm::max(v.x, v.y); }
+inline float al_max(glm::vec3 v) { return glm::max(glm::max(v.x, v.y), v.z); }
+inline float al_max(glm::vec4 v) { return glm::max(glm::max(v.x, v.y), glm::max(v.z, v.w)); }
 
-v = glm::cos(v);			// sin, tan, acos, atanh, etc.
-v = glm::atan(v1, v2);		// aka atan2
-v = glm::degrees(v);		// radians()
+float radians(float degrees) {
+	return degrees*0.01745329251994f;
+}
 
-v = glm::abs(v);			// ceil, floor, fract, trunc
-v = glm::pow(v1, v2);		// exp, exp2, log, log2, sqrt, inversesqrt
-v = glm::mod(v, v_or_s);	// x - y * floor(x / y)
-v = glm::modf(v, &iv);		// returns fract, stores integer part in iv
-v = glm::round(v);			// direction of 0.5 implementation defined
-v = glm::roundEven(v);		// 0.5 rounds to nearest even integer
-v = glm::sign(v);
-v = glm::clamp(v, vmin, vmax);	// min, max
-v = glm::fma(va, vb, vc);	// return a*b+c
-v = glm::mix(v1, v2, a);
+float degrees(float radians) {
+	return radians*57.29577951308233f;
+}
 
-// Returns 0.0 if x <= edge0 and 1.0 if x >= edge1 and performs smooth Hermite interpolation between 0 and 1 when edge0 < x < edge1.
-v = glm::smoothstep(v0, v1, vx);
-v = glm::step(e, v);		// v<e ? 0 : 1
+float clip(float in, float min, float max) {
+	float v = AL_MIN(in, max);
+	return AL_MAX(v, min);
+}
+
+/// Wrap is Euclidean modulo remainder
+// that is, the output is always zero or positive, and less than the upper bound
+// and rounding is always toward -infinity
+
+// For non-integral types:
+// N must be nonzero
+template<typename T, typename T1>
+typename std::enable_if<!std::is_integral<T>::value, T>::type wrap(T a, T1 N) {
+	// Note: "a - N*floor(a / N)" does not work due to occasional floating point error
+	return glm::fract(a / T(N)) * T(N);
+}
+
+// For integral types only:
+// N must be nonzero
+template<typename T, typename T1>
+typename std::enable_if<std::is_integral<T>::value, T>::type wrap(T a, T1 N) {
+    T r = a % T(N);
+    return r < 0 ? r+T(N) : r;
+}
+
+// wrap with a lower bound:
+template<typename T, typename T1>
+inline T wrap(T x, T1 lo, T1 hi) {
+	return lo + wrap(x-lo, hi-lo);
+}
+
+// Sign function that doesn't ever return 0
+inline float al_sign_nonzero(float x) { return (x < 0.f) ? -1.f : 1.f; }
+inline double al_sign_nonzero(double x) { return (x < 0.) ? -1. : 1.; }\
 
 
-v<bool> = glm::isnan(v);	// isinf
-v<bool> = glm::equal(v1, v2);	// notEqual, lessThanEqual, etc.
-bool = glm::any(v<bool);	// also glm::all()
+class rnd {
+public: 
 
-# Matrices:
+	static void seed() {
+		srand((unsigned int)time(NULL));
+	}
 
-m = mat4(1.); // or mat4();	// identity matrix
-m[3] = vec4(1, 1, 0, 1);	// set 4th column (translation)
+	static uint64_t integer(uint64_t lim=2) {
+		return (int)floorf(glm::linearRand(0.f, lim-0.0000001f));
+	}
 
-v = m * v;					// vertex transformation
+	static float uni(float lim=1.f) {
+		return glm::linearRand(0.f, lim);
+	}	
 
-// (matrix types store their values in column-major order)
-glm::value_ptr():
+	static float bi(float lim=1.f) {
+		return glm::linearRand(-lim, lim);
+	}	
 
-// e.g.
-glVertex3fv(glm::value_ptr(v));		// or glVertex3fv(&v[0]);
-glLoadMatrixfv(glm::value_ptr(m));	// or glLoadMatrixfv(&m[0][0]);
+};
 
-m = glm::make_mat4(ptr);	// also make_mat3, make_mat3x2, etc.
-
-v = glm::column(m, idx);
-v = glm::row(m, idx);
-m = glm::transpose(m);
-m = glm::inverse(m);
-s = glm::determinant(m);
-m = glm::matrixCompMult(m1, m2);	// component-wise multiplication
-m = glm::outerProduct(vc, vr);		// generate mat by vc * vr
-
-// Map the specified vertex into window coordinates.
-v = glm::project(vec3 v, mat4 model, mat4 proj, vec4 viewport);
-v = glm::unProject(vec3 win, mat4 model, mat4 proj, vec4 viewport);
-
-m = glm::frustum(l, r, b, t, near, far);
-m = glm::ortho(l, r, b, t);					// for 2D
-m = glm::ortho(l, r, b, t, near, far);
-m = glm::infinitePerspective(fovy, aspect, near, far);
-m = glm::perspective(fovy, aspect, near, far);
-
-m = glm::lookat(eye, at, up);
-
-// define a picking region
-m = glm::pickMatrix(vec2_center, vec2_delta, vec4_viewport);
-
-m = glm::rotate(m, angle, axis);
-m = glm::scale(m, v);
-m = glm::translate(m, v);
-
-m = glm::affineInverse(m);	// Fast inverse for affine matrix.
-m = glm::inverseTranspose(m);
-
-# Quaternions
-// constructor uses wxyz order:
-q = quat(w, x, y, z);
-// however the contents are actually stored as xyzw
-
-q = q * rot;				// rot is in model space (local)
-q = rot * q;				// rot is in world space (global)
-Remember to normalize quaternions periodically!
-
-s = glm::length(q);
-s = glm::pitch(q);			// also roll(q), yaw(q)
-
-q = glm::normalize(q);
-q = glm::conjugate(q);
-q = glm::inverse(q);
-q = glm::dot(q1, q2);
-v = glm::cross(q, v);
-
-q = glm::lerp(q1, q2, s);
-q = glm::mix(q1, q2, s);
-q = glm::slerp(q1, q2, s);
-
-// also greaterThan, greaterThanEqual, lessThan, notEqual, etc.
-vec4_bool = glm::equal(q1, q2);
-
-## conversions:
-
-q = glm::angleAxis(angle, x, y, z);
-q = glm::angleAxis(angle, axis);
-
-a = glm::angle(q);
-axis = glm::axis(q);
-
-m = glm::mat3_cast(q);
-m = glm::mat4_cast(q);
-q = glm::quat_cast(m);		// from mat3 or mat4
-
-pitch_yaw_roll = glm::eulerAngles(q);
-
-# Random / Noise
-
-s = glm::noise1(v);
-vec2 = glm::noise2(v);		// etc. noise3, noise4
-
-s = glm::perlin(v);			// classic perlin noise
-s = glm::perlin(v, v_rep);	// periodic perlin noise
-s = glm::simplex(v);		// simplex noise
-
-## generate vec<n> or scalar:
-gaussRand(mean, deviation);
-linearRand(min, max);
-
-## generate vec3:
-ballRand(radius);			// coordinates are regulary distributed within the volume of a ball
-circularRand(radius);		// coordinates are regulary distributed on a circle
-diskRand(radius);			// coordinates are regulary distributed within the area of a disk
-sphericalRand(radius);		// coordinates are regulary distributed on a sphere
-*/
-
+#endif //AL_MATH_H
