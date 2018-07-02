@@ -11,7 +11,7 @@ public:
 	void * outlet_results;
 	
 	// attrs:
-	glm::vec3 world_min = glm::vec3(-1.f);
+	glm::vec3 world_min = glm::vec3(0.f);
 	glm::vec3 world_max = glm::vec3(1.f);
 	
 	// internal:
@@ -19,7 +19,8 @@ public:
 	
 	max_hashspace() {
 		outlet_msg = outlet_new(&ob, NULL);
-		outlet_results = outlet_new(&ob, NULL);
+		outlet_results = outlet_new(&ob, "list");
+		
 	}
 	
 	void init() {
@@ -29,6 +30,50 @@ public:
 	
 	void clear() {
 		space->reset(world_min, world_max);
+	}
+	
+	// accepts type=float32, planecount=3, dim=1 or 2
+	void jit_matrix(void * in_mat) {
+		t_jit_matrix_info in_info;
+		char * in_bp;
+		// lock it:
+		long in_savelock = (long)jit_object_method(in_mat, _jit_sym_lock, 1);
+		
+		// ensure data exists:
+		jit_object_method(in_mat, _jit_sym_getdata, &in_bp);
+		if (!in_bp) {
+			jit_error_code(&ob, JIT_ERR_INVALID_INPUT);
+			return;
+		}
+		
+		// ensure the type is correct:
+		jit_object_method(in_mat, _jit_sym_getinfo, &in_info);
+		if (in_info.type != _jit_sym_float32) {
+			jit_error_code(&ob, JIT_ERR_MISMATCH_TYPE);
+			return;
+		}
+		else if (in_info.planecount != 3) {
+			jit_error_code(&ob, JIT_ERR_MISMATCH_PLANE);
+			return;
+		}
+		else if (in_info.dimcount > 2) {
+			jit_error_code(&ob, JIT_ERR_MISMATCH_DIM);
+			return;
+		}
+		
+		int rows = in_info.dim[0];
+		// treat 1D matrices as 1xN 2D matrix, so we can use the same loop code:
+		int cols = in_info.dimcount > 1 ? in_info.dim[1] : 1;
+		
+		for (int i = 0, y = 0; y<cols; y++) {
+			glm::vec3 * cell = (glm::vec3 *)(in_bp + y*in_info.dimstride[1]);
+			for (int x = 0; x<rows; x++, i++) {
+				space->move(i, *cell++);
+			}
+		}
+		
+		// restore matrix lock state:
+		jit_object_method(in_mat, _jit_sym_lock, in_savelock);
 	}
 	
 	// args: x, y, z (position to query)
@@ -48,12 +93,13 @@ public:
 		std::vector<int32_t> results;
 		int nres = space->query(results, maxresults, center, id, radius, 0.f);
 		
+		t_atom list[nres];
 		for (int i=0; i<nres; i++) {
 			// note: query results will never include self.
-			t_atom a[1];
-			atom_setlong(a, results[i]);
-			outlet_list(outlet_results, NULL, 1, a);
+			atom_setlong(&list[i], results[i]);
 		}
+		outlet_list(outlet_results, 0L, nres, list);
+		
 		t_atom a[1];
 		atom_setlong(a, nres);
 		outlet_anything(outlet_msg, gensym("found"), 1, a);
@@ -88,6 +134,15 @@ void hashspace_clear(max_hashspace* self) { self->clear(); }
 
 void hashspace_move(max_hashspace* self, t_atom_long id, float x, float y, float z) {
 	self->space->move(id, glm::vec3(x, y, z));
+}
+
+void hashspace_move_jit_matrix(max_hashspace* self, t_symbol * name) {
+	void * in_mat = jit_object_findregistered(name);
+	if (!in_mat) {
+		jit_error_code(self, JIT_ERR_INVALID_INPUT);
+		return;
+	}
+	self->jit_matrix(in_mat);
 }
 
 void hashspace_remove(max_hashspace* self, t_atom_long id) {
@@ -125,6 +180,7 @@ extern "C" void ext_main(void *r)
 	class_addmethod(c, (method)hashspace_move, "move", A_LONG, A_FLOAT, A_FLOAT, A_FLOAT, 0);
 	class_addmethod(c, (method)hashspace_remove, "remove", A_LONG, 0);
 	class_addmethod(c, (method)hashspace_query, "query", A_GIMME, 0);
+	class_addmethod(c, (method)hashspace_move_jit_matrix, "jit_matrix", A_SYM, 0);
 	
 	//CLASS_ATTR_LONG(c, "port", 0, max_hashspace, port);
 	//CLASS_ATTR_SYM(c, "host", 0, max_hashspace, host);
