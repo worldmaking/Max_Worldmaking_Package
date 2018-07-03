@@ -120,7 +120,7 @@ struct Hashspace3D {
 			// earlier 
 			//std::reverse(std::begin(list), std::end(list));
 			
-			//std::sort(list.begin(), list.end(), [](ShellData a, ShellData b) { return b.distance > a.distance; });
+			std::sort(list.begin(), list.end(), [](ShellData a, ShellData b) { return b.distance > a.distance; });
 			
 			if (!list.empty()) {
 				for (unsigned j=0; j<list.size(); j++) {
