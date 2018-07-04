@@ -89,9 +89,10 @@ public:
 		float radius = atom_getfloat(&argv[3]);
 		int32_t id = atom_gettype(&argv[4]) == A_LONG ? atom_getlong(&argv[4]) : -1;
 		int32_t maxresults = atom_gettype(&argv[5]) == A_LONG ? atom_getlong(&argv[5]) : 32;
+		int32_t toroidal = atom_gettype(&argv[6]) == A_LONG ? atom_getlong(&argv[6]) : 0;
 		
 		std::vector<int32_t> results;
-		int nres = space->query(results, maxresults, center, id, radius, 0.f);
+		int nres = space->query(results, maxresults, center, id, radius, 0.f, toroidal);
 		
 		t_atom list[nres];
 		for (int i=0; i<nres; i++) {
