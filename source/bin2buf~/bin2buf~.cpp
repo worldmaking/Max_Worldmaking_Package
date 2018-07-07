@@ -78,14 +78,19 @@ public:
 		if (mmap_handle) {
 			UnmapViewOfFile(shared);
 			shared = 0;
+			sharesize = 0;
 			CloseHandle(mmap_handle);
 			mmap_handle = 0;
 		}
 #endif
 #ifdef AL_OSX
 		// Don't forget to free the mmapped memory
-		if (munmap(shared, sharesize) == -1) {
-			object_error((t_object *)this, "error un-mmapping the file");
+		if (shared) {
+			if (munmap(shared, sharesize) == -1) {
+				object_error((t_object *)this, "error un-mmapping the file");
+			}
+			shared = 0;
+			sharesize = 0;
 		}
 		if (fd > 0) {
 			close(fd);
@@ -295,8 +300,33 @@ void bin2buf_dblclick(Bin2Buf *x) {
 }
 
 t_max_err bin2buf_file_set(Bin2Buf *x, t_object *attr, long argc, t_atom *argv) {
-	x->filename = atom_getsym(argv);
-	x->init();
+	
+	short outvol;
+	t_fourcc outtype;
+	t_symbol * filename = atom_getsym(argv);
+	char folderpath[MAX_FILENAME_CHARS];
+	char systempath[MAX_FILENAME_CHARS];
+	
+	post("look for %s", filename->s_name);
+	
+	short result = locatefile_extended(filename->s_name, &outvol, &outtype, NULL, 0);
+	if (result == 0) {
+		if (path_toabsolutesystempath(outvol, filename->s_name, folderpath) == 0) {
+			if (path_nameconform(folderpath, systempath, PATH_STYLE_NATIVE_PLAT, PATH_TYPE_BOOT) == 0) {
+				
+				x->filename = gensym(systempath);
+				object_post((t_object *)x, "loading %s", x->filename->s_name);
+				
+				x->init();
+			} else {
+				object_error((t_object *)x, "couldn't conform path for %s", filename->s_name);
+			}
+		} else {
+			object_error((t_object *)x, "couldn't get absolute path for %s", filename->s_name);
+		}
+	} else {
+		object_error((t_object *)x, "couldn't find %s", filename->s_name);
+	}
 }
 
 

@@ -96,9 +96,9 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 217.0, 313.0, 101.0, 22.0 ],
+					"patching_rect" : [ 217.0, 313.0, 104.0, 22.0 ],
 					"style" : "",
-					"text" : "file grainstate.bin"
+					"text" : "file audiostate.bin"
 				}
 
 			}
@@ -185,9 +185,9 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 103.0, 352.0, 229.0, 22.0 ],
+					"patching_rect" : [ 103.0, 352.0, 232.0, 22.0 ],
 					"style" : "",
-					"text" : "bin2buf~ @buffer foo @file grainstate.bin"
+					"text" : "bin2buf~ @buffer foo @file audiostate.bin"
 				}
 
 			}
