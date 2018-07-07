@@ -175,8 +175,8 @@ static const int cColorHeight = 1080;
 struct ColourFrame {
 	// RGB colour image at full resolution
 	ColorPoint color[cColorWidth*cColorHeight];
-	
-	int64_t timeStamp;
+	// XYZ cloud at colour resolution
+	glm::vec3 cloud[cColorWidth*cColorHeight];
 };
 
 struct CloudFrame {
@@ -262,6 +262,7 @@ struct CloudDevice {
 		libfreenect2::Registration* registration = new libfreenect2::Registration(dev->getIrCameraParams(), dev->getColorCameraParams());
 		libfreenect2::Frame undistorted(cDepthWidth, cDepthHeight, 4);
 		libfreenect2::Frame  registered(cDepthWidth, cDepthHeight, 4);
+
 		
 		object_post((t_object *)this, "freenect ready");
 		
@@ -293,6 +294,11 @@ struct CloudDevice {
 					dst[i].g = src[i].g;
 					dst[i].b = src[i].b;
 				}
+
+				
+
+				/*
+				*/
 				
 				// we finished writing, we can now share this as the next frame to read:
 				//colourFrame.timeStamp = currentColorFrameTime;
@@ -320,7 +326,6 @@ struct CloudDevice {
 			
 			// copy to captureFrame:
 			for (int r=0; r<cDepthHeight; r++) {
-				
 				for (int c=0; c<cDepthWidth; c++) {
 					float mm = mmptr[i];
 					dptr[i] = mm;
@@ -357,7 +362,7 @@ struct CloudDevice {
 			listener.release(frames);
 		}
 		
-		object_post((t_object *)this, "bye from freenect thread for device %s", dev->getSerialNumber().c_str());
+		post("bye from freenect thread for device %s", dev->getSerialNumber().c_str());
 		dev->stop();
 		dev->close();
 		return 0;
@@ -413,6 +418,10 @@ struct CloudDeviceManager {
 	int numDevices = 0;
 	
 	libfreenect2::Freenect2 freenect2;
+
+	CloudDeviceManager() {
+		reset();
+	}
 	
 	void reset() {
 		for (int i=0; i<KINECT_MAX_DEVICES; i++) {
@@ -474,7 +483,7 @@ struct CloudDeviceManager {
 	}
 };
 
-static CloudDeviceManager manager;
+static CloudDeviceManager * manager;
 
 struct ARGB {
 	unsigned char a, r, g, b;
@@ -586,6 +595,10 @@ public:
 	}
 	
 	void open(t_symbol *s, long argc, t_atom * argv) {
+		if (!manager) {
+			error("no device manager for freenect2 yet");
+			manager = new CloudDeviceManager;
+		}
 		t_atom a[1];
 		
 		if (device) {
@@ -596,37 +609,43 @@ public:
 		whichdevice = ((unsigned)atom_getlong(argv)) % KINECT_MAX_DEVICES;
 		object_post(&ob, "open device %d", whichdevice);
 		
-		bool res = manager.open(whichdevice);
+		bool res = manager->open(whichdevice);
 		if (!res) {
 			object_error(&ob, "failed to open device %d", whichdevice);
 		}
 		
-		device = &manager.devices[whichdevice];
+		device = &manager->devices[whichdevice];
 	}
 	
 	void close() {
+
 		if (device) {
 			device->close();
+			device = 0;
 		}
 	}
 	
 	void bang() {
 		if (!device) return;
+
+		//post("lastframe %d %d", device->lastCloudFrame, device->lastColourFrame);
 		
 		// TODO: unique
 		
 		if (use_colour) {
 			// the most recently completed frame:
 			const ColourFrame& colourframe = device->colourFrame();
+
+			//post("copying frame %d", device->lastColourFrame);
 			
 			// copy into rgbmat
 			for (int y=0, i=0; y<cColorHeight; y++) {
 				for (int x=0; x<cColorWidth; x++, i++) {
-					const ColorPoint src = colourframe.color[i];
-					ARGB dst = rgb_mat.back[i];
-					dst.r = src.r;
+					const ColorPoint& src = colourframe.color[i];
+					ARGB& dst = rgb_mat.back[i];
+					dst.r = src.b;
 					dst.g = src.g;
-					dst.b = src.b;
+					dst.b = src.r;
 					dst.a = 255;
 				}
 			}
@@ -836,7 +855,7 @@ void ext_main(void *r)
 	
 	t_class *c;
 	
-	c = class_new("kinect2", (method)kinect_new, (method)kinect_free, (long)sizeof(kinect2), 0L, A_GIMME, 0);
+	c = class_new("freenect2", (method)kinect_new, (method)kinect_free, (long)sizeof(kinect2), 0L, A_GIMME, 0);
 	class_addmethod(c, (method)kinect_assist, "assist", A_CANT, 0);
 	class_addmethod(c, (method)kinect_open, "open", A_GIMME, 0);
 	class_addmethod(c, (method)kinect_bang, "bang", 0);
