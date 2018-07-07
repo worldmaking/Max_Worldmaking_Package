@@ -5,6 +5,7 @@
 
 #ifdef WIN_VERSION
 #define AL_WIN
+#include "Shlwapi.h"
 #else
 #define AL_OSX
 #endif
@@ -100,16 +101,19 @@ public:
 	}
 	
 	float * read() {
+		if (shared) return shared;
+
 		if (!filename) return 0;
 		
 		release();
 		
 #ifdef AL_WIN
 		
-		if (!PathFileExists(filename->s_name)) {
+		/*
+		if (!PathFileExistsA(filename->s_name)) {
 			object_error((t_object *)this, "File %s does not exist", filename->s_name);
 			return 0;
-		}
+		}*/
 	
 		HANDLE file = CreateFileA(filename->s_name,
 								  GENERIC_READ, // what I want to do with it
@@ -124,7 +128,7 @@ public:
 			return 0;
 		}
 		
-		size_t sharesize = GetFileSize(file, NULL);
+		sharesize = GetFileSize(file, NULL);
 		
 		mmap_handle = CreateFileMappingA(file,
 										 NULL, // change this to allow child processes to inherit the handle
@@ -139,7 +143,7 @@ public:
 			return 0;
 		}
 		
-		shared = (T *)MapViewOfFile(mmap_handle, readWrite ? FILE_MAP_WRITE : FILE_MAP_READ, 0, 0, sizeof(T));
+		shared = (float *)MapViewOfFile(mmap_handle, FILE_MAP_READ, 0, 0, sharesize);
 		if (!shared) {
 			CloseHandle(file);
 			CloseHandle(mmap_handle);
@@ -195,7 +199,7 @@ public:
 	}
 	
 	void perform64(t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags) {
-		
+	
 		if (!shared || !sharesize
 			|| !bufname || bufname == ps_nothing) return;
 		t_buffer * b = (t_buffer *)bufname->s_thing;
@@ -210,9 +214,6 @@ public:
 			float * dest = b->b_samples;
 			// no. frames available in the bin:
 			int shareframes = sharesize / (sizeof(float) * nchans);
-			//post("Frames available: %d", shareframes);
-			
-			
 			{
 				t_double * src = ins[0];
 				
@@ -314,10 +315,14 @@ t_max_err bin2buf_file_set(Bin2Buf *x, t_object *attr, long argc, t_atom *argv) 
 		if (path_toabsolutesystempath(outvol, filename->s_name, folderpath) == 0) {
 			if (path_nameconform(folderpath, systempath, PATH_STYLE_NATIVE_PLAT, PATH_TYPE_BOOT) == 0) {
 				
-				x->filename = gensym(systempath);
-				object_post((t_object *)x, "loading %s", x->filename->s_name);
-				
-				x->init();
+				t_symbol * newpath = gensym(systempath);
+
+				if (newpath != x->filename) {
+					x->filename = newpath;
+					object_post((t_object *)x, "loading %s", x->filename->s_name);
+
+					x->init();
+				}
 			} else {
 				object_error((t_object *)x, "couldn't conform path for %s", filename->s_name);
 			}
@@ -327,6 +332,7 @@ t_max_err bin2buf_file_set(Bin2Buf *x, t_object *attr, long argc, t_atom *argv) 
 	} else {
 		object_error((t_object *)x, "couldn't find %s", filename->s_name);
 	}
+	return MAX_ERR_NONE;
 }
 
 
