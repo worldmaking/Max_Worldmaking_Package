@@ -6,35 +6,35 @@
 #include "al_math.h"
 
 /*
-	A POD-friendly data structure for near-neighbour queries
-	
-	Stores object unique ids (int32_t) into a voxel grid
-	There are up to MAX_OBJECTS objects in the space, with ids 0..MAX_OBJECTS-1
-	Each voxel can contain multiple objects
-
-	It is NOT thread-safe.
-	
-	Hashspace<MAX_OBJECTS, RESOLUTION> hashspace;
-
-	// defines the space over which the hashspace exists
-	// expects 'position' values to be given in this world space
-	hashspace.reset(world_min, world_max);
-
-	// position an agent
-	hashspace.move(id, pos);
-
-	// remove an agent
-	hashspace.remove(id);
-
-	// find near agents:
-	std::vector<int32_t> nearby;
-	int nres = hashspace.query(nearby, NEIGHBOURS_MAX, pos, id, range_of_view);
-	for (auto j : nearby) {
-		// note: query results will never include self.
-		auto& n = objects[j];
-		...
-	}
-*/
+ A POD-friendly data structure for near-neighbour queries
+ 
+ Stores object unique ids (int32_t) into a voxel grid
+ There are up to MAX_OBJECTS objects in the space, with ids 0..MAX_OBJECTS-1
+ Each voxel can contain multiple objects
+ 
+ It is NOT thread-safe.
+ 
+ Hashspace<MAX_OBJECTS, RESOLUTION> hashspace;
+ 
+ // defines the space over which the hashspace exists
+ // expects 'position' values to be given in this world space
+ hashspace.reset(world_min, world_max);
+ 
+ // position an agent
+ hashspace.move(id, pos);
+ 
+ // remove an agent
+ hashspace.remove(id);
+ 
+ // find near agents:
+ std::vector<int32_t> nearby;
+ int nres = hashspace.query(nearby, NEIGHBOURS_MAX, pos, id, range_of_view);
+ for (auto j : nearby) {
+ // note: query results will never include self.
+ auto& n = objects[j];
+ ...
+ }
+ */
 
 
 // RESOLUTION 5 means 2^5 = 32 voxels in each axis.
@@ -53,6 +53,11 @@ struct Hashspace3D {
 		int32_t first;
 	};
 	
+	// a shell is a container of all voxels of approximately the same distance from the origin
+	// (distances are approximated as integer squared-distance)
+	// the start & end values are indices into the mVoxelsByDistance array.
+	// the largest complete shell radius possible is mDimHalf;
+	// as any radius larger than this would be an incomplete shell
 	struct Shell {
 		uint32_t start;
 		uint32_t end;
@@ -60,16 +65,15 @@ struct Hashspace3D {
 	
 	Object mObjects[MAX_OBJECTS];
 	Voxel mVoxels[(1<<RESOLUTION) * (1<<RESOLUTION) * (1<<RESOLUTION)];
-	Shell mShells[(1<<RESOLUTION) * (1<<RESOLUTION)]; // indices into mVoxelsByDistance
+	Shell mShells[((1<<RESOLUTION)/2) * ((1<<RESOLUTION)/2)]; // indices into mVoxelsByDistance
 	uint32_t mVoxelsByDistance[(1<<RESOLUTION) * (1<<RESOLUTION) * (1<<RESOLUTION)];
 	
 	uint32_t mShift, mShift2, mDim, mDim2, mDim3, mDimHalf, mWrap, mWrap3;
+	uint32_t mMaxRad2;
 	
 	glm::mat4 world2voxels;
 	glm::mat4 voxels2world;
 	float world2voxels_scale;
-	
-	Hashspace3D() {}
 	
 	Hashspace3D& reset(glm::vec3 world_min, glm::vec3 world_max) {
 		
@@ -78,66 +82,12 @@ struct Hashspace3D {
 		mDim = (1<<RESOLUTION);
 		mDim2 = (mDim*mDim);
 		mDim3 = (mDim2*mDim);
-		mDimHalf = (mDim/2);
 		mWrap = (mDim-1);
 		mWrap3 = (mDim3-1);
+		mDimHalf = (mDim/2);
+		// the largest valid query of distance-squared
+		mMaxRad2 = mDimHalf * mDimHalf; // 256 for RESOLUTION=5
 		
-		struct ShellData {
-			int32_t hash;
-			double distance;
-			
-			ShellData(int32_t hash, double distance) 
-			: hash(hash), distance(distance) {}
-		};
-		
-		// create a map of shell radii to voxel hashes:
-		std::vector<std::vector<ShellData> > shells;
-		shells.resize(mDim2);
-		int32_t lim = mDimHalf;
-		for (int32_t x= -lim; x < lim; x++) {
-			for(int32_t y=-lim; y < lim; y++) {
-				for(int32_t z=-lim; z < lim; z++) {
-					// each voxel lives at a given distance from the origin:
-					double d = x*x+y*y+z*z;
-					if (d < mDim2) {
-						uint32_t h = hash(x, y, z);
-						// add to list: 
-						shells[d].push_back(ShellData(h, 0));
-					}
-				}
-			}
-		}
-		// now pack the shell indices into a sorted list
-		// and store in a secondary list the offsets per distance
-		int vi = 0;
-		for (unsigned d=0; d<mDim2; d++) {
-			Shell& shell = mShells[d];
-			shell.start = vi; 
-			
-			std::vector<ShellData>& list = shells[d];
-			
-			// the order of the elements within a shell is biased
-			// earlier 
-			//std::reverse(std::begin(list), std::end(list));
-			
-			std::sort(list.begin(), list.end(), [](ShellData a, ShellData b) { return b.distance > a.distance; });
-			
-			if (!list.empty()) {
-				for (unsigned j=0; j<list.size(); j++) {
-					mVoxelsByDistance[vi++] = list[j].hash;
-				}
-			}
-			shell.end = vi;
-
-			// shells run 0..1024 (mdim2)
-			// ranges up to 32768 (mdim3)
-			//object_post(0, "shell %d: %d..%d", d, shell.start, shell.end);
-		}
-		
-		
-		//object_post(0, "mDim %d mDim2 %d mDim3 %d mDimHalf %d %d", mDim, mDim2, mDim3, mDimHalf, lim);
-		
-	
 		// zero out the voxels:
 		for (int i=0; i<mDim3; i++) {
 			Voxel& o = mVoxels[i];
@@ -153,12 +103,79 @@ struct Hashspace3D {
 		}
 		
 		// define the transforms:
+		world2voxels_scale = mDim/((world_max.z - world_min.z));
 		voxels2world = glm::translate(world_min) * glm::scale((world_max - world_min) / float(mDim));
 		// world to normalized:
 		world2voxels = glm::inverse(voxels2world);
 		
-		world2voxels_scale = mDim/((world_max.z - world_min.z));
+		// estimate no. of voxels within max shell sphere (volume of max radius sphere)
+		//uint32_t validvoxels = (4.f/3.f)*M_PI*(mDimHalf * mDimHalf * mDimHalf);
+		//post("estimate valid voxels %d", validvoxels); // tends to over-estimate a little
 		
+		struct ShellData {
+			int32_t hash;
+			double distance_squared;
+			
+			ShellData(int32_t hash, double distance_squared)
+			: hash(hash), distance_squared(distance_squared) {}
+		};
+		
+		
+		// create a map of shell radii to voxel hashes:
+		std::vector<std::vector<ShellData> > shells;
+		shells.resize(mMaxRad2);
+		int32_t lim = mDimHalf;
+		
+		// for each voxel in the cube of -mDimHalf to mDimHalf,
+		for (int32_t x= -lim; x < lim; x++) {
+			for(int32_t y=-lim; y < lim; y++) {
+				for(int32_t z=-lim; z < lim; z++) {
+					// compute distance from the origin:
+					double d = (x*x+y*y+z*z);
+					int32_t di = (int)d;
+					// if within the mMaxRad2 sphere
+					if (di < mMaxRad2) {
+						// add to list of valid shells
+						shells[di].push_back(ShellData(hash(x, y, z), d));
+					}
+				}
+			}
+		}
+		
+		// first sort the ShellData members by distance-squared:
+		for (unsigned d=0; d<shells.size(); d++) {
+			std::sort(shells[d].begin(), shells[d].end(), [](ShellData a, ShellData b) { return b.distance_squared > a.distance_squared; });
+		}
+		
+		// now pack the shell indices into a sorted list
+		// and store in a secondary list the offsets per distance
+		int vi = 0; // index into mVoxelsByDistance
+		// for each shell:
+		for (unsigned d=0; d<shells.size(); d++) {
+			std::vector<ShellData>& list = shells[d];
+			
+			// set the shell start index:
+			Shell& shell = mShells[d];
+			shell.start = vi;
+			//post("shell %d:", d);
+			
+			if (!list.empty()) {
+				for (unsigned j=0; j<list.size(); j++) {
+					uint32_t h = list[j].hash;
+					mVoxelsByDistance[vi++] = h;
+				}
+			}
+			
+			// set the shell end index:
+			shell.end = vi;
+			
+			// shells run 0..1024 (mDimHalf)
+			// ranges up to 32768 (mdim3)
+			// it is possible that some shells have no entries.
+			//post("shell %d contains voxels %d..%d", d, shell.start, shell.end);
+		}
+		
+		//object_post(0, "mDim %d mDim2 %d mDim3 %d mDimHalf %d max radius squared: %d", mDim, mDim2, mDim3, mDimHalf, mMaxRad2);
 		return *this;
 	}
 	
@@ -170,40 +187,69 @@ struct Hashspace3D {
 		minRadius = minRadius * world2voxels_scale;
 		maxRadius = maxRadius * world2voxels_scale;
 		
+		// get shell radii:
+		const uint32_t iminr2 = glm::max(uint32_t(0), uint32_t(minRadius*minRadius));
+		const uint32_t imaxr2 = glm::min(mMaxRad2, 1 + uint32_t(maxRadius*maxRadius));
+		
 		// convert pos:
 		auto ctr = world2voxels * glm::vec4(center, 1);
 		const uint32_t x = ctr.x+0.5;
 		const uint32_t y = ctr.y+0.5;
 		const uint32_t z = ctr.z+0.5;
 		
-		// get shell radii:
-		const uint32_t iminr2 = glm::max(uint32_t(0), uint32_t(minRadius*minRadius));
-		const uint32_t imaxr2 = glm::min(mDim2, uint32_t(1 + maxRadius*maxRadius));
+		//post("query shells %d to %d for point %d %d %d", iminr2, imaxr2, x, y, z);
+		
 		
 		// move out shell by shell until we have enough results
 		for (int s = iminr2; s <= imaxr2 && nres < maxResults; s++) {
+			
 			const Shell& shell = mShells[s];
 			const uint32_t cellstart = shell.start;
 			const uint32_t cellend = shell.end;
+			
+			//post("search shell %d, cells %d to %d", s, cellstart, cellend);
+			
 			// look at all the voxels in this shell
 			// we must check an entire shell, to avoid any spatial bias
 			// due to the ordering of voxels within a shell
 			for (uint32_t i = cellstart; i < cellend; i++) {
+				
+				// use the current cell's hash to offset our query
+				// (i.e., translate to the voxel's center)
+				uint32_t offset = mVoxelsByDistance[i];
 				uint32_t index = toroidal
-					? hash(x, y, z, mVoxelsByDistance[i])
-					: hash_nontoroidal(x, y, z, mVoxelsByDistance[i]);
+				? hash(x, y, z, offset)
+				: hash_nontoroidal(x, y, z, offset);
+				
+//				uint32_t ux = unhashx(offset);
+//				uint32_t uy = unhashy(offset);
+//				uint32_t uz = unhashz(offset);
+//
+//				int32_t ox = ((ux+mDimHalf) & mWrap) - mDimHalf;
+//				int32_t oy = ((uy+mDimHalf) & mWrap) - mDimHalf;
+//				int32_t oz = ((uz+mDimHalf) & mWrap) - mDimHalf;
+//
+//				uint32_t hx = hashx_nontoroidal(ox + x);
+//				uint32_t hy = hashy_nontoroidal(oy + y);
+//				uint32_t hz = hashz_nontoroidal(oz + z);
+				//post(".  search cell %d, offset %d (%d %d %d) = index %d", i, offset, ux, uy, uz, index);
+				//post(".  => real offset %d %d %d -> pos %d %d %d => hashed %d %d %d", ox, oy, oz, x + ox, y + oy, z + oz, hx, hy, hz);
+				
 				if (!isValid(index)) continue;
 				
 				const Voxel& voxel = mVoxels[index];
 				// now add any objects in this voxel to the result...
 				const int32_t first = voxel.first;
 				if (first >= 0) {
+					
+					
 					int32_t current = first;
-					//int runaway_limit = 100;
+					//post(".    check cell member %d", current);
+					int runaway_limit = MAX_OBJECTS;
 					do {
 						const Object& o = mObjects[current];
 						if (current != o.id) {
-							//object_post(0, "corrupt list");
+							object_error(0, "hashspace list is corrupt - reset");
 							break;
 						}
 						if (current != selfId) {
@@ -212,14 +258,16 @@ struct Hashspace3D {
 						}
 						current = o.next;
 					} while (
-							current != first // bail if we looped around the voxel
-							//&& nres < maxResults // bail if we have enough hits
-							//&& current >= 0  // bail if this isn't a valid object
-							//&& --runaway_limit // bail if this has lost control
-							); 
-				}	
+							 current != first // bail if we looped around the voxel
+							 && current >= 0  // bail if this isn't a valid object
+							 && --runaway_limit // bail if this has lost control
+							 );
+				}
 			}
 		}
+		
+		// TODO: would be nice to set the nearest as the first item...
+		
 		return nres;
 	}
 	
@@ -239,15 +287,15 @@ struct Hashspace3D {
 			voxel_add(mVoxels[newhash], o);
 		}
 	}
-
+	
 	inline glm::ivec3 dim() { return glm::ivec3(mDim); }
 	
 	static uint32_t invalidHash() { return UINT_MAX; }
 	static bool isValid(uint32_t h) { return h != invalidHash(); }
 	
-	inline uint32_t hash(glm::vec3 v) const { 
+	inline uint32_t hash(glm::vec3 v) const {
 		glm::vec4 norm = world2voxels * glm::vec4(v, 1.f);
-		return hash(norm[0]+0.5, norm[1]+0.5, norm[2]+0.5); 
+		return hash(norm[0]+0.5, norm[1]+0.5, norm[2]+0.5);
 	}
 	
 	// convert x,y,z in range [0..DIM) to unsigned hash:
@@ -259,14 +307,15 @@ struct Hashspace3D {
 	inline uint32_t hashy(uint32_t v) const { return (v & mWrap)<<mShift; }
 	inline uint32_t hashz(uint32_t v) const { return (v & mWrap)<<mShift2; }
 	
-	inline uint32_t hashx_nontoroidal(uint32_t v) const {
-		return v >= 0 && v < mWrap ? v : invalidHash();
+	
+	inline uint32_t hashx_nontoroidal(int32_t v) const {
+		return (v >= 0 && v <= mWrap) ? v 		    : invalidHash();
 	}
-	inline uint32_t hashy_nontoroidal(uint32_t v) const {
-		return v >= 0 && v < mWrap ? v<<mShift : invalidHash();
+	inline uint32_t hashy_nontoroidal(int32_t v) const {
+		return (v >= 0 && v <= mWrap) ? v<<mShift  : invalidHash();
 	}
-	inline uint32_t hashz_nontoroidal(uint32_t v) const {
-		return v >= 0 && v < mWrap ? v<<mShift2 : invalidHash();
+	inline uint32_t hashz_nontoroidal(int32_t v) const {
+		return (v >= 0 && v <= mWrap) ? v<<mShift2 : invalidHash();
 	}
 	
 	inline uint32_t unhashx(uint32_t h) const { return (h) & mWrap; }
@@ -276,16 +325,24 @@ struct Hashspace3D {
 	// generate hash offset by an already generated hash:
 	inline uint32_t hash(uint32_t x, uint32_t y, uint32_t z, uint32_t offset) const {
 		return	hashx(unhashx(offset) + x) +
-		hashy(unhashy(offset) + y) +
-		hashz(unhashz(offset) + z);
+				hashy(unhashy(offset) + y) +
+				hashz(unhashz(offset) + z);
 	}
+	
 	inline uint32_t hash_nontoroidal(uint32_t x, uint32_t y, uint32_t z, uint32_t offset) const {
-		x = hashx_nontoroidal(unhashx(offset) + x);
-		y = hashy_nontoroidal(unhashy(offset) + y);
-		z = hashy_nontoroidal(unhashz(offset) + z);
-		return	isValid(x) && isValid(y) && isValid(z)
+		// get signed version of offsets:
+		int32_t ox = (((unhashx(offset)+mDimHalf) & mWrap) - mDimHalf);
+		int32_t oy = (((unhashy(offset)+mDimHalf) & mWrap) - mDimHalf);
+		int32_t oz = (((unhashz(offset)+mDimHalf) & mWrap) - mDimHalf);
+		// apply to position & hash
+		x = hashx_nontoroidal(ox + x);
+		y = hashy_nontoroidal(oy + y);
+		z = hashz_nontoroidal(oz + z);
+		// validate & combine:
+		return isValid(x) && isValid(y) && isValid(z)
 		? x + y + z
 		: invalidHash();
+
 	}
 	
 	// this is definitely not thread-safe.
@@ -320,7 +377,7 @@ struct Hashspace3D {
 		o.prev = o.next = -1;
 		return *this;
 	}
-
+	
 };
 
 #endif // AL_HASHSPACE_H

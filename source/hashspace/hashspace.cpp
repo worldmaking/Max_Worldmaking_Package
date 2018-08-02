@@ -68,6 +68,7 @@ public:
 		for (int i = 0, y = 0; y<cols; y++) {
 			glm::vec3 * cell = (glm::vec3 *)(in_bp + y*in_info.dimstride[1]);
 			for (int x = 0; x<rows; x++, i++) {
+				//post("move %d %f %f %f", i, cell->x, cell->y, cell->z);
 				space->move(i, *cell++);
 			}
 		}
@@ -94,9 +95,12 @@ public:
 		std::vector<int32_t> results;
 		int nres = space->query(results, maxresults, center, id, radius, 0.f, toroidal);
 		
+		//post("query at %f %f %f", center.x, center.y, center.z);
+		//post("rad %f ignore %d maxres %d toroidal %d, found %d", radius, id, maxresults, toroidal, nres);
+		
 		t_atom list[nres];
 		for (int i=0; i<nres; i++) {
-			// note: query results will never include self.
+			//post("res %d: %d", i, results[i]);
 			atom_setlong(&list[i], results[i]);
 		}
 		outlet_list(outlet_results, 0L, nres, list);
