@@ -38,6 +38,105 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-27",
+					"linecount" : 2,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 417.0, 521.5, 331.0, 33.0 ],
+					"presentation_rect" : [ 438.0, 532.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "@tooManyResults determines an approximate maximum of the number of results to return (default 32)"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-26",
+					"linecount" : 2,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 417.0, 486.0, 315.0, 33.0 ],
+					"presentation_rect" : [ 440.0, 486.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "@toroidal 1 will wrap around the space boundaries (disabled by default)"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-25",
+					"linecount" : 2,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 417.0, 407.0, 315.0, 33.0 ],
+					"presentation_rect" : [ 436.0, 405.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "@radius attribute sets how far the query will search around the desired point"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-23",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 249.0, 436.0, 160.0, 22.0 ],
+					"presentation_rect" : [ 249.0, 436.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "radius 0.5, query 0.5 0.5 0.5"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-21",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 249.0, 407.0, 160.0, 22.0 ],
+					"presentation_rect" : [ 249.0, 407.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "radius 0.1, query 0.5 0.5 0.5"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"fontname" : "Arial Italic",
+					"id" : "obj-20",
+					"linecount" : 3,
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 417.0, 573.0, 320.0, 47.0 ],
+					"presentation_rect" : [ 313.5, 607.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "Uses an internal resolution of 32 * 32 * 32 voxels mapped over the space determined by @world_min and @world_max; default space bounds are (0,0,0) to (1,1,1)."
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-8",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 249.0, 327.0, 117.0, 22.0 ],
+					"presentation_rect" : [ 249.0, 376.0, 0.0, 0.0 ],
+					"style" : "",
+					"text" : "query 0.5 0.5 0.5 74"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"fontname" : "Arial Italic",
 					"id" : "obj-24",
 					"maxclass" : "comment",
@@ -45,7 +144,7 @@
 					"numoutlets" : 0,
 					"patching_rect" : [ 13.5, 50.0, 489.0, 20.0 ],
 					"style" : "",
-					"text" : "Fast spherical nearest-neighbour lookup"
+					"text" : "Fast spherical nearest-neighbour lookup for up to 1024 individual identities"
 				}
 
 			}
@@ -69,7 +168,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 320.0, 238.0, 199.0, 20.0 ],
+					"patching_rect" : [ 374.0, 238.0, 199.0, 20.0 ],
 					"style" : "",
 					"text" : "remove all objects"
 				}
@@ -95,7 +194,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 49.0, 146.0, 24.0, 24.0 ],
+					"patching_rect" : [ 49.0, 181.0, 24.0, 24.0 ],
 					"style" : ""
 				}
 
@@ -107,7 +206,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "jit_matrix", "" ],
-					"patching_rect" : [ 49.0, 176.0, 131.0, 22.0 ],
+					"patching_rect" : [ 49.0, 211.0, 131.0, 22.0 ],
 					"style" : "",
 					"text" : "jit.noise 3 float32 1024"
 				}
@@ -120,22 +219,9 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 77.0, 112.0, 156.0, 60.0 ],
+					"patching_rect" : [ 77.0, 147.0, 156.0, 60.0 ],
 					"style" : "",
 					"text" : "set object positions via a matrix (sets positions of 1024 objects as randomized x,y,z positions)"
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-16",
-					"linecount" : 3,
-					"maxclass" : "comment",
-					"numinlets" : 1,
-					"numoutlets" : 0,
-					"patching_rect" : [ 249.0, 457.0, 258.0, 47.0 ],
-					"style" : "",
-					"text" : "default space bounds are (0,0,0) to (1,1,1)\nmax objects are 1024\nresolution is 2^5 = 32 in each axis"
 				}
 
 			}
@@ -145,9 +231,9 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 320.0, 211.0, 199.0, 20.0 ],
+					"patching_rect" : [ 374.0, 211.0, 199.0, 20.0 ],
 					"style" : "",
-					"text" : "remove object id 1 from the space"
+					"text" : "remove object id 0 from the space"
 				}
 
 			}
@@ -157,7 +243,7 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 356.0, 150.0, 276.0, 20.0 ],
+					"patching_rect" : [ 372.0, 150.0, 276.0, 20.0 ],
 					"style" : "",
 					"text" : "set position of object id 0 to position (0., 0., 0.)"
 				}
@@ -169,22 +255,22 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 356.0, 176.0, 276.0, 20.0 ],
+					"patching_rect" : [ 372.0, 176.0, 276.0, 20.0 ],
 					"style" : "",
-					"text" : "set position of object id 1 to position (0.1, 0., 0.)"
+					"text" : "set position of object id 74 to position (0.5 0.5 0.5)"
 				}
 
 			}
 , 			{
 				"box" : 				{
 					"id" : "obj-12",
-					"linecount" : 6,
+					"linecount" : 3,
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 376.0, 335.0, 433.0, 87.0 ],
+					"patching_rect" : [ 374.0, 297.0, 315.0, 47.0 ],
 					"style" : "",
-					"text" : "find nearby objects:\n\nfloat x, y, z (position)\nfloat radius\nint selfid (this id will be excluded from results, default -1)\nint maxresults (maximum no. of neighbours to consider default 32)"
+					"text" : "find nearby objects:\nfloat x, y, z (position)\nint selfid (this id will be excluded from results, default -1)"
 				}
 
 			}
@@ -195,9 +281,9 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 249.0, 176.0, 97.0, 22.0 ],
+					"patching_rect" : [ 249.0, 176.0, 117.0, 22.0 ],
 					"style" : "",
-					"text" : "move 1 0.1 0. 0."
+					"text" : "move 74 0.5 0.5 0.5"
 				}
 
 			}
@@ -234,7 +320,7 @@
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 249.0, 211.0, 61.0, 22.0 ],
 					"style" : "",
-					"text" : "remove 1"
+					"text" : "remove 0"
 				}
 
 			}
@@ -272,7 +358,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "list", "" ],
-					"patching_rect" : [ 49.0, 457.0, 184.0, 29.0 ],
+					"patching_rect" : [ 49.0, 482.0, 184.0, 29.0 ],
 					"style" : "",
 					"text" : "hashspace"
 				}
@@ -285,9 +371,9 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 249.0, 335.0, 117.0, 22.0 ],
+					"patching_rect" : [ 249.0, 297.0, 101.0, 22.0 ],
 					"style" : "",
-					"text" : "query 0. 0. 0. 0.25 0"
+					"text" : "query 0.5 0.5 0.5"
 				}
 
 			}
@@ -323,6 +409,20 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
+					"source" : [ "obj-21", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-1", 0 ],
+					"source" : [ "obj-23", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-1", 0 ],
 					"source" : [ "obj-4", 0 ]
 				}
 
@@ -345,6 +445,13 @@
 				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
 					"source" : [ "obj-7", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-1", 0 ],
+					"source" : [ "obj-8", 0 ]
 				}
 
 			}

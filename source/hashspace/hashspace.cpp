@@ -13,6 +13,11 @@ public:
 	// attrs:
 	glm::vec3 world_min = glm::vec3(0.f);
 	glm::vec3 world_max = glm::vec3(1.f);
+	float radius = 0.1f;
+	t_atom_long toroidal = 0;
+	t_atom_long tooManyResults = 32;
+	t_atom_long resolution = 1024;
+	t_atom_long max_objects = 1024;
 	
 	// internal:
 	Hashspace3D<> * space;
@@ -78,22 +83,16 @@ public:
 	}
 	
 	// args: x, y, z (position to query)
-	// r radius
 	// id (of query object, or -1 for no id)
-	// maxresults to return
 	void query(t_atom_long argc, t_atom * argv) {
 		
 		//post("pos %f %f %f", atom_getfloat(&argv[0]), atom_getfloat(&argv[1]), atom_getfloat(&argv[2]));
 		
-		
 		glm::vec3 center = glm::vec3(atom_getfloat(&argv[0]), atom_getfloat(&argv[1]), atom_getfloat(&argv[2]));
-		float radius = atom_getfloat(&argv[3]);
-		int32_t id = atom_gettype(&argv[4]) == A_LONG ? atom_getlong(&argv[4]) : -1;
-		int32_t maxresults = atom_gettype(&argv[5]) == A_LONG ? atom_getlong(&argv[5]) : 32;
-		int32_t toroidal = atom_gettype(&argv[6]) == A_LONG ? atom_getlong(&argv[6]) : 0;
+		int32_t id = atom_gettype(&argv[3]) == A_LONG ? atom_getlong(&argv[3]) : -1;
 		
 		std::vector<int32_t> results;
-		int nres = space->query(results, maxresults, center, id, radius, 0.f, toroidal);
+		int nres = space->query(results, tooManyResults, center, id, radius, 0.f, toroidal);
 		
 		//post("query at %f %f %f", center.x, center.y, center.z);
 		//post("rad %f ignore %d maxres %d toroidal %d, found %d", radius, id, maxresults, toroidal, nres);
@@ -137,7 +136,11 @@ void hashspace_free(max_hashspace *self) {
 
 void hashspace_clear(max_hashspace* self) { self->clear(); }
 
-void hashspace_move(max_hashspace* self, t_atom_long id, float x, float y, float z) {
+void hashspace_move(max_hashspace* self, t_symbol * name, t_atom_long argc, t_atom * argv) {
+	int id = atom_getlong(argv + 0);
+	float x = atom_getfloat(argv + 1);
+	float y = atom_getfloat(argv + 2);
+	float z = atom_getfloat(argv + 3);
 	self->space->move(id, glm::vec3(x, y, z));
 }
 
@@ -172,26 +175,47 @@ void hashspace_assist(max_hashspace *self, void *b, long m, long a, char *s)
 	}
 }
 
+t_max_err hashspace_world_min_set(max_hashspace *self, t_object *attr, long argc, t_atom *argv) {
+	if (argc < 3) return 0;
+	self->world_min.x = atom_getfloat(argv + 0);
+	self->world_min.y = atom_getfloat(argv + 1);
+	self->world_min.z = atom_getfloat(argv + 2);
+	self->clear();
+	return 0;
+}
+
+t_max_err hashspace_world_max_set(max_hashspace *self, t_object *attr, long argc, t_atom *argv) {
+	if (argc < 3) return 0;
+	self->world_max.x = atom_getfloat(argv + 0);
+	self->world_max.y = atom_getfloat(argv + 1);
+	self->world_max.z = atom_getfloat(argv + 2);
+	self->clear();
+	return 0;
+}
 
 extern "C" void ext_main(void *r)
 {
 	t_class *c;
+	
 
 	c = class_new("hashspace", (method)hashspace_new, (method)hashspace_free, (long)sizeof(max_hashspace), 0L, A_GIMME, 0);
 	
 	class_addmethod(c, (method)hashspace_assist, "assist", A_CANT, 0);
 	
 	class_addmethod(c, (method)hashspace_clear,	"clear", 0);
-	class_addmethod(c, (method)hashspace_move, "move", A_LONG, A_FLOAT, A_FLOAT, A_FLOAT, 0);
+	class_addmethod(c, (method)hashspace_move, "move", A_GIMME, 0);
 	class_addmethod(c, (method)hashspace_remove, "remove", A_LONG, 0);
 	class_addmethod(c, (method)hashspace_query, "query", A_GIMME, 0);
 	class_addmethod(c, (method)hashspace_move_jit_matrix, "jit_matrix", A_SYM, 0);
 	
-	//CLASS_ATTR_LONG(c, "port", 0, max_hashspace, port);
-	//CLASS_ATTR_SYM(c, "host", 0, max_hashspace, host);
-	//CLASS_ATTR_ACCESSORS(c, "host", NULL, hashspace_host_set);
-	//CLASS_ATTR_SYM(c, "name", 0, max_hashspace, name);
-	//CLASS_ATTR_ACCESSORS(c, "name", NULL, hashspace_name_set);
+	CLASS_ATTR_FLOAT(c, "radius", 0, max_hashspace, radius);
+	CLASS_ATTR_LONG(c, "tooManyResults", 0, max_hashspace, tooManyResults);
+	CLASS_ATTR_LONG(c, "toroidal", 0, max_hashspace, toroidal);
+	
+	CLASS_ATTR_FLOAT_ARRAY(c, "world_min", 0, max_hashspace, world_min, 3);
+	CLASS_ATTR_FLOAT_ARRAY(c, "world_max", 0, max_hashspace, world_max, 3);
+	CLASS_ATTR_ACCESSORS(c, "world_min", NULL, hashspace_world_min_set);
+	CLASS_ATTR_ACCESSORS(c, "world_max", NULL, hashspace_world_max_set);
 	
 	class_register(CLASS_BOX, c);
 	max_class = c;

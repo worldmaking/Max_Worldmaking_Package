@@ -36,7 +36,6 @@
  }
  */
 
-
 // RESOLUTION 5 means 2^5 = 32 voxels in each axis.
 template<int MAX_OBJECTS = 1024, int RESOLUTION = 5>
 struct Hashspace3D {
@@ -232,8 +231,8 @@ struct Hashspace3D {
 //				uint32_t hx = hashx_nontoroidal(ox + x);
 //				uint32_t hy = hashy_nontoroidal(oy + y);
 //				uint32_t hz = hashz_nontoroidal(oz + z);
-				//post(".  search cell %d, offset %d (%d %d %d) = index %d", i, offset, ux, uy, uz, index);
-				//post(".  => real offset %d %d %d -> pos %d %d %d => hashed %d %d %d", ox, oy, oz, x + ox, y + oy, z + oz, hx, hy, hz);
+//				post(".  search cell %d, offset %d (%d %d %d) = index %d", i, offset, ux, uy, uz, index);
+//				post(".  => real offset %d %d %d -> pos %d %d %d => hashed %d %d %d", ox, oy, oz, x + ox, y + oy, z + oz, hx, hy, hz);
 				
 				if (!isValid(index)) continue;
 				
@@ -281,10 +280,11 @@ struct Hashspace3D {
 		Object& o = mObjects[objectId];
 		o.pos = pos;
 		uint32_t newhash = hash(o.pos);
+		//post("moving %d to %f %f %f %d", objectId, o.pos.x, o.pos.y, o.pos.z, newhash);
 		if (newhash != o.hash) {
 			if (o.hash != invalidHash()) voxel_remove(mVoxels[o.hash], o);
 			o.hash = newhash;
-			voxel_add(mVoxels[newhash], o);
+			if (newhash != invalidHash()) voxel_add(mVoxels[newhash], o);
 		}
 	}
 	
