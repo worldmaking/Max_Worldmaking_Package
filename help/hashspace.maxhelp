@@ -43,10 +43,9 @@
 					"maxclass" : "comment",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 417.0, 521.5, 331.0, 33.0 ],
-					"presentation_rect" : [ 438.0, 532.0, 0.0, 0.0 ],
+					"patching_rect" : [ 417.0, 521.5, 337.0, 33.0 ],
 					"style" : "",
-					"text" : "@tooManyResults determines an approximate maximum of the number of results to return (default 32)"
+					"text" : "@enoughResults determines an approximate maximum of the number of results to return (default 32)"
 				}
 
 			}
@@ -58,7 +57,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 417.0, 486.0, 315.0, 33.0 ],
-					"presentation_rect" : [ 440.0, 486.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "@toroidal 1 will wrap around the space boundaries (disabled by default)"
 				}
@@ -72,7 +70,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 417.0, 407.0, 315.0, 33.0 ],
-					"presentation_rect" : [ 436.0, 405.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "@radius attribute sets how far the query will search around the desired point"
 				}
@@ -86,7 +83,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 249.0, 436.0, 160.0, 22.0 ],
-					"presentation_rect" : [ 249.0, 436.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "radius 0.5, query 0.5 0.5 0.5"
 				}
@@ -100,7 +96,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 249.0, 407.0, 160.0, 22.0 ],
-					"presentation_rect" : [ 249.0, 407.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "radius 0.1, query 0.5 0.5 0.5"
 				}
@@ -115,7 +110,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 417.0, 573.0, 320.0, 47.0 ],
-					"presentation_rect" : [ 313.5, 607.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "Uses an internal resolution of 32 * 32 * 32 voxels mapped over the space determined by @world_min and @world_max; default space bounds are (0,0,0) to (1,1,1)."
 				}
@@ -129,7 +123,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 249.0, 327.0, 117.0, 22.0 ],
-					"presentation_rect" : [ 249.0, 376.0, 0.0, 0.0 ],
 					"style" : "",
 					"text" : "query 0.5 0.5 0.5 74"
 				}

@@ -15,7 +15,7 @@ public:
 	glm::vec3 world_max = glm::vec3(1.f);
 	float radius = 0.1f;
 	t_atom_long toroidal = 0;
-	t_atom_long tooManyResults = 32;
+	t_atom_long enoughResults = 32;
 	t_atom_long resolution = 1024;
 	t_atom_long max_objects = 1024;
 	
@@ -92,7 +92,7 @@ public:
 		int32_t id = atom_gettype(&argv[3]) == A_LONG ? atom_getlong(&argv[3]) : -1;
 		
 		std::vector<int32_t> results;
-		int nres = space->query(results, tooManyResults, center, id, radius, 0.f, toroidal);
+		int nres = space->query(results, enoughResults, center, id, radius, 0.f, toroidal);
 		
 		//post("query at %f %f %f", center.x, center.y, center.z);
 		//post("rad %f ignore %d maxres %d toroidal %d, found %d", radius, id, maxresults, toroidal, nres);
@@ -209,7 +209,7 @@ extern "C" void ext_main(void *r)
 	class_addmethod(c, (method)hashspace_move_jit_matrix, "jit_matrix", A_SYM, 0);
 	
 	CLASS_ATTR_FLOAT(c, "radius", 0, max_hashspace, radius);
-	CLASS_ATTR_LONG(c, "tooManyResults", 0, max_hashspace, tooManyResults);
+	CLASS_ATTR_LONG(c, "enoughResults", 0, max_hashspace, enoughResults);
 	CLASS_ATTR_LONG(c, "toroidal", 0, max_hashspace, toroidal);
 	
 	CLASS_ATTR_FLOAT_ARRAY(c, "world_min", 0, max_hashspace, world_min, 3);
