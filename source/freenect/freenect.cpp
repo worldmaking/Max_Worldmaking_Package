@@ -14,6 +14,8 @@ void initialize_jitlib() {
 
 static t_class * max_class = 0;
 
+t_symbol * resource_path = 0;
+
 
 #ifdef __GNUC__
 #include <stdint.h>
@@ -262,14 +264,14 @@ public:
 		freenect_set_depth_buffer(device, depth_data);
 		freenect_set_video_mode(device, freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB));
 		freenect_set_depth_mode(device, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_MM));
-		freenect_set_led(device,LED_RED);
+        led(LED_OFF);
 		freenect_start_depth(device);
 		freenect_start_video(device);
 	}
 	
 	void getdevices() {
 		t_atom a[8];
-		int i, flags;
+		int i;
 		struct freenect_device_attributes* attribute_list;
 		struct freenect_device_attributes* attribute;
 		
@@ -284,7 +286,7 @@ public:
 			atom_setsym(a+i, gensym(attribute->camera_serial));
 			attribute = attribute->next;
 		}
-		outlet_anything(outlet_msg, gensym("devlist"), num_devices, a);
+		outlet_anything(outlet_msg, gensym("devices"), num_devices, a);
 		
 		freenect_free_device_attributes(attribute_list);
 	}
@@ -292,7 +294,8 @@ public:
 	void close() {
 		if(!device) return;
 		
-		freenect_set_led(device,LED_BLINK_GREEN);
+		led(LED_BLINK_GREEN);
+        
 		freenect_close_device(device);
 		device = NULL;
 		
@@ -349,6 +352,7 @@ public:
 	}
 	
 	void rgb_process() {
+        if (!device) return;
 		// helper function to map one FREENECT_VIDEO_RGB image to a FREENECT_DEPTH_MM
 		// image (inverse mapping to FREENECT_DEPTH_REGISTERED, which is depth -> RGB)
 		//FREENECTAPI void freenect_map_rgb_to_depth( freenect_device* dev, uint16_t* depth_mm, uint8_t* rgb_raw, uint8_t* rgb_registered );
@@ -357,6 +361,7 @@ public:
 	}
 	
 	void cloud_process() {
+        if (!device) return;
 		int i = 0;
 		for (int y=0; y<KINECT_DEPTH_HEIGHT; y++) {
 			for (int x=0; x<KINECT_DEPTH_WIDTH; x++, i++) {
@@ -396,6 +401,9 @@ public:
 	
 	static void *capture_threadfunc(void *arg) {
 		//freenect *x = (freenect *)arg;
+        setenv("LIBFREENECT_FIRMWARE_PATH", resource_path->s_name, 1);
+//        char* envpath = getenv("LIBFREENECT_FIRMWARE_PATH");
+//        post("env %s", envpath);
 		
 		// create the freenect context:
 		freenect_context *context = 0;
@@ -406,6 +414,7 @@ public:
 			}
 		}
 		f_ctx = context;
+        
 		
 		freenect_set_log_callback(f_ctx, freenect_logger);
 		//		FREENECT_LOG_FATAL = 0,     /**< Log for crashing/non-recoverable errors */
@@ -500,6 +509,30 @@ void ext_main(void *r)
 //	ps_normal_matrix = gensym("normal_matrix");
 //	ps_texcoord_matrix = gensym("texcoord_matrix");
 //	ps_index_matrix = gensym("index_matrix");
+    
+    
+    if (resource_path == 0) {
+        char filename[MAX_FILENAME_CHARS];
+        char folderpath[MAX_FILENAME_CHARS];
+        char systempath[MAX_FILENAME_CHARS];
+        short outvol;
+        t_fourcc outtype;
+#ifdef WIN_VERSION
+        strncpy_zero(filename, "freenect.mxe", MAX_FILENAME_CHARS);
+#else
+        strncpy_zero(filename, "freenect.mxo", MAX_FILENAME_CHARS);
+#endif
+        short result = locatefile_extended(filename, &outvol, &outtype, NULL, 0);
+        if (result == 0
+            && path_toabsolutesystempath(outvol, "../resources", folderpath) == 0
+            && path_nameconform(folderpath, systempath, PATH_STYLE_SLASH, PATH_TYPE_BOOT) == 0) {
+            resource_path = gensym(systempath);
+        }
+        else {
+            object_error(0, "failed to locate resources");
+            resource_path = gensym(".");
+        }
+    }
 
 	t_class *c;
 	
