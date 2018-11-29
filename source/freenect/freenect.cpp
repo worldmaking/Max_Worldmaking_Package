@@ -1,5 +1,6 @@
 // a bunch of likely Max includes:
 #include "al_max.h"
+#include "al_math.h"
 
 // used in ext_main
 // a dummy call just to get jitter initialized, otherwise _jit_sym_* symbols etc. won't be populated
@@ -26,67 +27,414 @@ static t_class * max_class = 0;
 #include <thread>
 
 #include "libfreenect.h"
+#include "libfreenect_registration.h"
 
 #define KINECT_DEPTH_WIDTH 640
 #define KINECT_DEPTH_HEIGHT 480
 
 freenect_context * f_ctx = NULL;
+t_systhread capture_thread;
+int capturing = 0;
+
+static void freenect_logger(freenect_context *dev, freenect_loglevel level, const char *msg) {
+	object_post(NULL, msg);
+}
+
+void freenect_quit() {
+	if (f_ctx) {
+		freenect_shutdown(f_ctx);
+		f_ctx = NULL;
+	}
+}
+
 
 class freenect {
 public:
 	t_object ob;
 	void *		outlet_msg;
+	void *		outlet_cloud;
+	void *		outlet_rgb_cloud;
+	void *		outlet_depth;
+	void *		outlet_rgb;
+	
+	// attrs:
+	t_atom_long clearnulls = 1;
+	t_atom_long unique = 1;
+	
+	// generic:
+	volatile char new_rgb_data;
+	volatile char new_depth_data;
+	volatile char new_cloud_data;
+	
+	// depth matrix for raw output:
+	void *		depth_mat;
+	void *		depth_mat_wrapper;
+	t_atom		depth_name[1];
+	uint32_t *	depth_back;
+	
+	// rgb matrix for raw output:
+	void *		rgb_mat;
+	void *		rgb_mat_wrapper;
+	t_atom		rgb_name[1];
+	glm::i8vec3 * 	rgb_back;
+	
+	// rgb matrix for cloud output:
+	void *		rgb_cloud_mat;
+	void *		rgb_cloud_mat_wrapper;
+	t_atom		rgb_cloud_name[1];
+	glm::i8vec3 *	rgb_cloud_back;
+	
+	// cloud matrix for output:
+	void *		cloud_mat;
+	void *		cloud_mat_wrapper;
+	t_atom		cloud_name[1];
+	glm::vec3 *		cloud_back;
+	
+//	float		depth_base, depth_offset;
+//	glm::vec2	depth_focal;
+//	glm::vec2	depth_center;
+//	glm::vec2	rgb_focal;
+//	glm::vec2	rgb_center;
 	
 	// freenect:
 	freenect_device  *device;
+	// internal data:
+	uint16_t *	depth_data;
+	
+	
 	
 	freenect() {
 		
+		device = 0;
+		// depth buffer doesn't use a jit_matrix, because uint16_t is not a Jitter type:
+		depth_data = (uint16_t *)sysmem_newptr(KINECT_DEPTH_WIDTH*KINECT_DEPTH_HEIGHT * sizeof(uint16_t));
+		
+		new_rgb_data = new_depth_data = new_cloud_data = 0;
+		
+//		// attributes:
+//		depth_base = 0.085f;
+//		depth_offset = 0.0011f;
+//		depth_center.x = 314.f;
+//		depth_center.y = 241.f;
+//		depth_focal.x = 597.f;
+//		depth_focal.y = 597.f;
+//		rgb_center.x = 320.f;
+//		rgb_center.y = 240.f;
+//		rgb_focal.x = 524.f;
+//		rgb_focal.y = 524.f;
+		
+		t_jit_matrix_info info;
+		
+		depth_mat_wrapper = jit_object_new(gensym("jit_matrix_wrapper"), jit_symbol_unique(), 0, NULL);
+		depth_mat = jit_object_method(depth_mat_wrapper, _jit_sym_getmatrix);
+		// create the internal data:
+		jit_matrix_info_default(&info);
+		info.flags |= JIT_MATRIX_DATA_PACK_TIGHT;
+		info.planecount = 1;
+		info.type = gensym("long");
+		info.dimcount = 2;
+		info.dim[0] = KINECT_DEPTH_WIDTH;
+		info.dim[1] = KINECT_DEPTH_HEIGHT;
+		jit_object_method(depth_mat, _jit_sym_setinfo_ex, &info);
+		jit_object_method(depth_mat, _jit_sym_clear);
+		jit_object_method(depth_mat, _jit_sym_getdata, &depth_back);
+		// cache name:
+		atom_setsym(depth_name, jit_attr_getsym(depth_mat_wrapper, _jit_sym_name));
+		
+		rgb_mat_wrapper = jit_object_new(gensym("jit_matrix_wrapper"), jit_symbol_unique(), 0, NULL);
+		rgb_mat = jit_object_method(rgb_mat_wrapper, _jit_sym_getmatrix);
+		// create the internal data:
+		jit_matrix_info_default(&info);
+		info.flags |= JIT_MATRIX_DATA_PACK_TIGHT;
+		info.planecount = 3;
+		info.type = gensym("char");
+		info.dimcount = 2;
+		info.dim[0] = KINECT_DEPTH_WIDTH;
+		info.dim[1] = KINECT_DEPTH_HEIGHT;
+		jit_object_method(rgb_mat, _jit_sym_setinfo_ex, &info);
+		jit_object_method(rgb_mat, _jit_sym_clear);
+		jit_object_method(rgb_mat, _jit_sym_getdata, &rgb_back);
+		// cache name:
+		atom_setsym(rgb_name, jit_attr_getsym(rgb_mat_wrapper, _jit_sym_name));
+		
+		rgb_cloud_mat_wrapper = jit_object_new(gensym("jit_matrix_wrapper"), jit_symbol_unique(), 0, NULL);
+		rgb_cloud_mat = jit_object_method(rgb_cloud_mat_wrapper, _jit_sym_getmatrix);
+		// create the internal data:
+		jit_matrix_info_default(&info);
+		info.flags |= JIT_MATRIX_DATA_PACK_TIGHT;
+		info.planecount = 3;
+		info.type = gensym("char");
+		info.dimcount = 2;
+		info.dim[0] = KINECT_DEPTH_WIDTH;
+		info.dim[1] = KINECT_DEPTH_HEIGHT;
+		jit_object_method(rgb_cloud_mat, _jit_sym_setinfo_ex, &info);
+		jit_object_method(rgb_cloud_mat, _jit_sym_clear);
+		jit_object_method(rgb_cloud_mat, _jit_sym_getdata, &rgb_cloud_back);
+		// cache name:
+		atom_setsym(rgb_cloud_name, jit_attr_getsym(rgb_cloud_mat_wrapper, _jit_sym_name));
+		
+		cloud_mat_wrapper = jit_object_new(gensym("jit_matrix_wrapper"), jit_symbol_unique(), 0, NULL);
+		cloud_mat = jit_object_method(cloud_mat_wrapper, _jit_sym_getmatrix);
+		// create the internal data:
+		jit_matrix_info_default(&info);
+		info.flags |= JIT_MATRIX_DATA_PACK_TIGHT;
+		info.planecount = 3;
+		info.type = gensym("float32");
+		info.dimcount = 2;
+		info.dim[0] = KINECT_DEPTH_WIDTH;
+		info.dim[1] = KINECT_DEPTH_HEIGHT;
+		jit_object_method(cloud_mat, _jit_sym_setinfo_ex, &info);
+		jit_object_method(cloud_mat, _jit_sym_clear);
+		jit_object_method(cloud_mat, _jit_sym_getdata, &cloud_back);
+		// cache name:
+		atom_setsym(cloud_name, jit_attr_getsym(cloud_mat_wrapper, _jit_sym_name));
+		
 		outlet_msg = outlet_new(&ob, 0);
+		outlet_cloud = outlet_new(&ob, 0);
+		outlet_rgb_cloud = outlet_new(&ob, 0);
+		outlet_depth = outlet_new(&ob, 0);
+		outlet_rgb = outlet_new(&ob, 0);
 	}
 	
 	~freenect() {
 		close();
+		sysmem_freeptr(depth_data);
 	}
 	
 	void open(t_symbol *s, long argc, t_atom * argv) {
-		
 		t_atom a[1];
+		if (device){
+			object_post(&ob, "A device is already open.");
+			return;
+		}
 		
+		// mark one additional device:
+		capturing++;
+		if(!f_ctx){
+			long priority = 0; // maybe increase?
+			if (systhread_create((method)&capture_threadfunc, this, 0, priority, 0, &capture_thread)) {
+				object_error(&ob, "Failed to create capture thread.");
+				capturing = 0;
+				return;
+			}
+			while(!f_ctx){
+				systhread_sleep(0);
+			}
+		}
+		
+		getdevices();
+		
+		int ndevices = freenect_num_devices(f_ctx);
+		if(!ndevices){
+			object_post(&ob, "Could not find any connected kinect device. Are you sure the power cord is plugged-in?");
+			capturing = 0;
+			return;
+		}
+		
+		if (argc > 0 && atom_gettype(argv) == A_SYM) {
+			const char * serial = atom_getsym(argv)->s_name;
+			object_post(&ob, "opening device %s", serial);
+			if (freenect_open_device_by_camera_serial(f_ctx, &device, serial) < 0) {
+				object_error(&ob, "failed to open device %s", serial);
+				device = NULL;
+			}
+		} else {
+			int devidx = 0;
+			if (argc > 0 && atom_gettype(argv) == A_LONG) devidx = atom_getlong(argv);
+			
+			object_post(&ob, "opening device %d", devidx);
+			if (freenect_open_device(f_ctx, &device, devidx) < 0) {
+				object_error(&ob, "failed to open device %d", devidx);
+				device = NULL;
+			}
+		}
+		
+		if (!device) {
+			// failed to create device:
+			capturing--;
+			return;
+		}
+		
+		freenect_set_user(device, this);
+		freenect_set_depth_callback(device, depth_callback);
+		freenect_set_video_callback(device, rgb_callback);
+		freenect_set_video_buffer(device, rgb_back);
+		freenect_set_depth_buffer(device, depth_data);
+		freenect_set_video_mode(device, freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB));
+		freenect_set_depth_mode(device, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_MM));
+		freenect_set_led(device,LED_RED);
+		freenect_start_depth(device);
+		freenect_start_video(device);
+	}
+	
+	void getdevices() {
+		t_atom a[8];
+		int i, flags;
+		struct freenect_device_attributes* attribute_list;
+		struct freenect_device_attributes* attribute;
+		
+		// list devices:
+		if (!f_ctx) return;
+		
+		int num_devices = freenect_list_device_attributes(f_ctx, &attribute_list);
+		
+		i = 0;
+		attribute = attribute_list;
+		while (attribute) {
+			atom_setsym(a+i, gensym(attribute->camera_serial));
+			attribute = attribute->next;
+		}
+		outlet_anything(outlet_msg, gensym("devlist"), num_devices, a);
+		
+		freenect_free_device_attributes(attribute_list);
 	}
 	
 	void close() {
+		if(!device) return;
 		
+		freenect_set_led(device,LED_BLINK_GREEN);
+		freenect_close_device(device);
+		device = NULL;
+		
+		// mark one less device running:
+		capturing--;
+	}
+	
+	void accel() {
+		t_atom a[3];
+		double x, y, z;
+		if (!device) return;
+		
+		freenect_update_tilt_state(device);
+		freenect_raw_tilt_state * state = freenect_get_tilt_state(device);
+		freenect_get_mks_accel(state, &x, &y, &z);
+		atom_setfloat(a+0, x);
+		atom_setfloat(a+1, y);
+		atom_setfloat(a+2, z);
+		outlet_anything(outlet_msg, gensym("accel"), 3, a);
+	}
+	
+	void led(int option) {
+		if (!device) return;
+		
+		//		LED_OFF              = 0, /**< Turn LED off */
+		//		LED_GREEN            = 1, /**< Turn LED to Green */
+		//		LED_RED              = 2, /**< Turn LED to Red */
+		//		LED_YELLOW           = 3, /**< Turn LED to Yellow */
+		//		LED_BLINK_GREEN      = 4, /**< Make LED blink Green */
+		//		// 5 is same as 4, LED blink Green
+		//		LED_BLINK_RED_YELLOW = 6, /**< Make LED blink Red/Yellow */
+		freenect_set_led(device, (freenect_led_options)(option % 7));
+	}
+	
+	static void rgb_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
+		freenect *x = (freenect *)freenect_get_user(dev);
+		if(x) x->rgb_process();
+	}
+	
+	static void depth_callback(freenect_device *dev, void *pixels, uint32_t timestamp){
+		freenect *x = (freenect *)freenect_get_user(dev);
+		if(x) x->depth_process();
+	}
+	
+	
+	void depth_process() {
+		// for each cell:
+		for (int i=0; i<KINECT_DEPTH_HEIGHT*KINECT_DEPTH_WIDTH; i++) {
+			// cache raw, unrectified depth in output:
+			// (casts uint16_t to uint32_t)
+			depth_back[i] = depth_data[i];
+		}
+		new_depth_data = 1;
+	}
+	
+	void rgb_process() {
+		// helper function to map one FREENECT_VIDEO_RGB image to a FREENECT_DEPTH_MM
+		// image (inverse mapping to FREENECT_DEPTH_REGISTERED, which is depth -> RGB)
+		//FREENECTAPI void freenect_map_rgb_to_depth( freenect_device* dev, uint16_t* depth_mm, uint8_t* rgb_raw, uint8_t* rgb_registered );
+		freenect_map_rgb_to_depth(device, depth_data, (uint8_t*)rgb_back, (uint8_t*)rgb_cloud_back);
+		new_rgb_data = 1;
+	}
+	
+	void cloud_process() {
+		int i = 0;
+		for (int y=0; y<KINECT_DEPTH_HEIGHT; y++) {
+			for (int x=0; x<KINECT_DEPTH_WIDTH; x++, i++) {
+				glm::vec3& meters = cloud_back[i];
+				int mmz = depth_back[i];
+				if (mmz < 10000 && mmz > 10) {
+					// convenience function to convert a single x-y coordinate pair from camera
+					// to world coordinates
+					//FREENECTAPI void freenect_camera_to_world(freenect_device* dev, int cx, int cy, int wz, double* wx, double* wy);
+					double mmx, mmy;
+					freenect_camera_to_world(device, x, y, mmz, &mmx, &mmy);
+					meters.x = mmx * 0.001f;
+					meters.y = mmy * 0.001f;
+					meters.z = mmz * 0.001f;
+				} else if (clearnulls) {
+					meters.x = 0.f;
+					meters.x = 0.f;
+					meters.x = 0.f;
+				}
+			}
+		}
 	}
 	
 	void bang() {
+		if (new_rgb_data || !unique) {
+			outlet_anything(outlet_rgb  , _jit_sym_jit_matrix, 1, rgb_name  );
+			outlet_anything(outlet_rgb_cloud  , _jit_sym_jit_matrix, 1, rgb_cloud_name  );
+			new_rgb_data = 0;
+		}
+		if (new_depth_data || !unique) {
+			outlet_anything(outlet_depth, _jit_sym_jit_matrix, 1, depth_name);
+			cloud_process();
+			outlet_anything(outlet_cloud, _jit_sym_jit_matrix, 1, cloud_name);
+			new_depth_data = 0;
+		}
+	}
+	
+	static void *capture_threadfunc(void *arg) {
+		//freenect *x = (freenect *)arg;
 		
+		// create the freenect context:
+		freenect_context *context = 0;
+		if(!f_ctx){
+			if (freenect_init(&context, NULL) < 0) {
+				object_error(NULL, "freenect_init() failed");
+				goto out;
+			}
+		}
+		f_ctx = context;
+		
+		freenect_set_log_callback(f_ctx, freenect_logger);
+		//		FREENECT_LOG_FATAL = 0,     /**< Log for crashing/non-recoverable errors */
+		//		FREENECT_LOG_ERROR,         /**< Log for major errors */
+		//		FREENECT_LOG_WARNING,       /**< Log for warning messages */
+		//		FREENECT_LOG_NOTICE,        /**< Log for important messages */
+		//		FREENECT_LOG_INFO,          /**< Log for normal messages */
+		//		FREENECT_LOG_DEBUG,         /**< Log for useful development messages */
+		//		FREENECT_LOG_SPEW,          /**< Log for slightly less useful messages */
+		//		FREENECT_LOG_FLOOD,         /**< Log EVERYTHING. May slow performance. */
+		freenect_set_log_level(f_ctx, FREENECT_LOG_WARNING);
+		
+		object_post(NULL, "freenect starting processing");
+		while (capturing > 0) {
+			int err = freenect_process_events(f_ctx);
+			//int err = freenect_process_events_timeout(f_ctx);
+			if(err < 0){
+				object_error(NULL, "Freenect could not process events.");
+				break;
+			}
+			systhread_sleep(0);
+		}
+		object_post(NULL, "freenect finished processing");
+		
+	out:
+		freenect_quit();
+		systhread_exit(NULL);
+		return NULL;
 	}
-	
-	static void log_cb(freenect_context *dev, freenect_loglevel level, const char *msg) {
-		object_post(NULL, msg);
-	}
-	
-//	static void *capture_threadfunc(void *arg) {
-//		freenect *x = (freenect *)arg;
-//
-//		capturing = 1;
-//		object_post(NULL, "freenect starting processing");
-//		while (capturing > 0) {
-//			int err = freenect_process_events(f_ctx);
-//			//int err = freenect_process_events_timeout(f_ctx);
-//			if(err < 0){
-//				object_error(NULL, "Freenect could not process events.");
-//				break;
-//			}
-//			systhread_sleep(0);
-//		}
-//		object_post(NULL, "freenect finished processing");
-//
-//	out:
-//		systhread_exit(NULL);
-//		return NULL;
-//	}
 };
 
 
@@ -115,6 +463,10 @@ void freenect_free(freenect *x) {
 	x->~freenect();
 }
 
+void freenect_accel(freenect *x) { x->accel(); }
+void freenect_led(freenect *x, t_atom_long n) { x->led(n); }
+void freenect_getdevices(freenect *x) { x->getdevices(); }
+
 void freenect_assist(freenect *x, void *b, long m, long a, char *s)
 {
 	if (m == ASSIST_INLET) { // inlet
@@ -133,48 +485,16 @@ void freenect_assist(freenect *x, void *b, long m, long a, char *s)
 	}
 }
 
-static void freenect_logger(freenect_context *dev, freenect_loglevel level, const char *msg) {
-	object_post(NULL, msg);
-}
 
-void freenect_quit() {
-	if (f_ctx) {
-		freenect_shutdown(f_ctx);
-		f_ctx = NULL;
-	}
-}
-
-void freenect_init() {
-	// create the freenect context:
-	freenect_context *context = 0;
-	if(!f_ctx){
-		if (freenect_init(&context, NULL) < 0) {
-			object_error(NULL, "freenect_init() failed");
-			return;
-		}
-	}
-	f_ctx = context;
-	
-	freenect_set_log_callback(f_ctx, freenect_logger);
-	//		FREENECT_LOG_FATAL = 0,     /**< Log for crashing/non-recoverable errors */
-	//		FREENECT_LOG_ERROR,         /**< Log for major errors */
-	//		FREENECT_LOG_WARNING,       /**< Log for warning messages */
-	//		FREENECT_LOG_NOTICE,        /**< Log for important messages */
-	//		FREENECT_LOG_INFO,          /**< Log for normal messages */
-	//		FREENECT_LOG_DEBUG,         /**< Log for useful development messages */
-	//		FREENECT_LOG_SPEW,          /**< Log for slightly less useful messages */
-	//		FREENECT_LOG_FLOOD,         /**< Log EVERYTHING. May slow performance. */
-	freenect_set_log_level(f_ctx, FREENECT_LOG_WARNING);
-	
-	quittask_install((method)freenect_quit, NULL);
-}
 
 void ext_main(void *r)
 {
 //	initialize_jitlib();
 //	common_symbols_init();
 //	
-	freenect_init();
+//	freenect_init();
+	
+	quittask_install((method)freenect_quit, NULL);
 	
 //	ps_vertex_matrix = gensym("vertex_matrix");
 //	ps_normal_matrix = gensym("normal_matrix");
@@ -188,10 +508,16 @@ void ext_main(void *r)
 	class_addmethod(c, (method)freenect_open, "open", A_GIMME, 0);
 	class_addmethod(c, (method)freenect_bang, "bang", 0);
 	class_addmethod(c, (method)freenect_close, "close", 0);
+	class_addmethod(c, (method)freenect_accel, "accel", 0);
+	class_addmethod(c, (method)freenect_getdevices, "getdevices", 0);
+	class_addmethod(c, (method)freenect_led, "led", A_LONG, 0);
 	
-//	CLASS_ATTR_LONG(c, "unique", 0, freenect, unique);
-//	CLASS_ATTR_STYLE(c, "unique", 0, "onoff");
-//	CLASS_ATTR_LONG(c, "use_depth", 0, freenect, use_depth);
+	CLASS_ATTR_LONG(c, "unique", 0, freenect, unique);
+	CLASS_ATTR_STYLE(c, "unique", 0, "onoff");
+	CLASS_ATTR_LONG(c, "clearnulls", 0, freenect, clearnulls);
+	CLASS_ATTR_STYLE(c, "clearnulls", 0, "onoff");
+
+	//	CLASS_ATTR_LONG(c, "use_depth", 0, freenect, use_depth);
 //	CLASS_ATTR_STYLE(c, "use_depth", 0, "onoff");
 //	CLASS_ATTR_LONG(c, "use_colour", 0, freenect, use_colour);
 //	CLASS_ATTR_STYLE(c, "use_colour", 0, "onoff");
