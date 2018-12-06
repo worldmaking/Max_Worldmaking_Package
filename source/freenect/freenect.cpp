@@ -207,7 +207,6 @@ public:
     // TODO: a 'reopen()' message for when some attrs change
 	
 	void open(t_symbol *s, long argc, t_atom * argv) {
-		t_atom a[1];
 		if (device){
 			object_post(&ob, "A device is already open.");
 			return;
@@ -399,7 +398,11 @@ public:
 	void bang() {
 		if (new_rgb_data || !unique) {
 			outlet_anything(outlet_rgb  , _jit_sym_jit_matrix, 1, rgb_name  );
-			outlet_anything(outlet_rgb_cloud  , _jit_sym_jit_matrix, 1, rgb_cloud_name  );
+            if (map_color_to_depth) {
+                outlet_anything(outlet_rgb_cloud  , _jit_sym_jit_matrix, 1, rgb_cloud_name  );
+            } else {
+                outlet_anything(outlet_rgb_cloud  , _jit_sym_jit_matrix, 1, rgb_name  );
+            }
 			new_rgb_data = 0;
 		}
 		if (new_depth_data || !unique) {
