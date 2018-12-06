@@ -142,6 +142,7 @@
 		2FBBEAD008F335010078DB84 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
 				VALID_ARCHS = x86_64;
 			};
 			name = Development;
@@ -149,6 +150,7 @@
 		2FBBEAD108F335010078DB84 /* Deployment */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
 				VALID_ARCHS = x86_64;
 			};
 			name = Deployment;
