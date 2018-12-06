@@ -62,6 +62,7 @@ public:
 	// attrs:
 	t_atom_long clearnulls = 1;
 	t_atom_long unique = 1;
+    t_atom_long map_color_to_depth = 1;
 	
 	// generic:
 	volatile char new_rgb_data;
@@ -202,6 +203,8 @@ public:
 		close();
 		sysmem_freeptr(depth_data);
 	}
+    
+    // TODO: a 'reopen()' message for when some attrs change
 	
 	void open(t_symbol *s, long argc, t_atom * argv) {
 		t_atom a[1];
@@ -263,7 +266,11 @@ public:
 		freenect_set_video_buffer(device, rgb_back);
 		freenect_set_depth_buffer(device, depth_data);
 		freenect_set_video_mode(device, freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB));
-		freenect_set_depth_mode(device, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_MM));
+        if (map_color_to_depth) {
+            freenect_set_depth_mode(device, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_MM));
+        } else {
+            freenect_set_depth_mode(device, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_REGISTERED));
+        }
         led(LED_OFF);
 		freenect_start_depth(device);
 		freenect_start_video(device);
@@ -356,7 +363,11 @@ public:
 		// helper function to map one FREENECT_VIDEO_RGB image to a FREENECT_DEPTH_MM
 		// image (inverse mapping to FREENECT_DEPTH_REGISTERED, which is depth -> RGB)
 		//FREENECTAPI void freenect_map_rgb_to_depth( freenect_device* dev, uint16_t* depth_mm, uint8_t* rgb_raw, uint8_t* rgb_registered );
-		freenect_map_rgb_to_depth(device, depth_data, (uint8_t*)rgb_back, (uint8_t*)rgb_cloud_back);
+        if (map_color_to_depth) {
+            freenect_map_rgb_to_depth(device, depth_data, (uint8_t*)rgb_back, (uint8_t*)rgb_cloud_back);
+        } else {
+            // nothing to do
+        }
 		new_rgb_data = 1;
 	}
 	
@@ -367,19 +378,19 @@ public:
 			for (int x=0; x<KINECT_DEPTH_WIDTH; x++, i++) {
 				glm::vec3& meters = cloud_back[i];
 				int mmz = depth_back[i];
-				if (mmz < 10000 && mmz > 10) {
+				if (mmz < 10000 && mmz > 300) {
 					// convenience function to convert a single x-y coordinate pair from camera
 					// to world coordinates
 					//FREENECTAPI void freenect_camera_to_world(freenect_device* dev, int cx, int cy, int wz, double* wx, double* wy);
 					double mmx, mmy;
 					freenect_camera_to_world(device, x, y, mmz, &mmx, &mmy);
 					meters.x = mmx * 0.001f;
-					meters.y = mmy * 0.001f;
-					meters.z = mmz * 0.001f;
+					meters.y = mmy * -0.001f;
+					meters.z = mmz * -0.001f;
 				} else if (clearnulls) {
 					meters.x = 0.f;
-					meters.x = 0.f;
-					meters.x = 0.f;
+					meters.y = 0.f;
+					meters.z = 0.f;
 				}
 			}
 		}
@@ -549,7 +560,9 @@ void ext_main(void *r)
 	CLASS_ATTR_STYLE(c, "unique", 0, "onoff");
 	CLASS_ATTR_LONG(c, "clearnulls", 0, freenect, clearnulls);
 	CLASS_ATTR_STYLE(c, "clearnulls", 0, "onoff");
-
+    CLASS_ATTR_LONG(c, "map_color_to_depth", 0, freenect, map_color_to_depth);
+    CLASS_ATTR_STYLE(c, "map_color_to_depth", 0, "onoff");
+    
 	//	CLASS_ATTR_LONG(c, "use_depth", 0, freenect, use_depth);
 //	CLASS_ATTR_STYLE(c, "use_depth", 0, "onoff");
 //	CLASS_ATTR_LONG(c, "use_colour", 0, freenect, use_colour);
