@@ -67,7 +67,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
-					"patching_rect" : [ 327.0, 379.0, 80.0, 60.0 ]
+					"patching_rect" : [ 89.0, 365.0, 303.5, 198.0 ]
 				}
 
 			}
@@ -258,7 +258,6 @@
 					"fontsize" : 12.0,
 					"id" : "obj-19",
 					"maxclass" : "jit.fpsgui",
-					"mode" : 2,
 					"numinlets" : 1,
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],

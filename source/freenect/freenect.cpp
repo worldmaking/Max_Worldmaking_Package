@@ -74,7 +74,7 @@ public:
 	void *		depth_mat;
 	void *		depth_mat_wrapper;
 	t_atom		depth_name[1];
-	uint32_t *	depth_back;
+	float *	depth_back;
 	
 	// rgb matrix for raw output:
 	void *		rgb_mat;
@@ -135,7 +135,7 @@ public:
 		jit_matrix_info_default(&info);
 		info.flags |= JIT_MATRIX_DATA_PACK_TIGHT;
 		info.planecount = 1;
-		info.type = gensym("long");
+		info.type = gensym("float32");
 		info.dimcount = 2;
 		info.dim[0] = KINECT_DEPTH_WIDTH;
 		info.dim[1] = KINECT_DEPTH_HEIGHT;
@@ -357,7 +357,7 @@ public:
 		for (int i=0; i<KINECT_DEPTH_HEIGHT*KINECT_DEPTH_WIDTH; i++) {
 			// cache raw, unrectified depth in output:
 			// (casts uint16_t to uint32_t)
-			depth_back[i] = depth_data[i];
+			depth_back[i] = (float)depth_data[i];
 		}
 		new_depth_data = 1;
 	}
