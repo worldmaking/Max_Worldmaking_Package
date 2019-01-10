@@ -577,6 +577,7 @@ void ext_main(void *r)
 //	CLASS_ATTR_LONG(c, "use_depth", 0, freenect, use_depth);
 //	CLASS_ATTR_STYLE(c, "use_depth", 0, "onoff");
     
+    
     CLASS_ATTR_LONG(c, "use_color", 0, freenect, use_color);
     CLASS_ATTR_STYLE(c, "use_color", 0, "onoff");
     
