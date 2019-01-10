@@ -60,6 +60,7 @@ public:
 	void *		outlet_rgb;
 	
 	// attrs:
+    t_atom_long use_color = 1;
 	t_atom_long clearnulls = 1;
 	t_atom_long unique = 1;
     t_atom_long map_color_to_depth = 1;
@@ -193,10 +194,10 @@ public:
 		atom_setsym(cloud_name, jit_attr_getsym(cloud_mat_wrapper, _jit_sym_name));
 		
 		outlet_msg = outlet_new(&ob, 0);
+        outlet_rgb_cloud = outlet_new(&ob, 0);
 		outlet_cloud = outlet_new(&ob, 0);
-		outlet_rgb_cloud = outlet_new(&ob, 0);
+        outlet_rgb = outlet_new(&ob, 0);
 		outlet_depth = outlet_new(&ob, 0);
-		outlet_rgb = outlet_new(&ob, 0);
 	}
 	
 	~freenect() {
@@ -261,18 +262,22 @@ public:
 		
 		freenect_set_user(device, this);
 		freenect_set_depth_callback(device, depth_callback);
-		freenect_set_video_callback(device, rgb_callback);
-		freenect_set_video_buffer(device, rgb_back);
-		freenect_set_depth_buffer(device, depth_data);
-		freenect_set_video_mode(device, freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB));
+        freenect_set_depth_buffer(device, depth_data);
         if (map_color_to_depth) {
             freenect_set_depth_mode(device, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_MM));
         } else {
             freenect_set_depth_mode(device, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_REGISTERED));
         }
+        
+        if (use_color) {
+            freenect_set_video_callback(device, rgb_callback);
+            freenect_set_video_buffer(device, rgb_back);
+            freenect_set_video_mode(device, freenect_find_video_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_VIDEO_RGB));
+        }
+        
         led(LED_OFF);
 		freenect_start_depth(device);
-		freenect_start_video(device);
+		if (use_color) freenect_start_video(device);
 	}
 	
 	void getdevices() {
@@ -396,15 +401,17 @@ public:
 	}
 	
 	void bang() {
-		if (new_rgb_data || !unique) {
-			outlet_anything(outlet_rgb  , _jit_sym_jit_matrix, 1, rgb_name  );
-            if (map_color_to_depth) {
-                outlet_anything(outlet_rgb_cloud  , _jit_sym_jit_matrix, 1, rgb_cloud_name  );
-            } else {
-                outlet_anything(outlet_rgb_cloud  , _jit_sym_jit_matrix, 1, rgb_name  );
+        if (use_color) {
+            if (new_rgb_data || !unique) {
+                outlet_anything(outlet_rgb  , _jit_sym_jit_matrix, 1, rgb_name  );
+                if (map_color_to_depth) {
+                    outlet_anything(outlet_rgb_cloud  , _jit_sym_jit_matrix, 1, rgb_cloud_name  );
+                } else {
+                    outlet_anything(outlet_rgb_cloud  , _jit_sym_jit_matrix, 1, rgb_name  );
+                }
+                new_rgb_data = 0;
             }
-			new_rgb_data = 0;
-		}
+        }
 		if (new_depth_data || !unique) {
 			outlet_anything(outlet_depth, _jit_sym_jit_matrix, 1, depth_name);
 			cloud_process();
@@ -497,10 +504,11 @@ void freenect_assist(freenect *x, void *b, long m, long a, char *s)
 	}
 	else {	// outlet
 		switch (a) {
-//			case 0: sprintf(s, "colour (jit_matrix)"); break;
-//			case 1: sprintf(s, "3D cloud at colour dim (jit_matrix)"); break;
-//			case 2: sprintf(s, "depth (jit_matrix)"); break;
-//			case 3: sprintf(s, "player at depth dim (jit_matrix)"); break;
+            case 0: sprintf(s, "depth in mm (jit_matrix)"); break;
+			case 1: sprintf(s, "raw colour (jit_matrix)"); break;
+                
+            case 2: sprintf(s, "point cloud in meters (jit_matrix)"); break;
+			case 3: sprintf(s, "colour for point cloud (jit_matrix)"); break;
 //			case 4: sprintf(s, "matrices for jit.gl.mesh (jit_matrix)"); break;
 //			case 5: sprintf(s, "skeleton"); break;
 			default: sprintf(s, "other messages"); break;
@@ -566,12 +574,12 @@ void ext_main(void *r)
     CLASS_ATTR_LONG(c, "map_color_to_depth", 0, freenect, map_color_to_depth);
     CLASS_ATTR_STYLE(c, "map_color_to_depth", 0, "onoff");
     
-	//	CLASS_ATTR_LONG(c, "use_depth", 0, freenect, use_depth);
+//	CLASS_ATTR_LONG(c, "use_depth", 0, freenect, use_depth);
 //	CLASS_ATTR_STYLE(c, "use_depth", 0, "onoff");
-//	CLASS_ATTR_LONG(c, "use_colour", 0, freenect, use_colour);
-//	CLASS_ATTR_STYLE(c, "use_colour", 0, "onoff");
-//	CLASS_ATTR_LONG(c, "use_colour_cloud", 0, freenect, use_colour_cloud);
-//	CLASS_ATTR_STYLE(c, "use_colour_cloud", 0, "onoff");
+    
+    CLASS_ATTR_LONG(c, "use_color", 0, freenect, use_color);
+    CLASS_ATTR_STYLE(c, "use_color", 0, "onoff");
+    
 //	CLASS_ATTR_LONG(c, "face_negative_z", 0, freenect, face_negative_z);
 //	CLASS_ATTR_STYLE(c, "face_negative_z", 0, "onoff");
 //	CLASS_ATTR_FLOAT(c, "triangle_limit", 0, freenect, triangle_limit);
