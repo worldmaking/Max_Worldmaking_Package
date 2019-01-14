@@ -39,13 +39,13 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
-					"attr" : "use_ir",
+					"attr" : "debug_level",
 					"id" : "obj-22",
 					"maxclass" : "attrui",
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 708.0, 34.0, 150.0, 22.0 ]
+					"patching_rect" : [ 708.0, 33.0, 150.0, 22.0 ]
 				}
 
 			}
@@ -297,7 +297,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 759.75, 283.0, 176.75, 22.0 ],
-					"text" : "A70773X02029232A"
+					"text" : "A70773X02029232A ???"
 				}
 
 			}

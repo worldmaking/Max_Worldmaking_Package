@@ -64,6 +64,7 @@ public:
 	t_atom_long clearnulls = 1;
 	t_atom_long unique = 1;
     t_atom_long map_color_to_depth = 1;
+    t_atom_long debug_level = 1;
 	
 	// generic:
 	volatile char new_rgb_data;
@@ -259,6 +260,18 @@ public:
 			capturing--;
 			return;
 		}
+        
+        //        FREENECT_LOG_FATAL = 0,     /**< Log for crashing/non-recoverable errors */
+        //        FREENECT_LOG_ERROR,         /**< Log for major errors */
+        //        FREENECT_LOG_WARNING,       /**< Log for warning messages */
+        //        FREENECT_LOG_NOTICE,        /**< Log for important messages */
+        //        FREENECT_LOG_INFO,          /**< Log for normal messages */
+        //        FREENECT_LOG_DEBUG,         /**< Log for useful development messages */
+        //        FREENECT_LOG_SPEW,          /**< Log for slightly less useful messages */
+        //        FREENECT_LOG_FLOOD,         /**< Log EVERYTHING. May slow performance. */
+        if (debug_level < 0) debug_level = 0;
+        if (debug_level > 7) debug_level = 7;
+        freenect_set_log_level(f_ctx, (freenect_loglevel)debug_level);
 		
 		freenect_set_user(device, this);
 		freenect_set_depth_callback(device, depth_callback);
@@ -438,15 +451,7 @@ public:
         
 		
 		freenect_set_log_callback(f_ctx, freenect_logger);
-		//		FREENECT_LOG_FATAL = 0,     /**< Log for crashing/non-recoverable errors */
-		//		FREENECT_LOG_ERROR,         /**< Log for major errors */
-		//		FREENECT_LOG_WARNING,       /**< Log for warning messages */
-		//		FREENECT_LOG_NOTICE,        /**< Log for important messages */
-		//		FREENECT_LOG_INFO,          /**< Log for normal messages */
-		//		FREENECT_LOG_DEBUG,         /**< Log for useful development messages */
-		//		FREENECT_LOG_SPEW,          /**< Log for slightly less useful messages */
-		//		FREENECT_LOG_FLOOD,         /**< Log EVERYTHING. May slow performance. */
-		freenect_set_log_level(f_ctx, FREENECT_LOG_WARNING);
+        freenect_set_log_level(f_ctx, FREENECT_LOG_ERROR);
 		
 		object_post(NULL, "freenect starting processing");
 		while (capturing > 0) {
@@ -580,6 +585,9 @@ void ext_main(void *r)
     
     CLASS_ATTR_LONG(c, "use_color", 0, freenect, use_color);
     CLASS_ATTR_STYLE(c, "use_color", 0, "onoff");
+    
+    
+    CLASS_ATTR_LONG(c, "debug_level", 0, freenect, debug_level);
     
 //	CLASS_ATTR_LONG(c, "face_negative_z", 0, freenect, face_negative_z);
 //	CLASS_ATTR_STYLE(c, "face_negative_z", 0, "onoff");
