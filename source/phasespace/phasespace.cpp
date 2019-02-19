@@ -16,12 +16,12 @@ public:
 
 	OWL::Context owl; 
 	OWL::Markers markers;
+	OWL::Cameras cameras;
 	
 	phasespace() {
 		address = gensym("localhost");
 		out1 = outlet_new(&ob, 0);
 
-		connect();
 	}
 	
 	~phasespace() {
@@ -37,6 +37,7 @@ public:
 			object_attr_touch(&ob, gensym("connected"));
 		}
 		else {
+			\ 
 			connected = 1;
 			object_attr_touch(&ob, gensym("connected"));
 			owl.streaming(1);
@@ -49,6 +50,61 @@ public:
 			owl.close();
 			connected = 0;
 			object_attr_touch(&ob, gensym("connected"));
+		}
+	}
+
+	void getcameras() {
+		post("getting cameras\n");
+		if (owl.isOpen() && owl.property<int>("initialized")) {
+			const OWL::Event *event = owl.nextEvent(0);
+			while (event) {
+
+				post("getting camera events\n");
+				if (event->type_id() == OWL::Type::ERROR) {
+					object_error(&ob, "OWL error: %s %s", event->name(), event->str().data());
+					break;
+				}
+				else if (event->type_id() == OWL::Type::FRAME)
+				{
+					//cout << "time=" << event->time() << " " << event->type_name() << " " << event->name() << "=" << event->size<OWL::Event>() << ":" << endl;
+					if (event->find("cameras", cameras) > 0)
+					{
+						//cout << " markers=" << markers.size() << ":" << endl;
+						for (OWL::Cameras::iterator m = cameras.begin(); m != cameras.end(); m++) {
+
+							/*
+							uint32_t id; 
+							uint32_t flags; 
+							float    pose[7]; 
+							float    cond;
+							*/
+
+							if (m->cond > 0) {
+
+								t_atom a[8];
+								atom_setlong(a + 0, m->id);
+								atom_setfloat(a + 1, m->pose[0]); // pos x
+								atom_setfloat(a + 2, m->pose[1]); // pos y
+								atom_setfloat(a + 3, m->pose[2]); // pos z
+								 
+								atom_setfloat(a + 4, m->pose[4]); // quat x
+								atom_setfloat(a + 5, m->pose[5]); // quat y
+								atom_setfloat(a + 6, m->pose[6]); // quat z
+								atom_setfloat(a + 7, m->pose[3]); // quat w
+								outlet_anything(out1, gensym("camera"), 4, a);
+							}
+						}
+					}
+					else {
+
+						post("couldn't find cameras\n");
+					}
+				}
+				event = owl.nextEvent(0);
+			}
+		}
+		else {
+			disconnect();
 		}
 	}
 
@@ -68,6 +124,16 @@ public:
 					{
 						//cout << " markers=" << markers.size() << ":" << endl;
 						for (OWL::Markers::iterator m = markers.begin(); m != markers.end(); m++) {
+
+							/*
+							uint32_t id; uint32_t flags; 
+							• 0x000F = Slot number 
+							• 0x0010 = Predicted 
+							• 0x0100 = 3D rejected int64_t  time; float    x, y, z; float    cond; 
+							• Condition number of plane intersection matrix 
+							• Low positive numbers are good condition values, negative numbers are not
+							*/
+
 							if (m->cond > 0) {
 								
 								t_atom a[4];
@@ -99,7 +165,7 @@ void * phasespace_new(t_symbol *s, long argc, t_atom *argv) {
 		attr_args_process(x, (short)argc, argv);
 		
 		// invoke any initialization after the attrs are set from here:
-		
+		x->connect();
 	}
 	return (x);
 }
@@ -110,6 +176,10 @@ void phasespace_free(phasespace *x) {
 
 void phasespace_bang(phasespace * x) {
 	x->bang();
+}
+
+void phasespace_getcameras(phasespace * x) {
+	x->getcameras();
 }
 
 void phasespace_connect(phasespace * x) {
@@ -141,6 +211,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)phasespace_assist,			"assist",		A_CANT, 0);
 
 	class_addmethod(c, (method)phasespace_bang, "bang", 0);
+	class_addmethod(c, (method)phasespace_getcameras, "getcameras", 0);
 	class_addmethod(c, (method)phasespace_connect, "connect", 0);
 	class_addmethod(c, (method)phasespace_disconnect, "disconnect", 0);
 
