@@ -335,6 +335,8 @@ public:
 		capturing = 1;
 		while (capturing) {
 
+			//post(".");
+
 			float zmul = face_negative_z ? -1.f : 1.f;
 
 			IMultiSourceFrame* frame = nullptr;
@@ -579,7 +581,9 @@ public:
 
 
 	void bang() {
-		if (systhread_mutex_trylock(mlock) == 0) {
+
+
+		//if (systhread_mutex_trylock(mlock) == 0) {
 			if (use_colour && (new_rgb_data || unique == 0)) {
 				outlet_anything(outlet_rgb, _jit_sym_jit_matrix, 1, rgb_mat.name);
 				new_rgb_data = 0;
@@ -610,8 +614,8 @@ public:
 				}
 
 			}
-			systhread_mutex_unlock(mlock);
-		}
+			//systhread_mutex_unlock(mlock);
+		//}
 	}
 };
 

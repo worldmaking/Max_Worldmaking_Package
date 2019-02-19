@@ -7,13 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		22CF114E0EE9A6A70054F513 /* kinect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 22CF114D0EE9A6A70054F513 /* kinect.cpp */; };
+		891D520B20E70DD4009DC0B2 /* al_hashspace.h in Headers */ = {isa = PBXBuildFile; fileRef = 891D520920E70DD4009DC0B2 /* al_hashspace.h */; };
+		891D520C20E70DD4009DC0B2 /* hashspace.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 891D520A20E70DD4009DC0B2 /* hashspace.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		22CF10220EE984600054F513 /* maxmspsdk.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = maxmspsdk.xcconfig; path = ../maxmspsdk.xcconfig; sourceTree = SOURCE_ROOT; };
-		22CF114D0EE9A6A70054F513 /* kinect.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = kinect.cpp; sourceTree = "<group>"; };
-		2FBBEAE508F335360078DB84 /* kinect.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = kinect.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
+		2FBBEAE508F335360078DB84 /* hashspace.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = hashspace.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
+		891D520920E70DD4009DC0B2 /* al_hashspace.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = al_hashspace.h; sourceTree = "<group>"; };
+		891D520A20E70DD4009DC0B2 /* hashspace.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hashspace.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -30,8 +32,9 @@
 		089C166AFE841209C02AAC07 /* iterator */ = {
 			isa = PBXGroup;
 			children = (
+				891D520920E70DD4009DC0B2 /* al_hashspace.h */,
+				891D520A20E70DD4009DC0B2 /* hashspace.cpp */,
 				22CF10220EE984600054F513 /* maxmspsdk.xcconfig */,
-				22CF114D0EE9A6A70054F513 /* kinect.cpp */,
 				19C28FB4FE9D528D11CA2CBB /* Products */,
 			);
 			name = iterator;
@@ -40,7 +43,7 @@
 		19C28FB4FE9D528D11CA2CBB /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2FBBEAE508F335360078DB84 /* kinect.mxo */,
+				2FBBEAE508F335360078DB84 /* hashspace.mxo */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -52,6 +55,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				891D520B20E70DD4009DC0B2 /* al_hashspace.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,7 +78,7 @@
 			);
 			name = "max-external";
 			productName = iterator;
-			productReference = 2FBBEAE508F335360078DB84 /* kinect.mxo */;
+			productReference = 2FBBEAE508F335360078DB84 /* hashspace.mxo */;
 			productType = "com.apple.product-type.bundle";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +89,7 @@
 			attributes = {
 				LastUpgradeCheck = 0610;
 			};
-			buildConfigurationList = 2FBBEACF08F335010078DB84 /* Build configuration list for PBXProject "kinect" */;
+			buildConfigurationList = 2FBBEACF08F335010078DB84 /* Build configuration list for PBXProject "hashspace" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
 			hasScannedForEncodings = 1;
@@ -126,7 +130,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				22CF114E0EE9A6A70054F513 /* kinect.cpp in Sources */,
+				891D520C20E70DD4009DC0B2 /* hashspace.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -149,16 +153,17 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 22CF10220EE984600054F513 /* maxmspsdk.xcconfig */;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+				CLANG_CXX_LIBRARY = "libc++";
 				COPY_PHASE_STRIP = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				HEADER_SEARCH_PATHS = (
 					"\"$(C74SUPPORT)/max-includes\"",
 					"\"$(C74SUPPORT)/msp-includes\"",
-					libfreenect/include,
 					"\"$(C74SUPPORT)/jit-includes\"",
+					../,
 				);
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
-				PRODUCT_NAME = kinect;
+				PRODUCT_NAME = hashspace;
 			};
 			name = Development;
 		};
@@ -166,22 +171,23 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 22CF10220EE984600054F513 /* maxmspsdk.xcconfig */;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+				CLANG_CXX_LIBRARY = "libc++";
 				COPY_PHASE_STRIP = YES;
 				HEADER_SEARCH_PATHS = (
 					"\"$(C74SUPPORT)/max-includes\"",
 					"\"$(C74SUPPORT)/msp-includes\"",
-					libfreenect/include,
 					"\"$(C74SUPPORT)/jit-includes\"",
+					../,
 				);
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
-				PRODUCT_NAME = kinect;
+				PRODUCT_NAME = hashspace;
 			};
 			name = Deployment;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2FBBEACF08F335010078DB84 /* Build configuration list for PBXProject "kinect" */ = {
+		2FBBEACF08F335010078DB84 /* Build configuration list for PBXProject "hashspace" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2FBBEAD008F335010078DB84 /* Development */,
