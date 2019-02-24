@@ -119,6 +119,13 @@ template<> int jitmat_planecount_from_typename<glm::vec4>() { return 4; };
 template<> int jitmat_planecount_from_typename<glm::quat>() { return 4; };
 template<> int jitmat_planecount_from_typename<double>() { return 1; };
 
+size_t jitmat_type_size(t_symbol * type) {
+	if (type == _jit_sym_char) return 1;
+	if (type == _jit_sym_long) return sizeof(t_atom_long);
+	if (type == _jit_sym_float32) return 4;
+	if (type == _jit_sym_float64) return 8;
+}
+
 // a purely static base class for Max and MSP objects:
 template <typename T>
 class MaxCppBase {

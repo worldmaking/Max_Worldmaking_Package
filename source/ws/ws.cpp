@@ -18,16 +18,7 @@
 typedef websocketpp::server<websocketpp::config::asio> server;
 typedef std::set<websocketpp::connection_hdl, std::owner_less<websocketpp::connection_hdl> > con_list;
 
-
-// a bunch of likely Max includes:
-extern "C" {
-	#include "ext.h"
-	#include "ext_obex.h"
-	#include "ext_dictionary.h"
-	#include "ext_dictobj.h"
-	#include "ext_strings.h"
-	#include "ext_systhread.h"
-}
+#include "al_max.h"
 
 // TODO: check any multi-threading issues?
 
@@ -144,6 +135,12 @@ public:
 		}
 	}
 	
+	void send(void * buffer, size_t size) {
+		for (auto client : clients) {
+			server.send(client, buffer, size, websocketpp::frame::opcode::binary);
+		}
+	}
+	
 	void on_open(websocketpp::connection_hdl hdl) {
 		clients.insert(hdl);
 	}
@@ -153,6 +150,7 @@ public:
 	}
 	
 	void on_message(websocketpp::connection_hdl hdl, server::message_ptr msg) {
+		// if (msg->get_opcode() == websocketpp::frame::opcode::text) { // else binary, use msg->get_payload()
 		const char * buf = msg->get_payload().c_str();
 		
 		// if a broadcast...
@@ -213,6 +211,36 @@ public:
 	
 	void send(const std::string& s) {
 		if (server) server->send(s);
+	}
+	
+	void jit_matrix(t_symbol * name) {
+		if (!server) return;
+		void * in_mat = jit_object_findregistered(name);
+		if (!in_mat) {
+			jit_error_code(&ob, JIT_ERR_INVALID_INPUT);
+			return;
+		}
+		
+		t_jit_matrix_info in_info;
+		char * in_bp;
+		
+		// lock it:
+		long in_savelock = (long)jit_object_method(in_mat, _jit_sym_lock, 1);
+		
+		// ensure data exists:
+		jit_object_method(in_mat, _jit_sym_getdata, &in_bp);
+		if (!in_bp) {
+			jit_error_code(&ob, JIT_ERR_INVALID_INPUT);
+			return;
+		}
+		jit_object_method(in_mat, _jit_sym_getinfo, &in_info);
+		
+		size_t dimcount = in_info.dimcount;
+		size_t bytelength = in_info.dim[dimcount-1] * in_info.dimstride[dimcount-1];
+		server->send(in_bp, bytelength);
+	
+		// restore matrix lock state:
+		jit_object_method(in_mat, _jit_sym_lock, in_savelock);
 	}
 };
 
@@ -336,6 +364,10 @@ void ws_anything(ws * x, t_symbol * s, int argc, t_atom * argv) {
 	x->send(ss.str());
 }
 
+void ws_jit_matrix(ws *x, t_symbol *s) {
+	x->jit_matrix(s);
+}
+
 
 void ws_list(ws * x, t_symbol * s, int argc, t_atom * argv) {
 	ws_anything(x, NULL, argc, argv);
@@ -361,6 +393,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)ws_assist, "assist", A_CANT, 0);
 	class_addmethod(c, (method)ws_bang,	"bang",	0);
 	class_addmethod(c, (method)ws_send,	"send",	A_SYM, 0);
+	class_addmethod(c, (method)ws_jit_matrix, "jit_matrix", A_SYM, 0);
 	class_addmethod(c, (method)ws_dictionary, "dictionary", A_SYM, 0);
 	class_addmethod(c, (method)ws_anything, "anything", A_GIMME, 0);
 	class_addmethod(c, (method)ws_list, "list", A_GIMME, 0);

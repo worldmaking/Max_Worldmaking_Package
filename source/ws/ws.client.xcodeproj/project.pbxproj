@@ -547,6 +547,7 @@
 					"\"$(C74SUPPORT)/max-includes\"",
 					"\"$(C74SUPPORT)/msp-includes\"",
 					"\"$(C74SUPPORT)/jit-includes\"",
+					../,
 				);
 				LIBRARY_SEARCH_PATHS = osx/lib;
 				OTHER_CFLAGS = (
@@ -554,7 +555,11 @@
 					"-I$(SRCROOT)/",
 					"-DASIO_STANDALONE",
 				);
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
+				OTHER_LDFLAGS = (
+					"$(C74_SYM_LINKER_FLAGS)",
+					"-framework",
+					JitterAPI,
+				);
 				PRODUCT_NAME = ws.client;
 			};
 			name = Development;
@@ -571,6 +576,7 @@
 					"\"$(C74SUPPORT)/max-includes\"",
 					"\"$(C74SUPPORT)/msp-includes\"",
 					"\"$(C74SUPPORT)/jit-includes\"",
+					../,
 				);
 				LIBRARY_SEARCH_PATHS = osx/lib;
 				OTHER_CFLAGS = (
@@ -578,7 +584,11 @@
 					"-I$(SRCROOT)/",
 					"-DASIO_STANDALONE",
 				);
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
+				OTHER_LDFLAGS = (
+					"$(C74_SYM_LINKER_FLAGS)",
+					"-framework",
+					JitterAPI,
+				);
 				PRODUCT_NAME = ws.client;
 			};
 			name = Deployment;

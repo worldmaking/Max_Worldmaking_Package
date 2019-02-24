@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <Carbon/Carbon.h> 
+
 #include "al_max.h"
 #include "al_math.h"
 
