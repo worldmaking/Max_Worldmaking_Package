@@ -2,14 +2,15 @@
 	"patcher" : 	{
 		"fileversion" : 1,
 		"appversion" : 		{
-			"major" : 7,
-			"minor" : 2,
-			"revision" : 4,
-			"architecture" : "x86",
+			"major" : 8,
+			"minor" : 0,
+			"revision" : 3,
+			"architecture" : "x64",
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 136.0, 243.0, 877.0, 604.0 ],
+		"classnamespace" : "box",
+		"rect" : [ 125.0, 220.0, 877.0, 604.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -38,6 +39,167 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-8",
+					"maxclass" : "newobj",
+					"numinlets" : 0,
+					"numoutlets" : 1,
+					"outlettype" : [ "jit_matrix" ],
+					"patcher" : 					{
+						"fileversion" : 1,
+						"appversion" : 						{
+							"major" : 8,
+							"minor" : 0,
+							"revision" : 3,
+							"architecture" : "x64",
+							"modernui" : 1
+						}
+,
+						"classnamespace" : "box",
+						"rect" : [ 738.0, 420.0, 639.0, 485.0 ],
+						"bglocked" : 0,
+						"openinpresentation" : 0,
+						"default_fontsize" : 12.0,
+						"default_fontface" : 0,
+						"default_fontname" : "Arial",
+						"gridonopen" : 1,
+						"gridsize" : [ 15.0, 15.0 ],
+						"gridsnaponopen" : 1,
+						"objectsnaponopen" : 1,
+						"statusbarvisible" : 2,
+						"toolbarvisible" : 1,
+						"lefttoolbarpinned" : 0,
+						"toptoolbarpinned" : 0,
+						"righttoolbarpinned" : 0,
+						"bottomtoolbarpinned" : 0,
+						"toolbars_unpinned_last_save" : 0,
+						"tallnewobj" : 0,
+						"boxanimatetime" : 200,
+						"enablehscroll" : 1,
+						"enablevscroll" : 1,
+						"devicewidth" : 0.0,
+						"description" : "",
+						"digest" : "",
+						"tags" : "",
+						"style" : "",
+						"subpatcher_template" : "",
+						"boxes" : [ 							{
+								"box" : 								{
+									"id" : "obj-12",
+									"linecount" : 3,
+									"maxclass" : "comment",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 30.0, 412.0, 587.0, 47.0 ],
+									"presentation_linecount" : 3,
+									"text" : "IMPORTANT NOTE 2: Binary data uses the endianness of the host machine. At the time of writing all desktop Intel systems use little-endian encoding so this is not a problem, but some SoC devices may use big-endian encoding -- in which case receiving code may need to byte-swap the data accordingly. "
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-11",
+									"linecount" : 8,
+									"maxclass" : "comment",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 30.0, 287.0, 587.0, 114.0 ],
+									"presentation_linecount" : 17,
+									"text" : "IMPORTANT NOTE: Jitter aligns the row size of matrices to 16 bytes. \nThat means the buffer will not be contiguous if the planecount * columncount * typesize is not a multiple of 16. Note, char is 1 byte, float32 is 4 bytes.\n\ne.g. a 4-plane char matrix with a column count of 6 gives a rowsize of 4 * 6 * 1 = 24, but the actual rowsize will be rounded up to 32, padding each row with 8 zeros. \n\nIf you send matrices that are not naturally 16-byte aligned you will need to deal with this padding."
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-10",
+									"linecount" : 15,
+									"maxclass" : "comment",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 158.0, 48.0, 459.0, 208.0 ],
+									"presentation_linecount" : 18,
+									"text" : "browser-based code can parse these as Array buffers as follows (see the ws_help.html file for a fuller example)\n\nsocket.binaryType = 'arraybuffer';\nsocket.onmessage = function(ev) {\n  if (ev.data instanceof ArrayBuffer) {\n    console.log(\"ws received arraybuffer of \" + ev.data.byteLength + \" bytes\");\n    // for char matrices:\n    console.log(new Uint8Array(ev.data));\n    // for float32 matrices\n    console.log(new Float32Array(ev.data));\n  } else {\n    // handle text-based messages\n  }\n}"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-7",
+									"maxclass" : "comment",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 30.0, 13.0, 224.0, 20.0 ],
+									"text" : "jit matrices are sent as binary buffers"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-5",
+									"maxclass" : "button",
+									"numinlets" : 1,
+									"numoutlets" : 1,
+									"outlettype" : [ "bang" ],
+									"parameter_enable" : 0,
+									"patching_rect" : [ 30.0, 48.0, 24.0, 24.0 ]
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"id" : "obj-2",
+									"maxclass" : "newobj",
+									"numinlets" : 1,
+									"numoutlets" : 2,
+									"outlettype" : [ "jit_matrix", "" ],
+									"patching_rect" : [ 30.0, 85.0, 106.0, 22.0 ],
+									"text" : "jit.noise 4 char 4 4"
+								}
+
+							}
+, 							{
+								"box" : 								{
+									"comment" : "",
+									"id" : "obj-1",
+									"index" : 1,
+									"maxclass" : "outlet",
+									"numinlets" : 1,
+									"numoutlets" : 0,
+									"patching_rect" : [ 30.0, 122.0, 30.0, 30.0 ]
+								}
+
+							}
+ ],
+						"lines" : [ 							{
+								"patchline" : 								{
+									"destination" : [ "obj-1", 0 ],
+									"source" : [ "obj-2", 0 ]
+								}
+
+							}
+, 							{
+								"patchline" : 								{
+									"destination" : [ "obj-2", 0 ],
+									"source" : [ "obj-5", 0 ]
+								}
+
+							}
+ ]
+					}
+,
+					"patching_rect" : [ 362.5, 255.0, 90.0, 22.0 ],
+					"saved_object_attributes" : 					{
+						"description" : "",
+						"digest" : "",
+						"globalpatchername" : "",
+						"tags" : ""
+					}
+,
+					"text" : "p jitter matrices"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-58",
 					"maxclass" : "newobj",
 					"numinlets" : 2,
@@ -45,13 +207,14 @@
 					"patcher" : 					{
 						"fileversion" : 1,
 						"appversion" : 						{
-							"major" : 7,
-							"minor" : 2,
-							"revision" : 4,
-							"architecture" : "x86",
+							"major" : 8,
+							"minor" : 0,
+							"revision" : 3,
+							"architecture" : "x64",
 							"modernui" : 1
 						}
 ,
+						"classnamespace" : "box",
 						"rect" : [ 0.0, 0.0, 640.0, 480.0 ],
 						"bglocked" : 0,
 						"openinpresentation" : 0,
@@ -87,7 +250,6 @@
 									"numoutlets" : 2,
 									"outlettype" : [ "", "" ],
 									"patching_rect" : [ 50.0, 145.0, 40.0, 22.0 ],
-									"style" : "",
 									"text" : "zl.reg"
 								}
 
@@ -101,8 +263,7 @@
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
 									"patching_rect" : [ 71.0, 181.0, 131.0, 35.0 ],
-									"style" : "",
-									"text" : ";\rmax launchbrowser $1"
+									"text" : ";\r\nmax launchbrowser $1"
 								}
 
 							}
@@ -114,7 +275,6 @@
 									"numoutlets" : 2,
 									"outlettype" : [ "", "" ],
 									"patching_rect" : [ 71.0, 100.0, 55.0, 22.0 ],
-									"style" : "",
 									"text" : "route url"
 								}
 
@@ -123,12 +283,12 @@
 								"box" : 								{
 									"comment" : "",
 									"id" : "obj-56",
+									"index" : 1,
 									"maxclass" : "inlet",
 									"numinlets" : 0,
 									"numoutlets" : 1,
 									"outlettype" : [ "bang" ],
-									"patching_rect" : [ 50.0, 40.0, 30.0, 30.0 ],
-									"style" : ""
+									"patching_rect" : [ 50.0, 40.0, 30.0, 30.0 ]
 								}
 
 							}
@@ -136,12 +296,12 @@
 								"box" : 								{
 									"comment" : "",
 									"id" : "obj-57",
+									"index" : 2,
 									"maxclass" : "inlet",
 									"numinlets" : 0,
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
-									"patching_rect" : [ 85.0, 40.0, 30.0, 30.0 ],
-									"style" : ""
+									"patching_rect" : [ 85.0, 40.0, 30.0, 30.0 ]
 								}
 
 							}
@@ -149,8 +309,6 @@
 						"lines" : [ 							{
 								"patchline" : 								{
 									"destination" : [ "obj-53", 1 ],
-									"disabled" : 0,
-									"hidden" : 0,
 									"source" : [ "obj-50", 0 ]
 								}
 
@@ -158,8 +316,6 @@
 , 							{
 								"patchline" : 								{
 									"destination" : [ "obj-52", 0 ],
-									"disabled" : 0,
-									"hidden" : 0,
 									"source" : [ "obj-53", 0 ]
 								}
 
@@ -167,8 +323,6 @@
 , 							{
 								"patchline" : 								{
 									"destination" : [ "obj-53", 0 ],
-									"disabled" : 0,
-									"hidden" : 0,
 									"source" : [ "obj-56", 0 ]
 								}
 
@@ -176,8 +330,6 @@
 , 							{
 								"patchline" : 								{
 									"destination" : [ "obj-50", 0 ],
-									"disabled" : 0,
-									"hidden" : 0,
 									"source" : [ "obj-57", 0 ]
 								}
 
@@ -190,11 +342,9 @@
 						"description" : "",
 						"digest" : "",
 						"globalpatchername" : "",
-						"style" : "",
 						"tags" : ""
 					}
 ,
-					"style" : "",
 					"text" : "p open_in_default_browser"
 				}
 
@@ -206,8 +356,8 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 505.0, 261.0, 24.0, 24.0 ],
-					"style" : ""
+					"parameter_enable" : 0,
+					"patching_rect" : [ 505.0, 261.0, 24.0, 24.0 ]
 				}
 
 			}
@@ -219,7 +369,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 152.0, 508.0, 73.0, 22.0 ],
-					"style" : "",
 					"text" : "fromsymbol"
 				}
 
@@ -232,7 +381,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 362.5, 112.5, 101.0, 33.0 ],
-					"style" : "",
 					"text" : "send a big dict (as JSON)"
 				}
 
@@ -245,7 +393,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 243.0, 112.5, 107.0, 33.0 ],
-					"style" : "",
 					"text" : "send a small dict (as JSON)"
 				}
 
@@ -257,7 +404,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 17.0, 55.0, 381.0, 20.0 ],
-					"style" : "",
 					"text" : "You can specify a port for the socket with @port (default 8080)"
 				}
 
@@ -270,7 +416,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 505.0, 334.0, 322.0, 154.0 ],
-					"style" : "",
 					"text" : "Client browsers can send string messages back over an ordinary javascript websocket. Array messages will be converted to comma-delimited strings (you can unpack them with [fromsymbol @separator ,] for example). \n\nMultiple clients can talk to the same server. (Try opening the help file HTML page with the button above).\n\nAs a convenience for sharing data globally, messages prefixed with \"*\" will have that character stripped and the message re-broadcast to all other clients. "
 				}
 
@@ -284,7 +429,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 17.0, 16.0, 433.0, 33.0 ],
-					"style" : "",
 					"text" : "A simple websocket server for Max"
 				}
 
@@ -296,8 +440,8 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 362.5, 148.0, 24.0, 24.0 ],
-					"style" : ""
+					"parameter_enable" : 0,
+					"patching_rect" : [ 362.5, 148.0, 24.0, 24.0 ]
 				}
 
 			}
@@ -2362,10 +2506,10 @@
 					"patching_rect" : [ 362.5, 184.0, 129.0, 22.0 ],
 					"saved_object_attributes" : 					{
 						"embed" : 1,
-						"parameter_enable" : 0
+						"parameter_enable" : 0,
+						"parameter_mappable" : 0
 					}
 ,
-					"style" : "",
 					"text" : "dict bigdict @embed 1"
 				}
 
@@ -2376,8 +2520,7 @@
 					"maxclass" : "dict.view",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 263.5, 214.0, 72.0, 22.0 ],
-					"style" : ""
+					"patching_rect" : [ 263.5, 214.0, 72.0, 22.0 ]
 				}
 
 			}
@@ -2388,7 +2531,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 152.0, 112.5, 79.0, 20.0 ],
-					"style" : "",
 					"text" : "send a string"
 				}
 
@@ -2401,8 +2543,7 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "bang" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 243.0, 148.0, 50.0, 22.0 ],
-					"style" : ""
+					"patching_rect" : [ 243.0, 148.0, 50.0, 22.0 ]
 				}
 
 			}
@@ -2414,7 +2555,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "dictionary" ],
 					"patching_rect" : [ 243.0, 184.0, 101.0, 22.0 ],
-					"style" : "",
 					"text" : "dict.pack num : 0"
 				}
 
@@ -2427,7 +2567,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 152.0, 382.0, 228.0, 74.0 ],
-					"style" : "",
 					"text" : "Multiple instanes with the same @port will share the same underlying server -- which means they'll talk to the same clients and output the same messages. So it can serve a role similar to maxhole."
 				}
 
@@ -2440,8 +2579,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 152.0, 544.0, 185.0, 22.0 ],
-					"style" : "",
-					"text" : "hello 7"
+					"text" : "hello 30"
 				}
 
 			}
@@ -2453,7 +2591,6 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
 					"patching_rect" : [ 152.0, 466.0, 91.0, 22.0 ],
-					"style" : "",
 					"text" : "ws @port 8080"
 				}
 
@@ -2466,7 +2603,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 17.0, 112.5, 96.0, 60.0 ],
-					"style" : "",
 					"text" : "Need to poll the server by sending frequent bangs:"
 				}
 
@@ -2479,8 +2615,7 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "bang" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 152.0, 148.0, 50.0, 22.0 ],
-					"style" : ""
+					"patching_rect" : [ 152.0, 148.0, 50.0, 22.0 ]
 				}
 
 			}
@@ -2492,7 +2627,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 152.0, 184.0, 44.0, 22.0 ],
-					"style" : "",
 					"text" : "foo $1"
 				}
 
@@ -2505,7 +2639,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
 					"patching_rect" : [ 539.0, 76.0, 60.0, 22.0 ],
-					"style" : "",
 					"text" : "loadbang"
 				}
 
@@ -2518,7 +2651,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 539.0, 108.0, 184.0, 22.0 ],
-					"style" : "",
 					"text" : "readfile ws_help.html?port=8080"
 				}
 
@@ -2531,7 +2663,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 732.0, 108.0, 44.0, 22.0 ],
-					"style" : "",
 					"text" : "reload"
 				}
 
@@ -2546,7 +2677,7 @@
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 539.0, 154.0, 288.0, 131.0 ],
 					"rendermode" : 0,
-					"url" : "file:///Users/grrrwaaa/Documents/Max%207/Packages/Max_Worldmaking_Package/help/ws_help.html?port=8080"
+					"url" : "file:///C:/Users/exhibit/Documents/Max%208/Packages/Max_Worldmaking_Package/help/ws_help.html?port=8080"
 				}
 
 			}
@@ -2557,9 +2688,8 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 17.0, 184.0, 115.0, 22.0 ],
-					"style" : "",
-					"text" : "metro 50 @active 1"
+					"patching_rect" : [ 17.0, 184.0, 119.0, 22.0 ],
+					"text" : "qmetro 50 @active 1"
 				}
 
 			}
@@ -2570,7 +2700,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 247.5, 317.0, 60.0, 22.0 ],
-					"style" : "",
 					"text" : "print msg"
 				}
 
@@ -2582,7 +2711,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 152.0, 317.0, 83.0, 22.0 ],
-					"style" : "",
 					"text" : "print received"
 				}
 
@@ -2596,7 +2724,6 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
 					"patching_rect" : [ 152.0, 284.0, 91.0, 22.0 ],
-					"style" : "",
 					"text" : "ws @port 8080"
 				}
 
@@ -2605,8 +2732,6 @@
 		"lines" : [ 			{
 				"patchline" : 				{
 					"destination" : [ "obj-2", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-1", 0 ]
 				}
 
@@ -2614,8 +2739,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-3", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-1", 1 ]
 				}
 
@@ -2623,8 +2746,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-7", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-10", 0 ]
 				}
 
@@ -2632,8 +2753,7 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
+					"order" : 1,
 					"source" : [ "obj-12", 0 ]
 				}
 
@@ -2641,8 +2761,7 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-37", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
+					"order" : 0,
 					"source" : [ "obj-12", 0 ]
 				}
 
@@ -2650,8 +2769,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-24", 0 ]
 				}
 
@@ -2659,8 +2776,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-24", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-26", 0 ]
 				}
 
@@ -2668,8 +2783,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-12", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-33", 0 ]
 				}
 
@@ -2677,8 +2790,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-38", 0 ]
 				}
 
@@ -2686,8 +2797,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-4", 0 ]
 				}
 
@@ -2695,8 +2804,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-38", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-41", 0 ]
 				}
 
@@ -2704,8 +2811,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-18", 1 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-48", 0 ]
 				}
 
@@ -2713,8 +2818,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-9", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-5", 0 ]
 				}
 
@@ -2722,8 +2825,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-58", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-55", 0 ]
 				}
 
@@ -2731,8 +2832,6 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-48", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-6", 0 ]
 				}
 
@@ -2740,25 +2839,28 @@
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-58", 1 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-7", 0 ]
 				}
 
 			}
 , 			{
 				"patchline" : 				{
+					"destination" : [ "obj-1", 0 ],
+					"source" : [ "obj-8", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
 					"destination" : [ "obj-7", 0 ],
-					"disabled" : 0,
-					"hidden" : 0,
 					"source" : [ "obj-9", 0 ]
 				}
 
 			}
  ],
 		"dependency_cache" : [ 			{
-				"name" : "ws.mxo",
-				"type" : "iLaX"
+				"name" : "ws.mxe64",
+				"type" : "mx64"
 			}
  ],
 		"autosave" : 0
