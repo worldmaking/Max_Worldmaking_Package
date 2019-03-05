@@ -52,6 +52,7 @@ function ws_connect() {
         var port = querystring.port || "8080";
         var address = "ws://" + host + ":" + port + "/";
         wsocket = new WebSocket(address);
+        wsocket.binaryType = 'arraybuffer';
         wsocket.onopen = function(ev) {        
             post('CONNECTED to ' + address);
             connected = true;
@@ -79,9 +80,14 @@ function ws_connect() {
         };
 
         wsocket.onmessage = function(ev) {
-        	// was it a dict?
-        	if (ev.data.charAt(0) == "{") {
-        		// attempt to json parse it:
+
+            if (ev.data instanceof ArrayBuffer) {
+                post("ws received arraybuffer of " + ev.data.byteLength + " bytes");
+                console.log(new Uint8Array(ev.data));
+                console.log(new Float32Array(ev.data));
+        	} else if (ev.data.charAt(0) == "{") {
+                // a dict
+                // attempt to json parse it:
         		var tree = JSON.parse(ev.data);
         		post("parsed " + JSON.stringify(tree));
         	} else {

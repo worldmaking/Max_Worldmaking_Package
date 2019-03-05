@@ -167,9 +167,15 @@ static const int        cDepthWidth = 512;
 static const int        cDepthHeight = 424;
 static const int        cColorWidth = 1920;
 static const int        cColorHeight = 1080;
+static const int NUM_FRAMES = 8;
 
 class kinect2 {
 public:
+
+	struct FrameData {
+		glm::vec3 cloud[cDepthWidth * cDepthHeight];
+	};
+
 	t_object ob; // max objkinectt, must be first!
 	// outlets:
 	//void *		outlet_cloud;
@@ -198,10 +204,13 @@ public:
 	jitmat<char> player_mat;
 	int hasColorMap;
 	int capturing;
-	int new_depth_data, new_rgb_data, new_cloud_data, new_uv_data, new_indices_data, new_colour_cloud_data;
+	int new_depth_data = 0, new_rgb_data = 0, new_cloud_data = 0, new_uv_data = 0, new_indices_data = 0, new_colour_cloud_data = 0;
 	t_systhread capture_thread;
 	t_systhread_mutex depth_mutex;
 	IKinectSensor * device;
+
+	FrameData frames[NUM_FRAMES];
+	int currentFrame = 0;
 
 	// multi reader
 	IMultiSourceFrameReader* m_reader;   // Kinect data source
@@ -228,6 +237,8 @@ public:
 	t_atom_float normal_temporal_smooth;
 
 	kinect2() {
+
+		memset(frames, 0, sizeof(frames));
 		
 		outlet_msg = outlet_new(&ob, 0);
 		outlet_skeleton = outlet_new(&ob, 0);
@@ -335,6 +346,9 @@ public:
 		capturing = 1;
 		while (capturing) {
 
+
+			//post(".");
+
 			float zmul = face_negative_z ? -1.f : 1.f;
 
 			IMultiSourceFrame* frame = nullptr;
@@ -374,6 +388,11 @@ public:
 			SafeRelease(colorframeref);
 
 			if (use_depth && SUCCEEDED(frame->get_DepthFrameReference(&depthframeref)) && SUCCEEDED(depthframeref->AcquireFrame(&depthframe))) {
+
+				int nextFrame = (currentFrame + 1) % NUM_FRAMES;
+				FrameData& frame = frames[nextFrame];
+
+
 				INT64 relativeTime = 0;
 				depthframe->get_RelativeTime(&relativeTime);
 				UINT capacity;
@@ -403,10 +422,12 @@ public:
 						cDepthWidth*cDepthHeight, m_depth_buffer,        // Depth frame data and size of depth frame
 						cDepthWidth*cDepthHeight, (CameraSpacePoint *)m_cloud_buffer); // Output CameraSpacePoint array and size
 					if (SUCCEEDED(hr)) {
+						glm::vec3 * p = frame.cloud; //.cloud_mat.back;
+
+
 						// copy into cloud, with transform
 						if (face_negative_z) {
 							glm::vec3 * o = m_cloud_buffer;
-							glm::vec3 * p = cloud_mat.back;
 							for (int i = 0; i<capacity; i++) {
 								p->x = -o->x;
 								p->y =  o->y;
@@ -417,7 +438,6 @@ public:
 						}
 						else {
 							glm::vec3 * o = m_cloud_buffer;
-							glm::vec3 * p = cloud_mat.back;
 							for (int i = 0; i<capacity; i++) {
 								p->x =  o->x;
 								p->y =  o->y;
@@ -554,6 +574,8 @@ public:
 						new_colour_cloud_data = 1;
 					}
 				}
+
+				currentFrame = nextFrame;
 			}
 
 			SafeRelease(depthframe);
@@ -579,7 +601,9 @@ public:
 
 
 	void bang() {
-		if (systhread_mutex_trylock(mlock) == 0) {
+
+
+		//if (systhread_mutex_trylock(mlock) == 0) {
 			if (use_colour && (new_rgb_data || unique == 0)) {
 				outlet_anything(outlet_rgb, _jit_sym_jit_matrix, 1, rgb_mat.name);
 				new_rgb_data = 0;
@@ -588,15 +612,25 @@ public:
 			//if (skeleton) outputSkeleton();
 			//if (player) outlet_anything(outlet_player, _jit_sym_jit_matrix, 1, player_mat.name);
 			if (use_depth) {
-				if (new_uv_data || unique == 0) {
-					outlet_anything(outlet_mesh, ps_texcoord_matrix, 1, uv_mat.name);
-					new_uv_data = 0;
-				}
-				if (new_indices_data || unique == 0) {
-					outlet_anything(outlet_mesh, ps_index_matrix, 1, index_mat.name);
-					outlet_anything(outlet_mesh, ps_normal_matrix, 1, normal_mat.name);
-					outlet_anything(outlet_mesh, ps_vertex_matrix, 1, cloud_mat.name);
-					new_indices_data = 0;
+				FrameData& frame = frames[currentFrame];
+				memcpy(cloud_mat.back, &frame.cloud, sizeof(frame.cloud));
+
+				if (stitch > 0) {
+
+					if (new_uv_data || unique == 0) {
+						outlet_anything(outlet_mesh, ps_texcoord_matrix, 1, uv_mat.name);
+						new_uv_data = 0;
+					}
+					if (new_indices_data || unique == 0) {
+						outlet_anything(outlet_mesh, ps_index_matrix, 1, index_mat.name);
+						outlet_anything(outlet_mesh, ps_normal_matrix, 1, normal_mat.name);
+						outlet_anything(outlet_mesh, ps_vertex_matrix, 1, cloud_mat.name);
+						new_indices_data = 0;
+					}
+				} else {
+					if (new_cloud_data || unique == 0) {
+						outlet_anything(outlet_mesh, ps_vertex_matrix, 1, cloud_mat.name);
+					}
 				}
 				if (new_depth_data || unique == 0) {
 					//if (uselock) systhread_mutex_lock(depth_mutex);
@@ -608,10 +642,10 @@ public:
 					outlet_anything(outlet_colour_cloud, _jit_sym_jit_matrix, 1, colour_cloud_mat.name);
 					new_cloud_data = 0;
 				}
-
+				
 			}
-			systhread_mutex_unlock(mlock);
-		}
+			//systhread_mutex_unlock(mlock);
+		//}
 	}
 };
 

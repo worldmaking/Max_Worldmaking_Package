@@ -14,14 +14,7 @@ typedef websocketpp::client<websocketpp::config::asio_client> client;
 typedef std::set<websocketpp::connection_hdl, std::owner_less<websocketpp::connection_hdl> > con_list;
 
 // a bunch of likely Max includes:
-extern "C" {
-	#include "ext.h"
-	#include "ext_obex.h"
-	#include "ext_dictionary.h"
-	#include "ext_dictobj.h"
-	#include "ext_strings.h"
-	#include "ext_systhread.h"
-}
+#include "al_max.h"
 
 // TODO: check any multi-threading issues?
 
@@ -133,6 +126,37 @@ public:
 		
 		wsclient.send(connection_hdl,msg,websocketpp::frame::opcode::text);
 		//object_post(&ob, "Sent Message: %s", msg.c_str());
+	}
+	
+	void jit_matrix(t_symbol * name) {
+		if (!connected) return;
+		
+		void * in_mat = jit_object_findregistered(name);
+		if (!in_mat) {
+			jit_error_code(&ob, JIT_ERR_INVALID_INPUT);
+			return;
+		}
+		
+		t_jit_matrix_info in_info;
+		char * in_bp;
+		
+		// lock it:
+		long in_savelock = (long)jit_object_method(in_mat, _jit_sym_lock, 1);
+		
+		// ensure data exists:
+		jit_object_method(in_mat, _jit_sym_getdata, &in_bp);
+		if (!in_bp) {
+			jit_error_code(&ob, JIT_ERR_INVALID_INPUT);
+			return;
+		}
+		jit_object_method(in_mat, _jit_sym_getinfo, &in_info);
+		
+		size_t dimcount = in_info.dimcount;
+		size_t bytelength = in_info.dim[dimcount-1] * in_info.dimstride[dimcount-1];
+		wsclient.send(connection_hdl, in_bp, bytelength, websocketpp::frame::opcode::binary);
+		
+		// restore matrix lock state:
+		jit_object_method(in_mat, _jit_sym_lock, in_savelock);
 	}
 	
 	////// websocketpp handlers //////
@@ -305,6 +329,10 @@ void ws_list(ws_client * x, t_symbol * s, int argc, t_atom * argv) {
 	ws_anything(x, NULL, argc, argv);
 }
 
+void ws_jit_matrix(ws_client *x, t_symbol *s) {
+	x->jit_matrix(s);
+}
+
 void ws_test_size(ws_client * x, t_atom_long size) {
 	
 	std::string s(size, 'a');
@@ -327,6 +355,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)ws_open,	"open",	0);
 	class_addmethod(c, (method)ws_close, "close", 0);
 	class_addmethod(c, (method)ws_send,	"send",	A_SYM, 0);
+	class_addmethod(c, (method)ws_jit_matrix, "jit_matrix", A_SYM, 0);
 	class_addmethod(c, (method)ws_dictionary, "dictionary", A_SYM, 0);
 	class_addmethod(c, (method)ws_anything, "anything", A_GIMME, 0);
 	class_addmethod(c, (method)ws_list, "list", A_GIMME, 0);

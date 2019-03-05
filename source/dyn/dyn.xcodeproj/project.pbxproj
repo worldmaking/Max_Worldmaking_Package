@@ -145,6 +145,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				HEADER_SEARCH_PATHS = "\"$PROJECT_DIR\"/..";
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				SDKROOT = macosx10.13;
+				VALID_ARCHS = x86_64;
 			};
 			name = Development;
 		};
@@ -152,6 +155,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				HEADER_SEARCH_PATHS = "\"$PROJECT_DIR\"/..";
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				SDKROOT = macosx10.13;
+				VALID_ARCHS = x86_64;
 			};
 			name = Deployment;
 		};
@@ -159,6 +165,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 22CF10220EE984600054F513 /* maxmspsdk.xcconfig */;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
 				COPY_PHASE_STRIP = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				HEADER_SEARCH_PATHS = (
@@ -184,6 +192,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 22CF10220EE984600054F513 /* maxmspsdk.xcconfig */;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
 				COPY_PHASE_STRIP = YES;
 				HEADER_SEARCH_PATHS = (
 					"\"$(C74SUPPORT)/max-includes\"",

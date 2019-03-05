@@ -7,13 +7,13 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string>ws.client</string>
+	<string>ws</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.cycling74.ws-client</string>
+	<string>com.cycling74.ws</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>7.0.1</string>
 	<key>CFBundleLongVersionString</key>
-	<string>ws.client 7.0.1, Copyright 2015 Computational Worldmaking Lab</string>
+	<string>ws 7.0.1, Copyright 2015 Computational Worldmaking Lab</string>
 	<key>CFBundlePackageType</key>
 	<string>iLaX</string>
 	<key>CFBundleShortVersionString</key>

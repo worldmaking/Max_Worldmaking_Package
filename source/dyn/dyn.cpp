@@ -78,6 +78,8 @@ public:
 	uv_loop_t uvloop;
 #endif
 	
+	char systempath[MAX_FILENAME_CHARS];
+	
 	dyn() {
 		outlet_msg = outlet_new(&ob, 0);
 		
@@ -131,10 +133,17 @@ public:
 				FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(),
 							  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), err, 255, NULL);
 				object_error(&ob, "%s", err);
+				return;
 			}
 #else
 			if (dlclose(lib_handle) != 0) {
 				object_error(&ob, "%s", dlerror());
+				return;
+			}
+			// check if it is already loaded?
+			if (dlopen(systempath, RTLD_NOLOAD)) {
+				object_warn(&ob, "library did not unload %s", dlerror());
+				return;
 			}
 #endif
 			lib_handle = 0;
@@ -184,7 +193,6 @@ public:
 				if (autowatch) filewatcher_start(filewatcher);
 				
 				char folderpath[MAX_FILENAME_CHARS];
-				char systempath[MAX_FILENAME_CHARS];
 				if (path_toabsolutesystempath(vol, libname, folderpath) == 0
 					&& path_nameconform(folderpath, systempath, PATH_STYLE_SLASH, PATH_TYPE_BOOT) == 0) {
 					

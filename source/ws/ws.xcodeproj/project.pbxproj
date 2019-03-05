@@ -17,6 +17,7 @@
 		22CF10220EE984600054F513 /* maxmspsdk.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = maxmspsdk.xcconfig; path = ../maxmspsdk.xcconfig; sourceTree = SOURCE_ROOT; };
 		22CF11AD0EE9A8840054F513 /* ws.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ws.cpp; sourceTree = "<group>"; };
 		2FBBEAE508F335360078DB84 /* ws.mxo */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ws.mxo; sourceTree = BUILT_PRODUCTS_DIR; };
+		8963AB9122235BF400C9668D /* al_max.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = al_max.h; path = ../al_max.h; sourceTree = "<group>"; };
 		899A5A001C49424000681F7D /* ws_help.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = ws_help.html; path = ../../help/ws_help.html; sourceTree = "<group>"; };
 		899A5A011C495E0200681F7D /* commonsyms.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = commonsyms.c; path = "../../../max-sdk/source/c74support/max-includes/common/commonsyms.c"; sourceTree = "<group>"; };
 		89E3AAAD1C4851FC008DAF37 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
@@ -138,6 +139,7 @@
 				89E3AAAD1C4851FC008DAF37 /* CoreFoundation.framework */,
 				89E3AAAE1C4851FC008DAF37 /* IOKit.framework */,
 				22CF10220EE984600054F513 /* maxmspsdk.xcconfig */,
+				8963AB9122235BF400C9668D /* al_max.h */,
 				22CF11AD0EE9A8840054F513 /* ws.cpp */,
 				899A5A001C49424000681F7D /* ws_help.html */,
 				89E3AAB11C48AEAB008DAF37 /* websocketpp */,
@@ -547,6 +549,7 @@
 					"\"$(C74SUPPORT)/max-includes\"",
 					"\"$(C74SUPPORT)/msp-includes\"",
 					"\"$(C74SUPPORT)/jit-includes\"",
+					../,
 				);
 				LIBRARY_SEARCH_PATHS = osx/lib;
 				OTHER_CFLAGS = (
@@ -554,7 +557,11 @@
 					"-I$(SRCROOT)/",
 					"-DASIO_STANDALONE",
 				);
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
+				OTHER_LDFLAGS = (
+					"$(C74_SYM_LINKER_FLAGS)",
+					"-framework",
+					JitterAPI,
+				);
 				PRODUCT_NAME = ws;
 			};
 			name = Development;
@@ -571,6 +578,7 @@
 					"\"$(C74SUPPORT)/max-includes\"",
 					"\"$(C74SUPPORT)/msp-includes\"",
 					"\"$(C74SUPPORT)/jit-includes\"",
+					../,
 				);
 				LIBRARY_SEARCH_PATHS = osx/lib;
 				OTHER_CFLAGS = (
@@ -578,7 +586,11 @@
 					"-I$(SRCROOT)/",
 					"-DASIO_STANDALONE",
 				);
-				OTHER_LDFLAGS = "$(C74_SYM_LINKER_FLAGS)";
+				OTHER_LDFLAGS = (
+					"$(C74_SYM_LINKER_FLAGS)",
+					"-framework",
+					JitterAPI,
+				);
 				PRODUCT_NAME = ws;
 			};
 			name = Deployment;

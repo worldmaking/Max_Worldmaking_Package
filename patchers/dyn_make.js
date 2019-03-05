@@ -16,10 +16,20 @@ if (process.platform == "win32") {
 } else {
 	cc = 'clang++';
 	args = args.concat([
+		'-x', 'c++',
+		'-std=c++11','-stdlib=libc++',
+		'-arch','i386','-arch','x86_64',
+		'-isysroot', '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk',
+		'-mmacosx-version-min=10.7',
 		'-I../source/',
+		'-I../../max-sdk/source/c74support/max-includes',
+		'-I../../max-sdk/source/c74support/msp-includes',
+		'-I../../max-sdk/source/c74support/jit-includes',
+		'-F../../max-sdk/source/c74support/max-includes',
+		'-F../../max-sdk/source/c74support/msp-includes',
+		'-F../../max-sdk/source/c74support/jit-includes',
 		'-dynamiclib', 
 		'-undefined','dynamic_lookup',
-		'-arch','i386','-arch','x86_64',
 		'-o','dyn_test.dylib'
 	]);
 }

@@ -123,7 +123,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalIncludeDirectories>$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <OutputFile>$(OutDir)$(ProjectName).mxe</OutputFile>
@@ -164,7 +164,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalIncludeDirectories>$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <OutputFile>$(OutDir)$(ProjectName).mxe64</OutputFile>
@@ -209,7 +209,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalIncludeDirectories>$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <OutputFile>$(OutDir)$(ProjectName).mxe</OutputFile>
@@ -257,7 +257,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalIncludeDirectories>$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;$(C74SUPPORT)\max-includes;$(C74SUPPORT)\msp-includes;$(C74SUPPORT)\jit-includes</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <OutputFile>$(OutDir)$(ProjectName).mxe64</OutputFile>
