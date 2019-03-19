@@ -202,7 +202,24 @@ public:
 	}
 	
 	~ws() {
-		if (server) server->remove(this);
+		disconnect();
+	}
+
+	void disconnect() {
+		if (server) {
+			server->remove(this);
+			server = nullptr;
+		}
+	}
+
+	void connect() {
+		disconnect();
+		try {
+			server = Server::get(port); // can throw
+			server->add(this);
+		} catch (const std::exception& ex) {
+			object_error(&ob, "failed to create server: %s", ex.what());
+		}
 	}
 	
 	void bang() {
@@ -291,6 +308,14 @@ void ws_assist(ws *x, void *b, long m, long a, char *s)
 
 void ws_bang(ws * x) {
 	x->bang();
+}
+
+void ws_connect(ws * x) {
+	x->connect();
+}
+
+void ws_disconnect(ws * x) {
+	x->disconnect();
 }
 
 void ws_send(ws * x, t_symbol * s) {
@@ -392,6 +417,8 @@ void ext_main(void *r)
 	c = class_new("ws", (method)ws_new, (method)ws_free, (long)sizeof(ws), 0L, A_GIMME, 0);
 	class_addmethod(c, (method)ws_assist, "assist", A_CANT, 0);
 	class_addmethod(c, (method)ws_bang,	"bang",	0);
+	class_addmethod(c, (method)ws_connect,	"connect",	0);
+	class_addmethod(c, (method)ws_disconnect,	"disconnect",	0);
 	class_addmethod(c, (method)ws_send,	"send",	A_SYM, 0);
 	class_addmethod(c, (method)ws_jit_matrix, "jit_matrix", A_SYM, 0);
 	class_addmethod(c, (method)ws_dictionary, "dictionary", A_SYM, 0);
