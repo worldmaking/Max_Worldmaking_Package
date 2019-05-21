@@ -527,6 +527,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				VALID_ARCHS = x86_64;
 			};
 			name = Development;
 		};
@@ -534,6 +535,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				VALID_ARCHS = x86_64;
 			};
 			name = Deployment;
 		};

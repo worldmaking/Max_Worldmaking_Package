@@ -343,6 +343,18 @@ void ws_test_size(ws_client * x, t_atom_long size) {
 	x->send(s);
 }
 
+t_max_err ws_port_set(ws_client *x, t_object *attr, long argc, t_atom *argv) {
+	x->port = atom_getlong(argv);
+	x->open();
+	return 0;
+}
+
+t_max_err ws_host_set(ws_client *x, t_object *attr, long argc, t_atom *argv) {
+	x->host = atom_getsym(argv);
+	x->open();
+	return 0;
+}
+
 void ext_main(void *r)
 {
 	t_class *c;
@@ -362,7 +374,9 @@ void ext_main(void *r)
 	class_addmethod(c, (method)ws_test_size, "test_size", A_LONG, 0);
 	
 	CLASS_ATTR_LONG(c, "port", 0, ws_client, port);
+	CLASS_ATTR_ACCESSORS(c, "port", NULL, ws_port_set);
 	CLASS_ATTR_SYM(c, "host", 0, ws_client, host);
+	CLASS_ATTR_ACCESSORS(c, "host", NULL, ws_host_set);
 	CLASS_ATTR_LONG(c, "poll_limit", 0, ws_client, poll_limit); // = max events per bang
 	CLASS_ATTR_LONG(c, "autoconnect", 0, ws_client, autoconnect); // = max events per bang
 	

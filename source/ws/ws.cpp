@@ -192,17 +192,28 @@ public:
 	}
 	
 	void post_attr_init() {
-		// will either get an existing or create a new server:
+		open();
+	}
+	
+	~ws() {
+		close();
+	}
+
+	void close() {
+		if (server) {
+			server->remove(this);
+			server = nullptr;
+		}
+	}
+
+	void open() {
+		close();
 		try {
 			server = Server::get(port); // can throw
 			server->add(this);
 		} catch (const std::exception& ex) {
 			object_error(&ob, "failed to create server: %s", ex.what());
 		}
-	}
-	
-	~ws() {
-		if (server) server->remove(this);
 	}
 	
 	void bang() {
@@ -291,6 +302,14 @@ void ws_assist(ws *x, void *b, long m, long a, char *s)
 
 void ws_bang(ws * x) {
 	x->bang();
+}
+
+void ws_open(ws * x) {
+	x->open();
+}
+
+void ws_close(ws * x) {
+	x->close();
 }
 
 void ws_send(ws * x, t_symbol * s) {
@@ -383,6 +402,12 @@ void ws_test_size(ws * x, t_atom_long size) {
 	x->send(s);
 }
 
+t_max_err ws_port_set(ws *x, t_object *attr, long argc, t_atom *argv) {
+	x->port = atom_getlong(argv);
+	x->open();
+	return 0;
+}
+
 void ext_main(void *r)
 {
 	t_class *c;
@@ -392,6 +417,8 @@ void ext_main(void *r)
 	c = class_new("ws", (method)ws_new, (method)ws_free, (long)sizeof(ws), 0L, A_GIMME, 0);
 	class_addmethod(c, (method)ws_assist, "assist", A_CANT, 0);
 	class_addmethod(c, (method)ws_bang,	"bang",	0);
+	class_addmethod(c, (method)ws_open,	"open",	0);
+	class_addmethod(c, (method)ws_close,	"close",	0);
 	class_addmethod(c, (method)ws_send,	"send",	A_SYM, 0);
 	class_addmethod(c, (method)ws_jit_matrix, "jit_matrix", A_SYM, 0);
 	class_addmethod(c, (method)ws_dictionary, "dictionary", A_SYM, 0);
@@ -400,6 +427,7 @@ void ext_main(void *r)
 	class_addmethod(c, (method)ws_test_size, "test_size", A_LONG, 0);
 	
 	CLASS_ATTR_LONG(c, "port", 0, ws, port);
+	CLASS_ATTR_ACCESSORS(c, "port", NULL, ws_port_set);
 	
 	class_register(CLASS_BOX, c);
 	max_class = c;

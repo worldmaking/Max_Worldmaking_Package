@@ -561,6 +561,7 @@
 					JitterAPI,
 				);
 				PRODUCT_NAME = ws.client;
+				VALID_ARCHS = x86_64;
 			};
 			name = Development;
 		};
@@ -590,6 +591,7 @@
 					JitterAPI,
 				);
 				PRODUCT_NAME = ws.client;
+				VALID_ARCHS = x86_64;
 			};
 			name = Deployment;
 		};
