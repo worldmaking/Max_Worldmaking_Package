@@ -2,6 +2,7 @@
 #define AL_HASHSPACE_H
 
 #include <vector>
+#include <algorithm>
 
 #include "al_math.h"
 
@@ -171,7 +172,7 @@ struct Hashspace3D {
 			// shells run 0..1024 (mDimHalf)
 			// ranges up to 32768 (mdim3)
 			// it is possible that some shells have no entries.
-			//post("shell %d contains voxels %d..%d", d, shell.start, shell.end);
+			//post("shell %d contains voxels %d..%d", d, shell.start, shell.end-1);
 		}
 		
 		//object_post(0, "mDim %d mDim2 %d mDim3 %d mDimHalf %d max radius squared: %d", mDim, mDim2, mDim3, mDimHalf, mMaxRad2);
@@ -181,6 +182,8 @@ struct Hashspace3D {
 	
 	int query(std::vector<int32_t>& result, int maxResults, glm::vec3 center, int32_t selfId=-1, float maxRadius=1000.f, float minRadius=0, bool toroidal=true) {
 		int nres = 0;
+
+		//post("query");
 		
 		// convert distance in term of voxels:
 		minRadius = minRadius * world2voxels_scale;
@@ -188,19 +191,24 @@ struct Hashspace3D {
 		
 		// get shell radii:
 		const uint32_t iminr2 = glm::max(uint32_t(0), uint32_t(minRadius*minRadius));
-		const uint32_t imaxr2 = glm::min(mMaxRad2, 1 + uint32_t(maxRadius*maxRadius));
+		const uint32_t imaxr2 = glm::min(mMaxRad2, 1 + uint32_t(ceil(maxRadius*maxRadius)));
+
 		
 		// convert pos:
 		auto ctr = world2voxels * glm::vec4(center, 1);
-		const uint32_t x = ctr.x+0.5;
-		const uint32_t y = ctr.y+0.5;
-		const uint32_t z = ctr.z+0.5;
+		const uint32_t x = ctr.x;
+		const uint32_t y = ctr.y;
+		const uint32_t z = ctr.z;
 		
+		//post("query point %s for voxel point %f => %d %d %d", glm::to_string(center), glm::to_string(ctr), x, y, z);
+
 		//post("query shells %d to %d for point %d %d %d", iminr2, imaxr2, x, y, z);
 		
 		
 		// move out shell by shell until we have enough results
-		for (int s = iminr2; s <= imaxr2 && nres < maxResults; s++) {
+		for (int s = iminr2; s < imaxr2 && nres < maxResults; s++) {
+
+			//post("shell %d", s);
 			
 			const Shell& shell = mShells[s];
 			const uint32_t cellstart = shell.start;
@@ -212,6 +220,7 @@ struct Hashspace3D {
 			// we must check an entire shell, to avoid any spatial bias
 			// due to the ordering of voxels within a shell
 			for (uint32_t i = cellstart; i < cellend; i++) {
+				//post("cell");
 				
 				// use the current cell's hash to offset our query
 				// (i.e., translate to the voxel's center)
@@ -220,30 +229,31 @@ struct Hashspace3D {
 				? hash(x, y, z, offset)
 				: hash_nontoroidal(x, y, z, offset);
 				
-//				uint32_t ux = unhashx(offset);
-//				uint32_t uy = unhashy(offset);
-//				uint32_t uz = unhashz(offset);
-//
-//				int32_t ox = ((ux+mDimHalf) & mWrap) - mDimHalf;
-//				int32_t oy = ((uy+mDimHalf) & mWrap) - mDimHalf;
-//				int32_t oz = ((uz+mDimHalf) & mWrap) - mDimHalf;
-//
-//				uint32_t hx = hashx_nontoroidal(ox + x);
-//				uint32_t hy = hashy_nontoroidal(oy + y);
-//				uint32_t hz = hashz_nontoroidal(oz + z);
-//				post(".  search cell %d, offset %d (%d %d %d) = index %d", i, offset, ux, uy, uz, index);
-//				post(".  => real offset %d %d %d -> pos %d %d %d => hashed %d %d %d", ox, oy, oz, x + ox, y + oy, z + oz, hx, hy, hz);
+				//uint32_t ux = unhashx(offset);
+				//uint32_t uy = unhashy(offset);
+				//uint32_t uz = unhashz(offset);
+
+				//int32_t ox = ((ux+mDimHalf) & mWrap) - mDimHalf;
+				//int32_t oy = ((uy+mDimHalf) & mWrap) - mDimHalf;
+				//int32_t oz = ((uz+mDimHalf) & mWrap) - mDimHalf;
+
+				//uint32_t hx = hashx_nontoroidal(ox + x);
+				//uint32_t hy = hashy_nontoroidal(oy + y);
+				//uint32_t hz = hashz_nontoroidal(oz + z);
+				//post(".  search cell %d, offset %d (%d %d %d) = index %d", i, offset, ux, uy, uz, index);
+				//post(".  => real offset %d %d %d -> pos %d %d %d => hashed %d %d %d", ox, oy, oz, x + ox, y + oy, z + oz, hx, hy, hz);
 				
 				if (!isValid(index)) continue;
 				
 				const Voxel& voxel = mVoxels[index];
 				// now add any objects in this voxel to the result...
 				const int32_t first = voxel.first;
+				int32_t prev = -1;
 				if (first >= 0) {
 					
 					
 					int32_t current = first;
-					//post(".    check cell member %d", current);
+					//post(".    check cell member %d after %d", current, prev);
 					int runaway_limit = MAX_OBJECTS;
 					do {
 						const Object& o = mObjects[current];
@@ -255,9 +265,11 @@ struct Hashspace3D {
 							result.push_back(current);
 							nres++;
 						}
+						prev = current;
 						current = o.next;
 					} while (
 							 current != first // bail if we looped around the voxel
+							 && current != prev
 							 && current >= 0  // bail if this isn't a valid object
 							 && --runaway_limit // bail if this has lost control
 							 );
@@ -295,7 +307,8 @@ struct Hashspace3D {
 	
 	inline uint32_t hash(glm::vec3 v) const {
 		glm::vec4 norm = world2voxels * glm::vec4(v, 1.f);
-		return hash(norm[0]+0.5, norm[1]+0.5, norm[2]+0.5);
+		//return hash(norm[0]+0.5, norm[1]+0.5, norm[2]+0.5);
+		return hash(norm[0] , norm[1] , norm[2]);
 	}
 	
 	// convert x,y,z in range [0..DIM) to unsigned hash:

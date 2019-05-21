@@ -4,6 +4,10 @@
 
 static t_class * max_class = 0;
 
+//TODO: Wishlist:
+// Searching non-toroidally should not be limited to mDimHalf
+// maximum number of objects and resolution should be definable in max object
+
 class max_hashspace {
 public:
 	t_object ob; // max objvrpnt, must be first!
@@ -85,6 +89,7 @@ public:
 	// args: x, y, z (position to query)
 	// id (of query object, or -1 for no id)
 	void query(t_atom_long argc, t_atom * argv) {
+		static const int MAX_RESULTS = 1024;
 		
 		//post("pos %f %f %f", atom_getfloat(&argv[0]), atom_getfloat(&argv[1]), atom_getfloat(&argv[2]));
 		
@@ -97,15 +102,16 @@ public:
 		//post("query at %f %f %f", center.x, center.y, center.z);
 		//post("rad %f ignore %d maxres %d toroidal %d, found %d", radius, id, maxresults, toroidal, nres);
 		
-		t_atom list[nres];
-		for (int i=0; i<nres; i++) {
+		t_atom list[MAX_RESULTS];
+		int i = 0;
+		for (;  i < nres && i < MAX_RESULTS; i++) {
 			//post("res %d: %d", i, results[i]);
 			atom_setlong(&list[i], results[i]);
 		}
-		outlet_list(outlet_results, 0L, nres, list);
+		outlet_list(outlet_results, 0L, i, list);
 		
 		t_atom a[1];
-		atom_setlong(a, nres);
+		atom_setlong(a, i);
 		outlet_anything(outlet_msg, gensym("found"), 1, a);
 	}
 	
@@ -211,6 +217,7 @@ extern "C" void ext_main(void *r)
 	CLASS_ATTR_FLOAT(c, "radius", 0, max_hashspace, radius);
 	CLASS_ATTR_LONG(c, "enoughResults", 0, max_hashspace, enoughResults);
 	CLASS_ATTR_LONG(c, "toroidal", 0, max_hashspace, toroidal);
+	CLASS_ATTR_STYLE(c, "toroidal", 0, "onoff");
 	
 	CLASS_ATTR_FLOAT_ARRAY(c, "world_min", 0, max_hashspace, world_min, 3);
 	CLASS_ATTR_FLOAT_ARRAY(c, "world_max", 0, max_hashspace, world_max, 3);
