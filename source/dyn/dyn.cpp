@@ -399,7 +399,8 @@ void ext_main(void *r)
 	CLASS_ATTR_ACCESSORS(c, "file", 0, dyn_setattr_file);
 	
 	
-	CLASS_ATTR_LONG(c, "autowatch", 0, dyn, autowatch);
+	//CLASS_ATTR_LONG(c, "autowatch", 0, dyn, autowatch); TODO: this line was causing an error. Replacing it with the next line solved the problem but this might not be a correct full-time solution
+	CLASS_ATTR_ATOM_LONG(c, "autowatch", 0, dyn, autowatch);
 	CLASS_ATTR_ACCESSORS(c, "autowatch", 0, dyn_setattr_autowatch);
 	
 	class_register(CLASS_BOX, c);
