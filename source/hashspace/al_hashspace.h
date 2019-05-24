@@ -7,35 +7,35 @@
 #include "al_math.h"
 
 /*
- A POD-friendly data structure for near-neighbour queries
- 
- Stores object unique ids (int32_t) into a voxel grid
- There are up to MAX_OBJECTS objects in the space, with ids 0..MAX_OBJECTS-1
- Each voxel can contain multiple objects
- 
- It is NOT thread-safe.
- 
- Hashspace<MAX_OBJECTS, RESOLUTION> hashspace;
- 
- // defines the space over which the hashspace exists
- // expects 'position' values to be given in this world space
- hashspace.reset(world_min, world_max);
- 
- // position an agent
- hashspace.move(id, pos);
- 
- // remove an agent
- hashspace.remove(id);
- 
- // find near agents:
- std::vector<int32_t> nearby;
- int nres = hashspace.query(nearby, NEIGHBOURS_MAX, pos, id, range_of_view);
- for (auto j : nearby) {
- // note: query results will never include self.
- auto& n = objects[j];
- ...
- }
- */
+	A POD-friendly data structure for near-neighbour queries
+	
+	Stores object unique ids (int32_t) into a voxel grid
+	There are up to MAX_OBJECTS objects in the space, with ids 0..MAX_OBJECTS-1
+	Each voxel can contain multiple objects
+
+	It is NOT thread-safe.
+	
+	Hashspace<MAX_OBJECTS, RESOLUTION> hashspace;
+
+	// defines the space over which the hashspace exists
+	// expects 'position' values to be given in this world space
+	hashspace.reset(world_min, world_max);
+
+	// position an agent
+	hashspace.move(id, pos);
+
+	// remove an agent
+	hashspace.remove(id);
+
+	// find near agents:
+	std::vector<int32_t> nearby;
+	int nres = hashspace.query(nearby, NEIGHBOURS_MAX, pos, id, range_of_view);
+	for (auto j : nearby) {
+		// note: query results will never include self.
+		auto& n = objects[j];
+		...
+	}
+*/
 
 // RESOLUTION 5 means 2^5 = 32 voxels in each axis.
 template<int MAX_OBJECTS = 1024, int RESOLUTION = 5>
@@ -91,7 +91,7 @@ struct Hashspace3D {
 		// zero out the voxels:
 		for (int i=0; i<mDim3; i++) {
 			Voxel& o = mVoxels[i];
-			o.first = -1;
+			o.first = invalidObject();
 		}
 		
 		// zero out the objects:
@@ -99,7 +99,7 @@ struct Hashspace3D {
 			Object& o = mObjects[i];
 			o.id = i;
 			o.hash = invalidHash();
-			o.next = o.prev = -1;
+			o.next = o.prev = invalidObject();
 		}
 		
 		// define the transforms:
@@ -179,8 +179,90 @@ struct Hashspace3D {
 		return *this;
 	}
 	
+	// returns invalidHash() if not found:
+	int32_t first(glm::vec3 center, int32_t selfId=invalidObject(), float maxRadius=1000.f, float minRadius=0, bool toroidal=true) {
+		
+		// convert distance in term of voxels:
+		minRadius = minRadius * world2voxels_scale;
+		maxRadius = maxRadius * world2voxels_scale;
+		
+		// get shell radii:
+		const uint32_t iminr2 = glm::max(uint32_t(0), uint32_t(minRadius*minRadius));
+		const uint32_t imaxr2 = glm::min(mMaxRad2, 1 + uint32_t(ceil(maxRadius*maxRadius)));
+
+		// convert pos:
+		auto ctr = world2voxels * glm::vec4(center, 1);
+		const uint32_t x = ctr.x;
+		const uint32_t y = ctr.y;
+		const uint32_t z = ctr.z;
+		
+		//post("query point %s for voxel point %f => %d %d %d", glm::to_string(center), glm::to_string(ctr), x, y, z);
+
+		//post("query shells %d to %d for point %d %d %d", iminr2, imaxr2, x, y, z);
+		
+		
+		// move out shell by shell until we have enough results
+		for (int s = iminr2; s < imaxr2; s++) {
+
+			//post("shell %d", s);
+			
+			const Shell& shell = mShells[s];
+			const uint32_t cellstart = shell.start;
+			const uint32_t cellend = shell.end;
+			
+			//post("search shell %d, cells %d to %d", s, cellstart, cellend);
+			
+			// look at all the voxels in this shell
+			// we must check an entire shell, to avoid any spatial bias
+			// due to the ordering of voxels within a shell
+			for (uint32_t i = cellstart; i < cellend; i++) {
+				//post("cell");
+				
+				// use the current cell's hash to offset our query
+				// (i.e., translate to the voxel's center)
+				uint32_t offset = mVoxelsByDistance[i];
+				uint32_t index = toroidal
+				? hash(x, y, z, offset)
+				: hash_nontoroidal(x, y, z, offset);
+				
+				if (!isValid(index)) continue;
+				
+				const Voxel& voxel = mVoxels[index];
+				// now add any objects in this voxel to the result...
+				const int32_t first = voxel.first;
+				int32_t prev = invalidObject();
+				if (first >= 0) {
+					
+					int32_t current = first;
+					//post(".    check cell member %d after %d", current, prev);
+					int runaway_limit = MAX_OBJECTS;
+					do {
+						const Object& o = mObjects[current];
+						if (current != o.id) {
+							fprintf(stderr, "hashspace list is corrupt - reset\n");
+							break;
+						}
+						if (current != selfId) {
+							return current;
+						}
+						prev = current;
+						current = o.next;
+					} while (
+							 current != first // bail if we looped around the voxel
+							 && current != prev
+							 && current >= 0  // bail if this isn't a valid object
+							 && --runaway_limit // bail if this has lost control
+							 );
+				}
+			}
+		}
+		
+		// TODO: would be nice to set the nearest as the first item...
+		
+		return invalidObject();
+	}
 	
-	int query(std::vector<int32_t>& result, int maxResults, glm::vec3 center, int32_t selfId=-1, float maxRadius=1000.f, float minRadius=0, bool toroidal=true) {
+	int query(std::vector<int32_t>& result, int maxResults, glm::vec3 center, int32_t selfId=invalidObject(), float maxRadius=1000.f, float minRadius=0, bool toroidal=true) {
 		int nres = 0;
 
 		//post("query");
@@ -248,7 +330,7 @@ struct Hashspace3D {
 				const Voxel& voxel = mVoxels[index];
 				// now add any objects in this voxel to the result...
 				const int32_t first = voxel.first;
-				int32_t prev = -1;
+				int32_t prev = invalidObject();
 				if (first >= 0) {
 					
 					
@@ -258,7 +340,7 @@ struct Hashspace3D {
 					do {
 						const Object& o = mObjects[current];
 						if (current != o.id) {
-							object_error(0, "hashspace list is corrupt - reset");
+							fprintf(stderr, "hashspace list is corrupt - reset\n");
 							break;
 						}
 						if (current != selfId) {
@@ -301,6 +383,9 @@ struct Hashspace3D {
 	}
 	
 	inline glm::ivec3 dim() { return glm::ivec3(mDim); }
+
+
+	static uint32_t invalidObject() { return -1; }
 	
 	static uint32_t invalidHash() { return UINT_MAX; }
 	static bool isValid(uint32_t h) { return h != invalidHash(); }
@@ -308,7 +393,7 @@ struct Hashspace3D {
 	inline uint32_t hash(glm::vec3 v) const {
 		glm::vec4 norm = world2voxels * glm::vec4(v, 1.f);
 		//return hash(norm[0]+0.5, norm[1]+0.5, norm[2]+0.5);
-		return hash(norm[0] , norm[1] , norm[2]);
+		return hash(norm[0], norm[1], norm[2]);
 	}
 	
 	// convert x,y,z in range [0..DIM) to unsigned hash:
@@ -387,12 +472,11 @@ struct Hashspace3D {
 			if (v.first == o.id) { v.first = next.id; }
 		}
 		// leave the object clean:
-		o.prev = o.next = -1;
+		o.prev = o.next = invalidObject();
 		return *this;
 	}
 	
 };
-
 
 /*
 	Would be nice to support different resolutions in each axis, to better fit data in a non-cube world
@@ -429,8 +513,8 @@ struct Hashspace3D3 {
 	Voxel mVoxels[(1<<RESX) * (1<<RESY) * (1<<RESZ)];
 	// mVoxels indices into mVoxelsByDistance
 	// what is the longest distance?
-	Shell mShells[((1<<glm::max(glm::max(RESX, RESY), RESZ))/2) * ((1<<glm::max(glm::max(RESX, RESY), RESZ))/2)];
-	uint32_t mVoxelsByDistance[(1<<glm::max(glm::max(RESX, RESY), RESZ)) * (1<<glm::max(glm::max(RESX, RESY), RESZ)) * (1<<glm::max(glm::max(RESX, RESY), RESZ))];
+	Shell mShells[((1<<std::max(std::max(RESX, RESY), RESZ))/2) * ((1<<std::max(std::max(RESX, RESY), RESZ))/2)];
+	uint32_t mVoxelsByDistance[(1<<std::max(std::max(RESX, RESY), RESZ)) * (1<<std::max(std::max(RESX, RESY), RESZ)) * (1<<std::max(std::max(RESX, RESY), RESZ))];
 
 	uint32_t mShift, mShift2, mShift3;
 	uint32_t mShiftX2, mShiftY2, mShiftZ2;
@@ -462,12 +546,12 @@ struct Hashspace3D3 {
 		mDimHalfZ = (mDimZ/2);
 
 		// the largest valid query of distance-squared
-		mMaxRad2 = glm::max(glm::max(mDimX, mDimY), mDimZ)/2 * glm::max(glm::max(mDimX, mDimY), mDimZ)/2;
+		mMaxRad2 = std::max(std::max(mDimX, mDimY), mDimZ)/2 * std::max(std::max(mDimX, mDimY), mDimZ)/2;
 
 		// zero out the voxels:
 		for (int i=0; i<mDim3; i++) {
 			Voxel& o = mVoxels[i];
-			o.first = -1;
+			o.first = invalidObject();
 		}
 		
 		// zero out the objects:
@@ -475,7 +559,7 @@ struct Hashspace3D3 {
 			Object& o = mObjects[i];
 			o.id = i;
 			o.hash = invalidHash();
-			o.next = o.prev = -1;
+			o.next = o.prev = invalidObject();
 		}
 		
 		// define the transforms:
@@ -556,6 +640,90 @@ struct Hashspace3D3 {
 		return *this;
 	}
 	
+
+	
+	// returns invalidHash() if not found:
+	int32_t first(glm::vec3 center, int32_t selfId=invalidObject(), float maxRadius=1000.f, float minRadius=0, bool toroidal=true) {
+		
+		// convert distance in term of voxels:
+		minRadius = minRadius * world2voxels_scale;
+		maxRadius = maxRadius * world2voxels_scale;
+		
+		// get shell radii:
+		const uint32_t iminr2 = glm::max(uint32_t(0), uint32_t(minRadius*minRadius));
+		const uint32_t imaxr2 = glm::min(mMaxRad2, 1 + uint32_t(ceil(maxRadius*maxRadius)));
+
+		// convert pos:
+		auto ctr = world2voxels * glm::vec4(center, 1);
+		const uint32_t x = ctr.x;
+		const uint32_t y = ctr.y;
+		const uint32_t z = ctr.z;
+		
+		//post("query point %s for voxel point %f => %d %d %d", glm::to_string(center), glm::to_string(ctr), x, y, z);
+
+		//post("query shells %d to %d for point %d %d %d", iminr2, imaxr2, x, y, z);
+		
+		
+		// move out shell by shell until we have enough results
+		for (int s = iminr2; s < imaxr2; s++) {
+
+			//post("shell %d", s);
+			
+			const Shell& shell = mShells[s];
+			const uint32_t cellstart = shell.start;
+			const uint32_t cellend = shell.end;
+			
+			//post("search shell %d, cells %d to %d", s, cellstart, cellend);
+			
+			// look at all the voxels in this shell
+			// we must check an entire shell, to avoid any spatial bias
+			// due to the ordering of voxels within a shell
+			for (uint32_t i = cellstart; i < cellend; i++) {
+				//post("cell");
+				
+				// use the current cell's hash to offset our query
+				// (i.e., translate to the voxel's center)
+				uint32_t offset = mVoxelsByDistance[i];
+				uint32_t index = toroidal
+				? hash(x, y, z, offset)
+				: hash_nontoroidal(x, y, z, offset);
+				
+				if (!isValid(index)) continue;
+				
+				const Voxel& voxel = mVoxels[index];
+				// now add any objects in this voxel to the result...
+				const int32_t first = voxel.first;
+				int32_t prev = invalidObject();
+				if (first >= 0) {
+					
+					int32_t current = first;
+					//post(".    check cell member %d after %d", current, prev);
+					int runaway_limit = MAX_OBJECTS;
+					do {
+						const Object& o = mObjects[current];
+						if (current != o.id) {
+							fprintf(stderr, "hashspace list is corrupt - reset\n");
+							break;
+						}
+						if (current != selfId) {
+							return current;
+						}
+						prev = current;
+						current = o.next;
+					} while (
+							 current != first // bail if we looped around the voxel
+							 && current != prev
+							 && current >= 0  // bail if this isn't a valid object
+							 && --runaway_limit // bail if this has lost control
+							 );
+				}
+			}
+		}
+		
+		// TODO: would be nice to set the nearest as the first item...
+		
+		return invalidObject();
+	}
 	
 	int query(std::vector<int32_t>& result, int maxResults, glm::vec3 center, int32_t selfId=-1, float maxRadius=1000.f, float minRadius=0, bool toroidal=true) {
 		int nres = 0;
@@ -625,7 +793,7 @@ struct Hashspace3D3 {
 				const Voxel& voxel = mVoxels[index];
 				// now add any objects in this voxel to the result...
 				const int32_t first = voxel.first;
-				int32_t prev = -1;
+				int32_t prev = invalidObject();
 				if (first >= 0) {
 					
 					
@@ -678,6 +846,8 @@ struct Hashspace3D3 {
 	}
 
 	inline glm::ivec3 dim() { return glm::ivec3(mDimX, mDimY, mDimZ); }
+
+	static uint32_t invalidObject() { return -1; }
 	
 	static uint32_t invalidHash() { return UINT_MAX; }
 	static bool isValid(uint32_t h) { return h != invalidHash(); }
@@ -753,7 +923,7 @@ struct Hashspace3D3 {
 	// this is definitely not thread-safe.
 	inline Hashspace3D3& voxel_remove(Voxel& v, Object& o) {
 		if (o.id == o.prev) {	// voxel only has 1 item
-			v.first = -1;
+			v.first = invalidObject();
 		} else {
 			Object& prev = mObjects[o.prev];
 			Object& next = mObjects[o.next];
@@ -763,7 +933,7 @@ struct Hashspace3D3 {
 			if (v.first == o.id) { v.first = next.id; }
 		}
 		// leave the object clean:
-		o.prev = o.next = -1;
+		o.prev = o.next = invalidObject();
 		return *this;
 	}
 };
