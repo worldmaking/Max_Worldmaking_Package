@@ -2,14 +2,15 @@
 	"patcher" : 	{
 		"fileversion" : 1,
 		"appversion" : 		{
-			"major" : 7,
-			"minor" : 3,
-			"revision" : 4,
+			"major" : 8,
+			"minor" : 0,
+			"revision" : 3,
 			"architecture" : "x64",
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 426.0, 85.0, 904.0, 363.0 ],
+		"classnamespace" : "box",
+		"rect" : [ 203.0, 274.0, 904.0, 363.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -38,12 +39,23 @@
 		"subpatcher_template" : "",
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-11",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 39.0, 46.0, 70.0, 22.0 ],
+					"text" : "loadmess 1"
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-8",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 216.0, 273.0, 80.0, 22.0 ],
-					"style" : "",
 					"text" : "print dyn-info"
 				}
 
@@ -55,8 +67,8 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 323.0, 147.0, 24.0, 24.0 ],
-					"style" : ""
+					"parameter_enable" : 0,
+					"patching_rect" : [ 323.0, 147.0, 24.0, 24.0 ]
 				}
 
 			}
@@ -68,7 +80,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 206.0, 147.0, 47.0, 22.0 ],
-					"style" : "",
 					"text" : "unload"
 				}
 
@@ -81,7 +92,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 266.0, 147.0, 44.0, 22.0 ],
-					"style" : "",
 					"text" : "reload"
 				}
 
@@ -94,7 +104,6 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 412.0, 56.0, 366.0, 234.0 ],
-					"style" : "",
 					"text" : "TODO\n\nWorks on Windows, except for the annoying thing of holding onto the dll; so unload is needed before recompiling\n(which makes a good argument for using a shell external in Max)\n\nadd a better plugin interface\ncall library's init(), return some state object (perhaps with handlers embedded), could even be a t_object if we want.\n\nmultiple instances: dlopen/close is playing well, but our instances aren't -- if one unloads() it can mess up another -- need some refcounting\n\ndynlet\n\ndynattr"
 				}
 
@@ -106,8 +115,8 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 126.0, 46.0, 24.0, 24.0 ],
-					"style" : ""
+					"parameter_enable" : 0,
+					"patching_rect" : [ 126.0, 46.0, 24.0, 24.0 ]
 				}
 
 			}
@@ -117,9 +126,8 @@
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 0,
-					"patching_rect" : [ 216.0, 237.0, 83.0, 22.0 ],
-					"style" : "",
-					"text" : "print dyn-msg"
+					"patching_rect" : [ 216.0, 237.0, 140.0, 22.0 ],
+					"text" : "print dyn-msg @popup 1"
 				}
 
 			}
@@ -131,8 +139,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "int" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 152.0, 273.0, 24.0, 24.0 ],
-					"style" : ""
+					"patching_rect" : [ 152.0, 273.0, 24.0, 24.0 ]
 				}
 
 			}
@@ -144,7 +151,6 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
 					"patching_rect" : [ 126.0, 237.0, 77.0, 22.0 ],
-					"style" : "",
 					"text" : "route loaded"
 				}
 
@@ -156,8 +162,8 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 126.0, 273.0, 24.0, 24.0 ],
-					"style" : ""
+					"parameter_enable" : 0,
+					"patching_rect" : [ 126.0, 273.0, 24.0, 24.0 ]
 				}
 
 			}
@@ -169,8 +175,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "int" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 212.0, 11.0, 24.0, 24.0 ],
-					"style" : ""
+					"patching_rect" : [ 212.0, 11.0, 24.0, 24.0 ]
 				}
 
 			}
@@ -182,7 +187,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "int" ],
 					"patching_rect" : [ 212.0, 81.0, 75.0, 22.0 ],
-					"style" : "",
 					"text" : "random 100"
 				}
 
@@ -195,7 +199,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "bang" ],
 					"patching_rect" : [ 212.0, 49.0, 78.0, 22.0 ],
-					"style" : "",
 					"text" : "qmetro 1000"
 				}
 
@@ -208,7 +211,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 39.0, 147.0, 63.0, 22.0 ],
-					"style" : "",
 					"text" : "hello 12 3"
 				}
 
@@ -221,8 +223,7 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "bang" ],
 					"parameter_enable" : 0,
-					"patching_rect" : [ 126.0, 95.0, 50.0, 22.0 ],
-					"style" : ""
+					"patching_rect" : [ 126.0, 95.0, 50.0, 22.0 ]
 				}
 
 			}
@@ -234,7 +235,6 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
 					"patching_rect" : [ 126.0, 192.0, 79.0, 22.0 ],
-					"style" : "",
 					"text" : "dyn dyn_test"
 				}
 
@@ -246,9 +246,8 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 126.0, 137.0, 50.0, 22.0 ],
-					"style" : "",
-					"text" : "test $1"
+					"patching_rect" : [ 126.0, 137.0, 49.0, 22.0 ],
+					"text" : "num $1"
 				}
 
 			}
@@ -264,6 +263,13 @@
 				"patchline" : 				{
 					"destination" : [ "obj-1", 0 ],
 					"source" : [ "obj-10", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-7", 0 ],
+					"source" : [ "obj-11", 0 ]
 				}
 
 			}
@@ -370,8 +376,8 @@
 			}
  ],
 		"dependency_cache" : [ 			{
-				"name" : "dyn.mxo",
-				"type" : "iLaX"
+				"name" : "dyn.mxe64",
+				"type" : "mx64"
 			}
  ],
 		"autosave" : 0

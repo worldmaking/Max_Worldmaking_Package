@@ -1,5 +1,5 @@
 
-rem TODO 64-bit version
+rem 32-bit version
 set "VCPATH=C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\"
 
 rem set up the environment of the console for VS2015
