@@ -201,6 +201,17 @@ public:
 	}
 
 	void on_message(websocketpp::connection_hdl hdl, client::message_ptr msg) {
+		
+		// TODO handle binary message
+		if (msg->get_opcode() == websocketpp::frame::opcode::binary) {
+			std::string& data = msg->get_raw_payload();
+			// can data.size and data.data for the underlying bytes
+			// see https://github.com/zaphoyd/websocketpp/issues/412
+			
+			// question is what to do with this now
+			// e.g., should it write into a named jit.matrix, or a named buffer~?
+		}
+		
 		outlet_anything(outlet_frame, gensym(msg->get_payload().c_str()), 0, 0);
 	}
 };
